@@ -2,8 +2,10 @@
 
 // Placeholder services - to be implemented
 
+#[allow(dead_code)]
 pub struct UserService;
 
+#[allow(dead_code)]
 impl UserService {
     pub async fn get_user_by_id(_id: &str) -> Result<(), String> {
         // TODO: Implement user service
@@ -16,8 +18,10 @@ impl UserService {
     }
 }
 
+#[allow(dead_code)]
 pub struct EscrowService;
 
+#[allow(dead_code)]
 impl EscrowService {
     pub async fn get_active_escrows() -> Result<Vec<String>, String> {
         // TODO: Implement escrow service
@@ -25,8 +29,10 @@ impl EscrowService {
     }
 }
 
+#[allow(dead_code)]
 pub struct AnalyticsService;
 
+#[allow(dead_code)]
 impl AnalyticsService {
     pub async fn get_trade_analytics() -> Result<serde_json::Value, String> {
         // TODO: Implement analytics service
