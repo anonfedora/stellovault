@@ -21,6 +21,14 @@ pub fn escrow_routes() -> Router<AppState> {
         .route("/api/escrows/webhook", axum::routing::post(webhook_escrow_update))
 }
 
+// Collateral routes
+pub fn collateral_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/collateral", axum::routing::post(create_collateral))
+        .route("/api/collateral", get(list_collateral))
+        .route("/api/collateral/:id", get(get_collateral))
+}
+
 // Analytics routes
 pub fn analytics_routes() -> Router<AppState> {
     Router::new()

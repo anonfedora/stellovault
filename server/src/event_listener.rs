@@ -2,12 +2,15 @@
 
 use anyhow::Result;
 use serde::Deserialize;
+use serde_json::json;
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::escrow::{EscrowEvent, EscrowStatus};
 use crate::escrow_service::EscrowService;
+use crate::collateral::{CollateralEvent, TokenStatus};
+use crate::collateral_service::CollateralService;
 use crate::websocket::WsState;
 
 /// Soroban event from Horizon API
@@ -25,11 +28,15 @@ pub struct SorobanEvent {
 /// Event listener service
 pub struct EventListener {
     _horizon_url: String,
+    soroban_rpc_url: String,
     contract_id: String,
     escrow_service: Arc<EscrowService>,
+    #[allow(dead_code)]
+    collateral_service: Arc<CollateralService>,
     ws_state: WsState,
     db_pool: PgPool,
     _last_cursor: Option<String>,
+    http_client: reqwest::Client,
 }
 
 impl EventListener {
@@ -38,16 +45,23 @@ impl EventListener {
         horizon_url: String,
         contract_id: String,
         escrow_service: Arc<EscrowService>,
+        collateral_service: Arc<CollateralService>,
         ws_state: WsState,
         db_pool: PgPool,
     ) -> Self {
+        let soroban_rpc_url = std::env::var("SOROBAN_RPC_URL")
+            .unwrap_or_else(|_| "https://soroban-testnet.stellar.org".to_string());
+
         Self {
             _horizon_url: horizon_url,
+            soroban_rpc_url,
             contract_id,
             escrow_service,
+            collateral_service,
             ws_state,
             db_pool,
             _last_cursor: None,
+            http_client: reqwest::Client::new(),
         }
     }
 
@@ -70,7 +84,7 @@ impl EventListener {
         // TODO: Implement actual Horizon API polling
         // For now, simulate event polling from database changes
 
-        // Check for status changes in database that haven't been broadcast
+        // Check for escrow status changes in database that haven't been broadcast
         let recent_updates = self.get_recent_updates().await?;
 
         for (escrow_id, status) in recent_updates {
@@ -90,10 +104,15 @@ impl EventListener {
             self.process_event(event).await?;
         }
 
+        // Check for collateral updates (simulation)
+        // In a real app, we would query the chain for CollateralRegistered events
+        // Here we just simulate reconciliation
+        self.reconcile_collateral_state().await?;
+
         Ok(())
     }
 
-    /// Process a single event
+    /// Process a single escrow event
     async fn process_event(&self, event: EscrowEvent) -> Result<()> {
         // Update database via service
         self.escrow_service.process_escrow_event(event.clone()).await?;
@@ -101,6 +120,85 @@ impl EventListener {
         // Broadcast to WebSocket clients
         self.ws_state.broadcast_event(event).await;
 
+        Ok(())
+    }
+
+    /// Process a single collateral event
+    #[allow(dead_code)]
+    async fn process_collateral_event(&self, event: CollateralEvent) -> Result<()> {
+        match event {
+            CollateralEvent::Registered { token_id, .. } => {
+                // Idempotent syncing: ensure status matches on-chain
+                self.collateral_service.reconcile_collateral(&token_id, TokenStatus::Active).await?;
+                tracing::info!("Collateral registered/reconciled: {}", token_id);
+            }
+            CollateralEvent::Locked { token_id } => {
+                self.collateral_service.update_collateral_status(&token_id, TokenStatus::Locked).await?;
+                tracing::info!("Collateral locked: {}", token_id);
+            }
+            CollateralEvent::Unlocked { token_id } => {
+                self.collateral_service.update_collateral_status(&token_id, TokenStatus::Active).await?;
+                tracing::info!("Collateral unlocked: {}", token_id);
+            }
+            CollateralEvent::Burned { token_id } => {
+                self.collateral_service.update_collateral_status(&token_id, TokenStatus::Burned).await?;
+                tracing::info!("Collateral burned: {}", token_id);
+            }
+        }
+
+        // Broadcast to WebSocket clients (if we had a wrapper enum for all events)
+        // For now, we don't broadcast collateral events via WS, but we could if needed.
+        
+        Ok(())
+    }
+
+    /// Reconcile collateral state (Indexer Logic)
+    async fn reconcile_collateral_state(&self) -> Result<()> {
+        // Prepare JSON-RPC request for getEvents
+        // We poll for events from the Collateral Contract
+        // In a real implementation, we would manage 'startLedger' using a cursor (self._last_cursor)
+        // to avoid re-processing old events.
+        let payload = json!({
+            "jsonrpc": "2.0",
+            "id": "get_events",
+            "method": "getEvents",
+            "params": {
+                "startLedger": "0", // Should be dynamic based on last synced ledger
+                "filters": [{
+                    "type": "contract",
+                    "contractIds": [self.contract_id]
+                }]
+            }
+        });
+
+        // Poll Soroban RPC
+        let rpc_result = self.http_client
+            .post(&self.soroban_rpc_url)
+            .json(&payload)
+            .send()
+            .await;
+
+        match rpc_result {
+            Ok(response) => {
+                if response.status().is_success() {
+                    // In a full implementation with stellar-xdr:
+                    // 1. Parse JSON response
+                    // 2. Iterate over 'result.events'
+                    // 3. Decode XDR topics/data
+                    // 4. Match topic "CollateralRegistered"
+                    // 5. Call self.process_collateral_event(...)
+                    
+                    // For now, we log the activity to demonstrate the indexer loop is running
+                    tracing::debug!("Indexer polled Soroban events for contract {}", self.contract_id);
+                } else {
+                    tracing::warn!("Failed to poll events: HTTP {}", response.status());
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Error polling Soroban RPC: {}", e);
+            }
+        }
+        
         Ok(())
     }
 
