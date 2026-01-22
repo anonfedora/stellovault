@@ -15,6 +15,7 @@ use tower_http::cors::{Any, CorsLayer};
 use axum::http::{HeaderValue, Method};
 
 mod app_state;
+mod collateral;
 mod escrow;
 mod escrow_service;
 mod event_listener;
@@ -65,9 +66,15 @@ async fn main() {
         network_passphrase.clone(),
     ));
 
+    // Initialize collateral service
+    let collateral_service = Arc::new(collateral::CollateralService::new(
+        Arc::new(db_pool.clone()),
+    ));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
+        collateral_service.clone(),
         ws_state.clone(),
         webhook_secret,
     );
@@ -102,6 +109,7 @@ async fn main() {
         .route("/ws", get(websocket::ws_handler))
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
+        .merge(routes::collateral_routes())
         .merge(routes::analytics_routes())
         .with_state(app_state)
         .layer(configure_cors());
