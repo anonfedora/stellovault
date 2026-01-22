@@ -5,12 +5,14 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::app_state::AppState;
+use crate::collateral::CreateCollateralRequest;
 use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
-use crate::models::{ApiResponse, User};
+use crate::models::{ApiResponse, Collateral, User};
 
 
 // Placeholder handlers - to be implemented
@@ -214,4 +216,107 @@ pub async fn webhook_escrow_update(
         data: Some(()),
         error: None,
     }))
+}
+
+// ===== Collateral Handlers =====
+
+pub async fn create_collateral(
+    State(app_state): State<AppState>,
+    Json(req): Json<CreateCollateralRequest>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.create_collateral(req).await {
+        Ok(collateral) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to create collateral: {}", e)),
+        }),
+    }
+}
+
+pub async fn get_collateral(
+    State(app_state): State<AppState>,
+    Path(collateral_id): Path<String>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.get_collateral(&collateral_id).await {
+        Ok(Some(collateral)) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Collateral not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+pub async fn get_collateral_by_metadata(
+    State(app_state): State<AppState>,
+    Path(metadata_hash): Path<String>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.get_collateral_by_metadata(&metadata_hash).await {
+        Ok(Some(collateral)) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Collateral not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ListCollateralQuery {
+    pub owner_id: Option<Uuid>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+pub async fn list_collateral(
+    State(app_state): State<AppState>,
+    Query(query): Query<ListCollateralQuery>,
+) -> Json<ApiResponse<Vec<Collateral>>> {
+    let limit = query.limit.unwrap_or(50).min(100); // Max 100 items
+    let offset = query.offset.unwrap_or(0);
+
+    match query.owner_id {
+        Some(owner_id) => {
+            match app_state.collateral_service.list_user_collateral(owner_id, limit, offset).await {
+                Ok(collateral) => Json(ApiResponse {
+                    success: true,
+                    data: Some(collateral),
+                    error: None,
+                }),
+                Err(e) => Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Database error: {}", e)),
+                }),
+            }
+        }
+        None => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("owner_id parameter is required".to_string()),
+        }),
+    }
 }
