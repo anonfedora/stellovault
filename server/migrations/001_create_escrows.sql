@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS escrows (
     escrow_id BIGINT NOT NULL UNIQUE,
     buyer_id UUID NOT NULL,
     seller_id UUID NOT NULL,
-    collateral_id UUID NOT NULL,
+    collateral_id TEXT NOT NULL, -- Collateral registry ID from Soroban contract
     amount BIGINT NOT NULL,
     status escrow_status NOT NULL DEFAULT 'pending',
     oracle_address TEXT NOT NULL,
@@ -17,11 +17,10 @@ CREATE TABLE IF NOT EXISTS escrows (
     disputed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    -- Foreign keys (assuming users and collateral_tokens tables exist)
+
+    -- Foreign keys (assuming users table exists)
     CONSTRAINT fk_buyer FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_seller FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_collateral FOREIGN KEY (collateral_id) REFERENCES collateral_tokens(id) ON DELETE CASCADE,
     
     -- Constraints
     CONSTRAINT check_amount_positive CHECK (amount > 0),
