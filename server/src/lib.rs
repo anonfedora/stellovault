@@ -7,6 +7,7 @@ pub mod collateral;
 pub mod escrow;
 pub mod escrow_service;
 pub mod event_listener;
+pub mod governance_service;
 pub mod handlers;
 pub mod models;
 pub mod oracle_service;
