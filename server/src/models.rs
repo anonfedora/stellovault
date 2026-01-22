@@ -176,6 +176,192 @@ pub struct PaginatedResponse<T> {
     pub limit: i32,
 }
 
+/// Governance proposal model
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct GovernanceProposal {
+    pub id: Uuid,
+    pub proposal_id: String, // Soroban contract proposal ID
+    pub title: String,
+    pub description: String,
+    pub proposer: String, // Stellar address
+    pub proposal_type: ProposalType,
+    pub status: ProposalStatus,
+    pub voting_start: DateTime<Utc>,
+    pub voting_end: DateTime<Utc>,
+    pub execution_time: Option<DateTime<Utc>>,
+    pub for_votes: i64,
+    pub against_votes: i64,
+    pub abstain_votes: i64,
+    pub quorum_required: i64,
+    pub approval_threshold: f64, // Percentage 0.0-1.0
+    pub executed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Proposal types
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
+#[sqlx(type_name = "proposal_type", rename_all = "snake_case")]
+pub enum ProposalType {
+    ParameterChange,
+    ContractUpgrade,
+    TreasuryAction,
+    EmergencyAction,
+    Custom,
+}
+
+/// Proposal status
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq)]
+#[sqlx(type_name = "proposal_status", rename_all = "lowercase")]
+pub enum ProposalStatus {
+    Pending,
+    Active,
+    Succeeded,
+    Failed,
+    Executed,
+    Cancelled,
+}
+
+/// Governance vote model
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct GovernanceVote {
+    pub id: Uuid,
+    pub proposal_id: String,
+    pub voter: String, // Stellar address
+    pub vote_option: VoteOption,
+    pub voting_power: i64,
+    pub transaction_hash: Option<String>,
+    pub voted_at: DateTime<Utc>,
+}
+
+/// Vote options
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
+#[sqlx(type_name = "vote_option", rename_all = "lowercase")]
+pub enum VoteOption {
+    For,
+    Against,
+    Abstain,
+}
+
+/// Governance parameter model
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct GovernanceParameter {
+    pub id: Uuid,
+    pub parameter_key: String,
+    pub parameter_value: serde_json::Value,
+    pub parameter_type: ParameterType,
+    pub description: String,
+    pub proposed_by: Option<String>,
+    pub proposal_id: Option<String>,
+    pub effective_from: DateTime<Utc>,
+    pub effective_until: Option<DateTime<Utc>>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Parameter types
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
+#[sqlx(type_name = "parameter_type", rename_all = "snake_case")]
+pub enum ParameterType {
+    Integer,
+    Float,
+    Boolean,
+    String,
+    Json,
+}
+
+/// Governance audit log model
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct GovernanceAuditLog {
+    pub id: Uuid,
+    pub action_type: AuditActionType,
+    pub entity_type: AuditEntityType,
+    pub entity_id: String,
+    pub user_address: String,
+    pub old_value: Option<serde_json::Value>,
+    pub new_value: Option<serde_json::Value>,
+    pub transaction_hash: Option<String>,
+    pub block_number: Option<i64>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Audit action types
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
+#[sqlx(type_name = "audit_action_type", rename_all = "snake_case")]
+pub enum AuditActionType {
+    ProposalCreated,
+    VoteCast,
+    ProposalExecuted,
+    ParameterChanged,
+    EmergencyAction,
+}
+
+/// Audit entity types
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
+#[sqlx(type_name = "audit_entity_type", rename_all = "snake_case")]
+pub enum AuditEntityType {
+    Proposal,
+    Vote,
+    Parameter,
+    Contract,
+}
+
+/// Governance metrics for dashboard
+#[derive(Debug, Serialize)]
+pub struct GovernanceMetrics {
+    pub total_proposals: i64,
+    pub active_proposals: i64,
+    pub total_votes: i64,
+    pub participation_rate: f64,
+    pub average_voting_time: f64, // in hours
+    pub successful_proposals: i64,
+    pub failed_proposals: i64,
+}
+
+/// Governance configuration
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GovernanceConfig {
+    pub voting_period_hours: i32,
+    pub execution_delay_hours: i32,
+    pub quorum_percentage: f64,
+    pub approval_threshold_percentage: f64,
+    pub min_voting_power: i64,
+    pub emergency_quorum_percentage: f64,
+    pub emergency_approval_threshold_percentage: f64,
+}
+
+/// Vote submission request
+#[derive(Debug, Deserialize)]
+pub struct VoteSubmissionRequest {
+    pub proposal_id: String,
+    pub vote_option: VoteOption,
+    pub voter_address: String,
+}
+
+/// Proposal creation request
+#[derive(Debug, Deserialize)]
+pub struct ProposalCreationRequest {
+    pub title: String,
+    pub description: String,
+    pub proposal_type: ProposalType,
+    pub parameters: Option<serde_json::Value>, // For parameter change proposals
+    pub execution_time: Option<DateTime<Utc>>,
+}
+
+/// Governance parameter cache
+#[derive(Debug, Clone)]
+pub struct GovernanceParameterCache {
+    pub voting_period_hours: i32,
+    pub execution_delay_hours: i32,
+    pub quorum_percentage: f64,
+    pub approval_threshold_percentage: f64,
+    pub min_voting_power: i64,
+    pub emergency_quorum_percentage: f64,
+    pub emergency_approval_threshold_percentage: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
 /// Oracle provider model
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Oracle {
