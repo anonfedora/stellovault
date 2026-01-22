@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::collateral::CreateCollateralRequest;
 use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
-use crate::models::{ApiResponse, Collateral, Oracle, OracleConfirmation, OracleConfirmationRequest, OracleMetrics, OracleRegistrationRequest, User};
+use crate::models::{ApiResponse, Collateral, Oracle, OracleConfirmation, OracleConfirmationRequest, OracleMetrics, OracleRegistrationRequest, GovernanceProposal, GovernanceVote, GovernanceParameter, GovernanceAuditLog, GovernanceMetrics, GovernanceConfig, PaginationParams, ProposalStatus, ProposalCreationRequest, User};
 
 
 // Placeholder handlers - to be implemented
@@ -456,4 +456,166 @@ pub async fn get_oracle_metrics(
             error: Some(format!("Database error: {}", e)),
         }),
     }
+}
+
+// ===== GOVERNANCE HANDLERS =====
+
+// Get all governance proposals
+pub async fn get_governance_proposals(
+    State(app_state): State<AppState>,
+    Query(params): Query<PaginationParams>,
+) -> Json<ApiResponse<Vec<GovernanceProposal>>> {
+    let page = params.page.unwrap_or(1);
+    let limit = params.limit.unwrap_or(20);
+    let offset = Some((page - 1) * limit);
+
+    match app_state.governance_service.get_proposals(None, Some(limit), offset).await {
+        Ok(proposals) => Json(ApiResponse {
+            success: true,
+            data: Some(proposals),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Create a new governance proposal
+pub async fn create_governance_proposal(
+    State(app_state): State<AppState>,
+    Json(proposal_data): Json<serde_json::Value>,
+) -> Json<ApiResponse<GovernanceProposal>> {
+    // Parse JSON into ProposalCreationRequest
+    let request: ProposalCreationRequest = match serde_json::from_value(proposal_data) {
+        Ok(req) => req,
+        Err(e) => return Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Invalid proposal data: {}", e)),
+        }),
+    };
+
+    // TODO: Extract proposer from authentication context
+    let proposer = "system"; // Placeholder
+    match app_state.governance_service.create_proposal(request, proposer).await {
+        Ok(proposal) => Json(ApiResponse {
+            success: true,
+            data: Some(proposal),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to create proposal: {}", e)),
+        }),
+    }
+}
+
+// Get a specific governance proposal
+pub async fn get_governance_proposal(
+    State(app_state): State<AppState>,
+    Path(proposal_id): Path<String>,
+) -> Json<ApiResponse<GovernanceProposal>> {
+    match app_state.governance_service.get_proposal(&proposal_id).await {
+        Ok(Some(proposal)) => Json(ApiResponse {
+            success: true,
+            data: Some(proposal),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Proposal not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Get votes for a specific proposal
+pub async fn get_proposal_votes(
+    State(app_state): State<AppState>,
+    Path(proposal_id): Path<String>,
+) -> Json<ApiResponse<Vec<GovernanceVote>>> {
+    match app_state.governance_service.get_proposal_votes(&proposal_id).await {
+        Ok(votes) => Json(ApiResponse {
+            success: true,
+            data: Some(votes),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Submit a governance vote
+pub async fn submit_governance_vote(
+    State(app_state): State<AppState>,
+    Json(vote_data): Json<serde_json::Value>,
+) -> Json<ApiResponse<GovernanceVote>> {
+    // TODO: Parse vote_data into VoteSubmissionRequest
+    // For now, return not implemented
+    Json(ApiResponse {
+        success: false,
+        data: None,
+        error: Some("Vote submission not yet implemented".to_string()),
+    })
+}
+
+// Get governance metrics
+pub async fn get_governance_metrics(
+    State(app_state): State<AppState>,
+) -> Json<ApiResponse<GovernanceMetrics>> {
+    match app_state.governance_service.get_governance_metrics().await {
+        Ok(metrics) => Json(ApiResponse {
+            success: true,
+            data: Some(metrics),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Get current governance parameters
+pub async fn get_governance_parameters(
+    State(app_state): State<AppState>,
+) -> Json<ApiResponse<GovernanceConfig>> {
+    match app_state.governance_service.get_governance_config().await {
+        Ok(parameters) => Json(ApiResponse {
+            success: true,
+            data: Some(parameters),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Get governance audit log
+pub async fn get_governance_audit_log(
+    State(app_state): State<AppState>,
+    Query(params): Query<PaginationParams>,
+) -> Json<ApiResponse<Vec<GovernanceAuditLog>>> {
+    // TODO: Implement audit log retrieval
+    Json(ApiResponse {
+        success: false,
+        data: None,
+        error: Some("Audit log not yet implemented".to_string()),
+    })
 }

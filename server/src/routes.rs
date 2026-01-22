@@ -42,6 +42,19 @@ pub fn oracle_routes() -> Router<AppState> {
         .route("/api/oracles/metrics", get(get_oracle_metrics))
 }
 
+// Governance routes
+pub fn governance_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/governance/proposals", get(get_governance_proposals))
+        .route("/api/governance/proposals", axum::routing::post(create_governance_proposal))
+        .route("/api/governance/proposals/:id", get(get_governance_proposal))
+        .route("/api/governance/proposals/:id/votes", get(get_proposal_votes))
+        .route("/api/governance/votes", axum::routing::post(submit_governance_vote))
+        .route("/api/governance/metrics", get(get_governance_metrics))
+        .route("/api/governance/parameters", get(get_governance_parameters))
+        .route("/api/governance/audit", get(get_governance_audit_log))
+}
+
 // Analytics routes
 pub fn analytics_routes() -> Router<AppState> {
     Router::new()
