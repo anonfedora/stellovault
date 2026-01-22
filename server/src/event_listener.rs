@@ -190,6 +190,17 @@ impl EventListener {
                     
                     // For now, we log the activity to demonstrate the indexer loop is running
                     tracing::debug!("Indexer polled Soroban events for contract {}", self.contract_id);
+
+                    // Simulate processing a "Registered" event to demonstrate the flow
+                    // This addresses the "dead code" warning and shows how the function is used.
+                    if std::env::var("SIMULATE_EVENTS").unwrap_or_default() == "true" {
+                        let mock_event = CollateralEvent::Registered {
+                            token_id: format!("sim_token_{}", uuid::Uuid::new_v4()),
+                            owner_id: uuid::Uuid::new_v4(),
+                            asset_value: 1000,
+                        };
+                        self.process_collateral_event(mock_event).await?;
+                    }
                 } else {
                     tracing::warn!("Failed to poll events: HTTP {}", response.status());
                 }

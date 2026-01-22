@@ -30,9 +30,11 @@ pub enum AssetType {
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq, Eq)]
 #[sqlx(type_name = "token_status", rename_all = "lowercase")]
 pub enum TokenStatus {
+    Pending,
     Active,
     Locked,  // Locked in escrow
     Burned,
+    Failed,
 }
 
 /// Request DTO for creating collateral

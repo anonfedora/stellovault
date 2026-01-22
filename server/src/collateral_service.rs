@@ -4,6 +4,8 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use std::time::Duration;
+
 use crate::collateral::{
     CollateralToken, CreateCollateralRequest, CreateCollateralResponse, ListCollateralQuery,
     TokenStatus,
@@ -52,18 +54,7 @@ impl CollateralService {
             anyhow::bail!("Asset value must be greater than 0");
         }
 
-        // Register on-chain via Soroban contract
-        // In a real implementation, this would call the Soroban RPC
-        let tx_hash = self
-            .register_on_chain_collateral(
-                &request.token_id,
-                &request.owner_id,
-                request.asset_value,
-                &request.metadata_hash,
-            )
-            .await?;
-
-        // Store collateral in database
+        // Store collateral in database with Pending status
         let db_id = Uuid::new_v4();
         let collateral = sqlx::query_as::<_, CollateralToken>(
             r#"
@@ -83,19 +74,44 @@ impl CollateralService {
         .bind(request.asset_value)
         .bind(&request.metadata_hash)
         .bind(request.fractional_shares)
-        .bind(TokenStatus::Active)
+        .bind(TokenStatus::Pending)
         .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.db_pool)
         .await
         .context("Failed to insert collateral into database")?;
 
-        Ok(CreateCollateralResponse {
-            id: collateral.id,
-            token_id: collateral.token_id,
-            status: collateral.status,
-            tx_hash,
-        })
+        // Register on-chain via Soroban contract
+        // In a real implementation, this would call the Soroban RPC
+        let tx_hash_result = self
+            .register_on_chain_collateral(
+                &request.token_id,
+                &request.owner_id,
+                request.asset_value,
+                &request.metadata_hash,
+            )
+            .await;
+
+        match tx_hash_result {
+            Ok(tx_hash) => {
+                // Update status to Active
+                self.update_collateral_status(&collateral.token_id, TokenStatus::Active).await?;
+                
+                Ok(CreateCollateralResponse {
+                    id: collateral.id,
+                    token_id: collateral.token_id,
+                    status: TokenStatus::Active,
+                    tx_hash,
+                })
+            },
+            Err(e) => {
+                // Update status to Failed
+                tracing::error!("Failed to register collateral on-chain: {}", e);
+                self.update_collateral_status(&collateral.token_id, TokenStatus::Failed).await?;
+                
+                anyhow::bail!("Failed to register collateral on-chain: {}", e);
+            }
+        }
     }
 
     /// Get a single collateral by ID
@@ -225,28 +241,35 @@ impl CollateralService {
         let rpc_result = self.http_client
             .post(&self.soroban_rpc_url)
             .json(&payload)
+            .timeout(Duration::from_secs(30))
             .send()
             .await;
 
         match rpc_result {
             Ok(response) => {
-                tracing::info!("Soroban RPC response status: {}", response.status());
-                // In a real app, we would:
-                // 1. Check response.status().is_success()
-                // 2. Parse the JSON body
-                // 3. Extract the 'hash' or 'error'
-                // 4. If error is "invalid XDR", handle it.
+                if response.status().is_success() {
+                    tracing::info!("Soroban RPC response status: {}", response.status());
+                    // In a real app, we would:
+                    // 1. Parse the JSON body
+                    // 2. Extract the 'hash' or 'error'
+                    // 3. If error is "invalid XDR", handle it.
+                    
+                    // 4. Return transaction hash
+                    // Since we can't sign a real transaction without the private key and SDK,
+                    // we return a simulated hash to allow the frontend/DB flow to proceed.
+                    let tx_hash = format!("sim_col_{}", Uuid::new_v4().to_string().replace("-", ""));
+                    Ok(tx_hash)
+                } else {
+                    let status = response.status();
+                    let text = response.text().await.unwrap_or_default();
+                    tracing::warn!("Soroban RPC failed: status={}, body={}", status, text);
+                    anyhow::bail!("Soroban RPC request failed with status {}", status);
+                }
             },
             Err(e) => {
                 tracing::warn!("Failed to contact Soroban RPC: {}", e);
+                anyhow::bail!("Network error contacting Soroban RPC: {}", e);
             }
         }
-
-        // 4. Return transaction hash
-        // Since we can't sign a real transaction without the private key and SDK,
-        // we return a simulated hash to allow the frontend/DB flow to proceed.
-        let tx_hash = format!("sim_col_{}", Uuid::new_v4().to_string().replace("-", ""));
-
-        Ok(tx_hash)
     }
 }
