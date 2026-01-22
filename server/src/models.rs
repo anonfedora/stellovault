@@ -88,6 +88,32 @@ pub enum TokenStatus {
     Burned,
 }
 
+/// Collateral registry model (mirror of Soroban contract)
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Collateral {
+    pub id: Uuid,
+    pub collateral_id: String, // Soroban contract collateral ID
+    pub owner_id: Uuid,
+    pub face_value: i64,
+    pub expiry_ts: i64,
+    pub metadata_hash: String,
+    pub registered_at: DateTime<Utc>,
+    pub locked: bool,
+    pub status: CollateralStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Collateral status
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq, Eq)]
+#[sqlx(type_name = "collateral_status", rename_all = "lowercase")]
+pub enum CollateralStatus {
+    Active,
+    Locked,
+    Expired,
+    Burned,
+}
+
 
 /// Transaction model
 #[allow(dead_code)]
