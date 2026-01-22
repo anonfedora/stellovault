@@ -7,7 +7,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, token,
 };
 
 /// Contract errors
@@ -27,6 +27,11 @@ pub enum ContractError {
     AssetNotWhitelisted = 11,
     OracleNotWhitelisted = 12,
     LtvExceeded = 13,
+    CollateralNotFound = 14,
+    MathOverflow = 15,
+    VoteOverflow = 16,
+    VotePeriodActive = 17,
+    QuorumNotMet = 18,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -118,18 +123,20 @@ pub struct StelloVaultContract;
 #[contractimpl]
 impl StelloVaultContract {
     /// Initialize the contract
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+    pub fn initialize(env: Env, admin: Address, gov_token: Address) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("admin")) {
             return Err(ContractError::Unauthorized);
         }
 
         env.storage().instance().set(&symbol_short!("admin"), &admin);
+        env.storage().instance().set(&symbol_short!("gov_token"), &gov_token);
         env.storage().instance().set(&symbol_short!("tok_next"), &1u64);
         env.storage().instance().set(&symbol_short!("esc_next"), &1u64);
         env.storage().instance().set(&symbol_short!("prop_next"), &1u64);
         
         // Default protocol parameters
         env.storage().instance().set(&symbol_short!("max_ltv"), &7000u32); // 70% LTV default
+        env.storage().instance().set(&symbol_short!("quorum"), &100u128); // Default quorum
 
         env.events().publish((symbol_short!("init"),), (admin,));
         Ok(())
@@ -221,10 +228,16 @@ impl StelloVaultContract {
         }
 
         // Verify collateral token exists and Check LTV
-        let collateral: CollateralToken = env.storage().persistent().get(&collateral_token_id).ok_or(ContractError::EscrowNotFound)?;
+        let collateral: CollateralToken = env.storage().persistent().get(&collateral_token_id).ok_or(ContractError::CollateralNotFound)?;
         
         let max_ltv: u32 = env.storage().instance().get(&symbol_short!("max_ltv")).unwrap_or(0);
-        let max_loan_amount = (collateral.asset_value as i128).checked_mul(max_ltv as i128).unwrap_or(0) / 10000;
+        
+        // Check for math overflow during LTV calculation
+        let adjusted_value = (collateral.asset_value as i128)
+            .checked_mul(max_ltv as i128)
+            .ok_or(ContractError::MathOverflow)?;
+            
+        let max_loan_amount = adjusted_value / 10000;
 
         if amount > max_loan_amount {
             return Err(ContractError::LtvExceeded);
@@ -385,13 +398,17 @@ impl StelloVaultContract {
         }
 
         // Quadratic Voting: Votes = Sqrt(weight)
-        // Note: In a real scenario, we would transfer `weight` tokens from `voter` to the contract here.
-        // Assuming the prompt implies calculation logic mainly.
-        // For strictness, if this contract held tokens, we'd call `token_client.transfer(...)`.
         
+        // Transfer governance tokens from voter to contract to lock weight
+        let gov_token: Address = env.storage().instance().get(&symbol_short!("gov_token")).unwrap();
+        let token_client = token::Client::new(&env, &gov_token);
+        
+        token_client.transfer(&voter, &env.current_contract_address(), &(weight as i128));
+
         let votes = Self::sqrt(weight); 
 
-        proposal.vote_count += votes;
+        // Use checked_add to prevent overflow
+        proposal.vote_count = proposal.vote_count.checked_add(votes).ok_or(ContractError::VoteOverflow)?;
         env.storage().persistent().set(&(symbol_short!("prop"), proposal_id), &proposal);
 
         // Mark as voted
@@ -414,20 +431,17 @@ impl StelloVaultContract {
             .ok_or(ContractError::ProposalNotFound)?;
 
         if env.ledger().timestamp() <= proposal.end_time {
-             // For testing, users might want early execution if majority reached, but typically wait for end.
-             // We'll enforce time.
-             // return Err(ContractError::ProposalNotActive); 
+             return Err(ContractError::VotePeriodActive); 
         }
 
         if proposal.executed {
             return Err(ContractError::ProposalNotActive);
         }
 
-        // Simple majority or threshold check
-        // For now, assuming > 0 votes is enough for demo, or we could add a quorum param.
-        if proposal.vote_count <= 0 {
-             // Failed (not really an error, but can't execute)
-             return Err(ContractError::InsufficientBalance); // Reuse error or add new one? Using InsufficientBalance as proxy for votes.
+        // Check Quorum
+        let quorum: u128 = env.storage().instance().get(&symbol_short!("quorum")).unwrap_or(100u128);
+        if proposal.vote_count < quorum {
+             return Err(ContractError::QuorumNotMet);
         }
 
         // Execute Action
@@ -484,7 +498,8 @@ mod test {
         let contract_id = env.register(StelloVaultContract, ());
         let client = StelloVaultContractClient::new(&env, &contract_id);
 
-        client.initialize(&admin);
+        let gov_token = Address::generate(&env);
+        client.initialize(&admin, &gov_token);
 
         let admin_result = client.admin();
         assert_eq!(admin_result, admin);
@@ -506,7 +521,8 @@ mod test {
         let contract_id = env.register(StelloVaultContract, ());
         let client = StelloVaultContractClient::new(&env, &contract_id);
 
-        client.initialize(&admin);
+        let gov_token = Address::generate(&env);
+        client.initialize(&admin, &gov_token);
 
         // Whitelist the asset manually
         let asset = Symbol::new(&env, "INVOICE");
@@ -540,7 +556,19 @@ mod test {
         let contract_id = env.register(StelloVaultContract, ());
         let client = StelloVaultContractClient::new(&env, &contract_id);
 
-        client.initialize(&admin);
+        // Create a separate token contract for testing
+        let gov_token_admin = Address::generate(&env);
+        let gov_token_id = env.register_stellar_asset_contract(gov_token_admin.clone());
+        let gov_token_client = token::Client::new(&env, &gov_token_id);
+        
+        // Mint tokens to users (StellarAssetClient matches token::StellarAssetClient import/usage if available, 
+        // but here we just use the token client or register call. 
+        // Note: register_stellar_asset_contract returns Address.
+        // We need to mint. 
+        token::StellarAssetClient::new(&env, &gov_token_id).mint(&user1, &1000);
+        token::StellarAssetClient::new(&env, &gov_token_id).mint(&user2, &1000);
+
+        client.initialize(&admin, &gov_token_id);
 
         // 1. Propose LTV change
         let new_ltv = 8000u32;
