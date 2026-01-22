@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+pub mod oracle;
+
 /// User model
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {

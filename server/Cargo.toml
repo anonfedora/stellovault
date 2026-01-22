@@ -35,5 +35,12 @@ jsonwebtoken = "9.0"
 # HTTP client for external APIs
 reqwest = { version = "0.11", features = ["json"] }
 
+# Soroban and Crypto
+# Soroban and Crypto
+soroban-sdk = "20.0.0"
+stellar-xdr = { version = "20.0.0", features = ["std"] }
+ed25519-dalek = "2.0.0" # Downgraded to match soroban-sdk requirement
+hex = "0.4"
+
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }

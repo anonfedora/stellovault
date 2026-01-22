@@ -5,6 +5,8 @@ use serde_json::json;
 
 use crate::models::{ApiResponse, User};
 
+pub mod oracle;
+
 // Placeholder handlers - to be implemented
 
 pub async fn get_user(Path(user_id): Path<String>) -> Json<ApiResponse<User>> {

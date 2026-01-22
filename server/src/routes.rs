@@ -24,3 +24,9 @@ pub fn analytics_routes() -> Router {
         .route("/api/analytics", get(get_analytics))
         // TODO: Add more analytics routes
 }
+
+// Oracle routes
+pub fn oracle_routes() -> Router {
+    Router::new()
+        .route("/oracle/confirm", axum::routing::post(oracle::confirm_handler))
+}

@@ -31,6 +31,7 @@ async fn main() {
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::analytics_routes())
+        .merge(routes::oracle_routes())
         .layer(CorsLayer::permissive()); // TODO: Configure CORS properly
 
     // Get port from environment or default to 3001

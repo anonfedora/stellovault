@@ -1,5 +1,7 @@
 //! Business logic services for StelloVault
 
+pub mod oracle_service;
+
 // Placeholder services - to be implemented
 
 pub struct UserService;
