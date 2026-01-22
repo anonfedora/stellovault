@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use axum::http::{HeaderValue, Method};
 
+// Re-declare modules for binary
 mod app_state;
 mod collateral;
 mod escrow;
@@ -21,6 +22,7 @@ mod escrow_service;
 mod event_listener;
 mod handlers;
 mod models;
+mod oracle_service;
 mod routes;
 mod services;
 mod websocket;
@@ -71,10 +73,16 @@ async fn main() {
         Arc::new(db_pool.clone()),
     ));
 
+    // Initialize oracle service
+    let oracle_service = Arc::new(oracle_service::OracleService::new(
+        db_pool.clone(),
+    ));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
+        oracle_service.clone(),
         ws_state.clone(),
         webhook_secret,
     );
@@ -110,6 +118,7 @@ async fn main() {
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
+        .merge(routes::oracle_routes())
         .merge(routes::analytics_routes())
         .with_state(app_state)
         .layer(configure_cors());
