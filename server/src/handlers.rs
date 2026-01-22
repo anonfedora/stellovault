@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use crate::app_state::AppState;
 use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
+use crate::collateral::{CreateCollateralRequest, CreateCollateralResponse, CollateralToken, ListCollateralQuery};
 use crate::models::{ApiResponse, User};
 
 
@@ -214,4 +215,80 @@ pub async fn webhook_escrow_update(
         data: Some(()),
         error: None,
     }))
+}
+
+// ===== Collateral Handlers =====
+
+/// Create new collateral
+pub async fn create_collateral(
+    State(app_state): State<AppState>,
+    Json(request): Json<CreateCollateralRequest>,
+) -> Result<Json<ApiResponse<CreateCollateralResponse>>, (StatusCode, Json<ApiResponse<CreateCollateralResponse>>)> {
+    match app_state.collateral_service.register_collateral(request).await {
+        Ok(response) => Ok(Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to register collateral: {}", e)),
+            }),
+        )),
+    }
+}
+
+/// Get collateral by ID
+pub async fn get_collateral(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<CollateralToken>>, (StatusCode, Json<ApiResponse<CollateralToken>>)> {
+    match app_state.collateral_service.get_collateral(&id).await {
+        Ok(Some(collateral)) => Ok(Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        })),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some("Collateral not found".to_string()),
+            }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Database error: {}", e)),
+            }),
+        )),
+    }
+}
+
+/// List collateral with filtering
+pub async fn list_collateral(
+    State(app_state): State<AppState>,
+    Query(query): Query<ListCollateralQuery>,
+) -> Result<Json<ApiResponse<Vec<CollateralToken>>>, (StatusCode, Json<ApiResponse<Vec<CollateralToken>>>)> {
+    match app_state.collateral_service.list_collateral(query).await {
+        Ok(collaterals) => Ok(Json(ApiResponse {
+            success: true,
+            data: Some(collaterals),
+            error: None,
+        })),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to list collateral: {}", e)),
+            }),
+        )),
+    }
 }

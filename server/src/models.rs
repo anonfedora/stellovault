@@ -55,40 +55,6 @@ pub enum EscrowStatus {
     Cancelled,
 }
 
-/// Collateral token model
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct CollateralToken {
-    pub id: Uuid,
-    pub token_id: String, // Soroban contract token ID
-    pub owner_id: Uuid,
-    pub asset_type: AssetType,
-    pub asset_value: i64,
-    pub metadata_hash: String,
-    pub fractional_shares: i32,
-    pub status: TokenStatus,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Asset types
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "asset_type", rename_all = "UPPERCASE")]
-pub enum AssetType {
-    Invoice,
-    Commodity,
-    Receivable,
-}
-
-/// Token status
-#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq, Eq)]
-#[sqlx(type_name = "token_status", rename_all = "lowercase")]
-pub enum TokenStatus {
-    Active,
-    Locked,  // Locked in escrow
-    Burned,
-}
-
-
 /// Transaction model
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

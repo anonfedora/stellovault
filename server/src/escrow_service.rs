@@ -10,7 +10,7 @@ use crate::escrow::{
     CreateEscrowRequest, CreateEscrowResponse, Escrow, EscrowEvent, EscrowStatus,
     EscrowWithCollateral, ListEscrowsQuery,
 };
-use crate::models::{CollateralToken, TokenStatus};
+use crate::collateral::{CollateralToken, TokenStatus};
 
 /// Escrow service for managing escrow lifecycle
 pub struct EscrowService {
