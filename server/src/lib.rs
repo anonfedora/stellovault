@@ -1,11 +1,14 @@
 //! StelloVault Backend Library
 //!
-//! This library contains the core business logic and utilities for the
-//! StelloVault backend server.
+//! This library exports the core modules for the StelloVault backend server.
 
+pub mod app_state;
+pub mod collateral;
+pub mod escrow;
+pub mod escrow_service;
+pub mod event_listener;
 pub mod handlers;
-pub mod middleware;
 pub mod models;
 pub mod routes;
 pub mod services;
-pub mod utils;
+pub mod websocket;
