@@ -43,18 +43,13 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
     }
     
     // 2. I validate the payload here
-    match OracleService::validate_payload(&payload) {
-        Ok(true) => {},
-        Ok(false) => return (StatusCode::BAD_REQUEST, Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some("Validation failed".to_string()),
-        })),
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(ApiResponse {
+    // 2. I validate the payload here
+    if let Err(e) = OracleService::validate_payload(&payload) {
+        return (StatusCode::BAD_REQUEST, Json(ApiResponse {
             success: false,
             data: None,
             error: Some(e),
-        })),
+        }));
     }
 
     // 3. I check aggregation (Logic: Do I have enough sigs to blast this on-chain?)
