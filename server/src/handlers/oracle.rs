@@ -62,7 +62,7 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
     match OracleService::submit_confirmation(&payload).await {
         Ok(confirmation) => {
             // I log audit trail here
-            println!("Audit Log: Successfully processed payload from {}", payload.source);
+            tracing::info!("Audit Log: Successfully processed payload from {}", payload.source);
 
             (StatusCode::OK, Json(ApiResponse {
                 success: true,
@@ -71,7 +71,7 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
             }))
         },
         Err(e) => {
-            println!("Audit Log: Failed to process payload from {}: {}", payload.source, e);
+            tracing::error!("Audit Log: Failed to process payload from {}: {}", payload.source, e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse {
                 success: false,
                 data: None,

@@ -48,23 +48,16 @@ impl OracleService {
         use std::convert::TryFrom;
 
         // 1. I parse the Keypair (Sender)
-        // I support RAW HEX (64 chars) or fallback for demo.
-        // If the secret is "S..." (Stellar Seed), it requires Base32 decoding, not Hex.
-        // For this MVP, I expect a 32-byte HEX string (64 chars).
-        
+        // I support RAW HEX (64 chars) or "S..." seeds.
         let secret = secret.trim();
         let seed_bytes = if secret.len() == 64 {
-            hex::decode(secret).unwrap_or_else(|_| vec![0u8; 32])
+             hex::decode(secret).map_err(|e| format!("Invalid hex key: {}", e))?
         } else {
-             // I use a fallback for "mock" values or "S..." seeds that I don't handle with full StrKey yet
-             // This prevents the server from crashing on invalid env vars.
-             info!("Warning: ORACLE_SECRET_KEY is not a valid 64-char hex string. Using derived mock key.");
-             let mut mock_key = [0u8; 32];
-             mock_key[0..std::cmp::min(secret.len(), 32)].copy_from_slice(&secret.as_bytes()[0..std::cmp::min(secret.len(), 32)]);
-             mock_key.to_vec()
+             // NO MOCK FALLBACK: Fail fast if configuration is invalid for production safety
+             return Err("ORACLE_SECRET_KEY must be a 64-char hex string (Ed25519 Seed)".to_string());
         };
         
-        let keypair = ed25519_dalek::SigningKey::from_bytes(seed_bytes[0..32].try_into().unwrap());
+        let keypair = ed25519_dalek::SigningKey::from_bytes(seed_bytes[0..32].try_into().map_err(|_| "Invalid key length")?);
         let pub_key = ed25519_dalek::VerifyingKey::from(&keypair);
         let sender_pk_bytes: [u8; 32] = pub_key.to_bytes();
         
@@ -73,8 +66,11 @@ impl OracleService {
         let seq_num: i64 = 12345; 
 
         // 3. I build the arguments
-        let type_sym = ScSymbol::try_from("manual_test").map_err(|_| "Symbol error").unwrap();
-        let payload_sig = ScBytes::try_from(vec![]).unwrap();
+        // I use the ACTUAL payload data now: data_type (Symbol) and signature (Bytes).
+        let type_sym = ScSymbol::try_from(payload.data_type.as_str()).map_err(|_| "Invalid data_type symbol")?;
+        
+        let sig_bytes = hex::decode(&payload.signature).map_err(|e| format!("Invalid signature hex for XDR: {}", e))?;
+        let payload_sig = ScBytes::try_from(sig_bytes).map_err(|_| "Signature bytes too long")?;
 
         let args = vec![
             ScVal::U64(payload.timestamp),
@@ -83,13 +79,16 @@ impl OracleService {
         ];
 
         // 4. I build the Operation with InvokeContractArgs struct
-        let contract_hash = hex::decode(&contract_id).unwrap_or(vec![0; 32]);
-        let fn_sym = ScSymbol::try_from("confirm").unwrap();
+        let contract_hash = hex::decode(&contract_id).map_err(|_| "Invalid CONTRACT_ID hex")?;
+        let fn_sym = ScSymbol::try_from("confirm").unwrap(); // 'confirm' is safe ASCII
+        
+        // Strict error handling for contract hash logic
+        let contract_hash_arr: [u8; 32] = contract_hash.try_into().map_err(|_| "CONTRACT_ID must be 32 bytes")?;
         
         let host_fn = HostFunction::InvokeContract(InvokeContractArgs {
-            contract_address: ScAddress::Contract(Hash(contract_hash.try_into().unwrap_or([0; 32]))),
+            contract_address: ScAddress::Contract(Hash(contract_hash_arr)),
             function_name: fn_sym,
-            args: VecM::try_from(args).unwrap(),
+            args: VecM::try_from(args).map_err(|_| "Too many arguments")?,
         });
         
         let op = Operation {
@@ -100,14 +99,14 @@ impl OracleService {
             }),
         };
 
-        // 5. I build the Transaction (I fixed Int64 init: Int64 is an alias for i64, SequenceNumber wraps it)
+        // 5. I build the Transaction
         let tx = Transaction {
             source_account: MuxedAccount::Ed25519(Uint256(sender_pk_bytes)),
             fee: 100, 
             seq_num: SequenceNumber(seq_num), 
             cond: Preconditions::None,
             memo: Memo::None,
-            operations: VecM::try_from(vec![op]).unwrap(),
+            operations: VecM::try_from(vec![op]).map_err(|_| "Failed to build operations vec")?,
             ext: TransactionExt::V0,
         };
 
