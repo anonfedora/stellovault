@@ -8,6 +8,8 @@ pub mod escrow;
 pub mod escrow_service;
 pub mod event_listener;
 pub mod handlers;
+pub mod loan;
+pub mod loan_service;
 pub mod models;
 pub mod routes;
 pub mod services;
