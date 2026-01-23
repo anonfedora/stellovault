@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OraclePayload {
-    pub source: String,
+    pub public_key: String,
     pub timestamp: u64,
     pub data_type: String, // e.g., "shipping", "iot", "manual" - I use this to classify the data
     pub value: String,     // JSON string or specific format - I store the actual data here

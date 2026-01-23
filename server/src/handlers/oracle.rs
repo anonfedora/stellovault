@@ -13,10 +13,27 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
         .parse()
         .unwrap_or(300);
 
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+    let now = std::time::SystemTime::now();
     
     // I allow future drift of 60s, lookback of 'window' seconds
-    if payload.timestamp > now + 60 || payload.timestamp < now.saturating_sub(window) {
+    // I uses checked_duration_since so I don't panic if clock drifts
+    let drift_allowance = std::time::Duration::from_secs(60);
+    
+    let is_valid_timestamp = match now.duration_since(std::time::UNIX_EPOCH) {
+        Ok(current_epoch) => {
+             let now_secs = current_epoch.as_secs();
+             if payload.timestamp > now_secs + 60 {
+                 false // Future
+             } else if payload.timestamp < now_secs.saturating_sub(window) {
+                 false // Too old
+             } else {
+                 true
+             }
+        },
+        Err(_) => false, // System time is before UNIX EPOCH (weird but fail safe)
+    };
+
+    if !is_valid_timestamp {
          return (StatusCode::BAD_REQUEST, Json(ApiResponse {
             success: false,
             data: None,
@@ -62,7 +79,7 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
     match OracleService::submit_confirmation(&payload).await {
         Ok(confirmation) => {
             // I log audit trail here
-            tracing::info!("Audit Log: Successfully processed payload from {}", payload.source);
+            tracing::info!("Audit Log: Successfully processed payload from {}", payload.public_key);
 
             (StatusCode::OK, Json(ApiResponse {
                 success: true,
@@ -71,7 +88,7 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
             }))
         },
         Err(e) => {
-            tracing::error!("Audit Log: Failed to process payload from {}: {}", payload.source, e);
+            tracing::error!("Audit Log: Failed to process payload from {}: {}", payload.public_key, e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse {
                 success: false,
                 data: None,
