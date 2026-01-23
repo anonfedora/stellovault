@@ -61,12 +61,18 @@ impl OracleService {
         let pub_key = ed25519_dalek::VerifyingKey::from(&keypair);
         let sender_pk_bytes: [u8; 32] = pub_key.to_bytes();
         
-        // 2. I fetch the Sequence Number (Real RPC Call Placeholder)
-        // I use seq_num of 0 if call fails for MVP flow, but in PROD this MUST work.
-        // NOTE: To make this real, I need to Encode 'sender_pk_bytes' to a 'G...' address using `stellar-strkey`.
-        // I am omitting that dependency to keep the build minimal as requested, but the logic place is here.
-        // client.post(rpc_url).json({ "method": "getAccount", "params": [ address ] })
-        let seq_num: i64 = 12345; 
+        // 2. I fetch the Sequence Number (Real RPC Call)
+        // TODO: Replace this placeholder with real sequence-number retrieval:
+        // call the RPC (client.post(rpc_url).json({ "method": "getAccount", "params": [ address ] }))
+        // and decode sender_pk_bytes to a Stellar address (use stellar-strkey or an environment-backed helper)
+        // to fetch and parse the account sequence, returning an error when the RPC fails in non-test environments.
+        
+        // Ensure any fallback to 0 or a hardcoded value is guarded by a test/dev-only flag or feature gate.
+        let seq_num: i64 = if env::var("STELLO_DEV_MODE").unwrap_or_default() == "true" {
+             12345
+        } else {
+             return Err("Real sequence fetching not implemented (missing stellar-strkey). Set STELLO_DEV_MODE=true to enable mock.".to_string());
+        }; 
 
         // 3. I build the arguments
         // I use the ACTUAL payload data now: data_type (Symbol) and signature (Bytes).

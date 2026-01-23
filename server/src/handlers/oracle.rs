@@ -22,7 +22,8 @@ pub async fn confirm_handler(Json(payload): Json<OraclePayload>) -> (StatusCode,
     let is_valid_timestamp = match now.duration_since(std::time::UNIX_EPOCH) {
         Ok(current_epoch) => {
              let now_secs = current_epoch.as_secs();
-             if payload.timestamp > now_secs + 60 {
+             // I use drift_allowance (60s) for future check
+             if payload.timestamp > now_secs + drift_allowance.as_secs() {
                  false // Future
              } else if payload.timestamp < now_secs.saturating_sub(window) {
                  false // Too old

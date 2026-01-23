@@ -17,9 +17,9 @@ I enforced strict validation checks in `validate_payload`. The service rejects a
 I utilized the `ed25519-dalek` crate to perform cryptographic verification. I reconstruct the signed message as `timestamp:value` and verify it against the provided public key and signature to ensure authenticity.
 
 ### Submit Soroban Transaction
-I integrated the `soroban-sdk` and `stellar-xdr` (v20.0.0) libraries to construct real Soroban transactions.
+I integrated the `stellar-xdr` (v20.0.0) library to construct real Soroban transactions manually (without `soroban-sdk`).
 *   I build a `HostFunction::InvokeContract` operation targeting the configured `CONTRACT_ID`.
-*   I encode the arguments (`timestamp`, `value`, `signature`) into valid XDR `ScVal` types.
+*   I encode the arguments (`timestamp`, `type`, `signature`) into valid XDR `ScVal` types.
 *   I wrap this in a `TransactionEnvelope` ready for signing.
 *   *Note*: The final broadcasting step is prepared but disabled to prevent testnet spending during isolated testing.
 
