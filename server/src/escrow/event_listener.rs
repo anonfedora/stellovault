@@ -6,8 +6,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::escrow::{EscrowEvent, EscrowStatus};
-use crate::escrow_service::EscrowService;
+use super::{EscrowEvent, EscrowService, EscrowStatus};
 use crate::websocket::WsState;
 
 /// Soroban event from Horizon API
@@ -96,7 +95,9 @@ impl EventListener {
     /// Process a single event
     async fn process_event(&self, event: EscrowEvent) -> Result<()> {
         // Update database via service
-        self.escrow_service.process_escrow_event(event.clone()).await?;
+        self.escrow_service
+            .process_escrow_event(event.clone())
+            .await?;
 
         // Broadcast to WebSocket clients
         self.ws_state.broadcast_event(event).await;
@@ -156,15 +157,15 @@ impl EventListener {
         .fetch_all(&self.db_pool)
         .await?;
 
-        Ok(updates.into_iter().map(|(id, status)| (id as i64, status)).collect())
+        Ok(updates
+            .into_iter()
+            .map(|(id, status)| (id as i64, status))
+            .collect())
     }
 }
 
 /// Background job for timeout detection
-pub async fn timeout_detector(
-    escrow_service: Arc<EscrowService>,
-    ws_state: WsState,
-) {
+pub async fn timeout_detector(escrow_service: Arc<EscrowService>, ws_state: WsState) {
     tracing::info!("Starting timeout detector");
 
     loop {

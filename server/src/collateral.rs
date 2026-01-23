@@ -3,8 +3,8 @@
 //! This module provides business logic for collateral management,
 //! including double-collateralization protection and metadata hash mapping.
 
-use crate::app_state::AppState;
 use crate::models::{Collateral, CollateralStatus};
+use crate::state::AppState;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -63,12 +63,11 @@ impl CollateralService {
         req: CreateCollateralRequest,
     ) -> Result<Collateral, CollateralError> {
         // Check for duplicate metadata hash (double-collateralization protection)
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM collateral WHERE metadata_hash = $1"
-        )
-        .bind(&req.metadata_hash)
-        .fetch_one(&*self.pool)
-        .await?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM collateral WHERE metadata_hash = $1")
+                .bind(&req.metadata_hash)
+                .fetch_one(&*self.pool)
+                .await?;
 
         if count > 0 {
             return Err(CollateralError::DuplicateMetadata);
@@ -91,7 +90,7 @@ impl CollateralService {
             RETURNING id, collateral_id, owner_id, face_value, expiry_ts,
                       metadata_hash, registered_at, locked, status,
                       created_at, updated_at
-            "#
+            "#,
         )
         .bind(&req.collateral_id)
         .bind(&req.owner_id)
@@ -118,12 +117,11 @@ impl CollateralService {
         &self,
         collateral_id: &str,
     ) -> Result<Option<Collateral>, CollateralError> {
-        let collateral = sqlx::query_as::<_, Collateral>(
-            "SELECT * FROM collateral WHERE collateral_id = $1"
-        )
-        .bind(collateral_id)
-        .fetch_optional(&*self.pool)
-        .await?;
+        let collateral =
+            sqlx::query_as::<_, Collateral>("SELECT * FROM collateral WHERE collateral_id = $1")
+                .bind(collateral_id)
+                .fetch_optional(&*self.pool)
+                .await?;
 
         Ok(collateral)
     }
@@ -139,12 +137,11 @@ impl CollateralService {
         &self,
         metadata_hash: &str,
     ) -> Result<Option<Collateral>, CollateralError> {
-        let collateral = sqlx::query_as::<_, Collateral>(
-            "SELECT * FROM collateral WHERE metadata_hash = $1"
-        )
-        .bind(metadata_hash)
-        .fetch_optional(&*self.pool)
-        .await?;
+        let collateral =
+            sqlx::query_as::<_, Collateral>("SELECT * FROM collateral WHERE metadata_hash = $1")
+                .bind(metadata_hash)
+                .fetch_optional(&*self.pool)
+                .await?;
 
         Ok(collateral)
     }
@@ -176,7 +173,7 @@ impl CollateralService {
             RETURNING id, collateral_id, owner_id, face_value, expiry_ts,
                       metadata_hash, registered_at, locked, status,
                       created_at, updated_at
-            "#
+            "#,
         )
         .bind(locked)
         .bind(status as CollateralStatus)
@@ -209,7 +206,7 @@ impl CollateralService {
             WHERE owner_id = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#
+            "#,
         )
         .bind(owner_id)
         .bind(limit)
@@ -231,12 +228,11 @@ impl CollateralService {
         &self,
         metadata_hash: &str,
     ) -> Result<bool, CollateralError> {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM collateral WHERE metadata_hash = $1"
-        )
-        .bind(metadata_hash)
-        .fetch_one(&*self.pool)
-        .await?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM collateral WHERE metadata_hash = $1")
+                .bind(metadata_hash)
+                .fetch_one(&*self.pool)
+                .await?;
 
         Ok(count > 0)
     }
@@ -256,7 +252,7 @@ impl CollateralService {
             r#"
             SELECT collateral_id FROM collateral
             WHERE expiry_ts <= $1 AND status = 'active'
-            "#
+            "#,
         )
         .bind(current_ts)
         .fetch_all(&*self.pool)

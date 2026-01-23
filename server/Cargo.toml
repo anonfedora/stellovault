@@ -8,7 +8,7 @@ edition = "2021"
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace", "set-header"] }
 
 
 # Serialization
