@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::collateral::CreateCollateralRequest;
 use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
+use crate::loan::{CreateLoanRequest, ListLoansQuery, Loan, Repayment, RepaymentRequest};
 use crate::models::{ApiResponse, Collateral, User};
-
 
 // Placeholder handlers - to be implemented
 
@@ -54,7 +54,10 @@ pub async fn get_analytics() -> Json<ApiResponse<serde_json::Value>> {
 pub async fn create_escrow(
     State(app_state): State<AppState>,
     Json(request): Json<CreateEscrowRequest>,
-) -> Result<Json<ApiResponse<CreateEscrowResponse>>, (StatusCode, Json<ApiResponse<CreateEscrowResponse>>)> {
+) -> Result<
+    Json<ApiResponse<CreateEscrowResponse>>,
+    (StatusCode, Json<ApiResponse<CreateEscrowResponse>>),
+> {
     // Validate request
     if let Err(e) = request.validate() {
         return Err((
@@ -75,7 +78,8 @@ pub async fn create_escrow(
     match app_state.escrow_service.create_escrow(request).await {
         Ok(response) => {
             // Broadcast creation event
-            app_state.ws_state
+            app_state
+                .ws_state
                 .broadcast_event(crate::escrow::EscrowEvent::Created {
                     escrow_id: response.escrow_id,
                     buyer_id,
@@ -161,7 +165,8 @@ pub async fn webhook_escrow_update(
     // Authenticate webhook
     match &app_state.webhook_secret {
         Some(secret) if !secret.is_empty() => {
-            let auth_header = headers.get("X-Webhook-Secret")
+            let auth_header = headers
+                .get("X-Webhook-Secret")
                 .and_then(|h| h.to_str().ok())
                 .unwrap_or_default();
 
@@ -196,7 +201,11 @@ pub async fn webhook_escrow_update(
             status,
         };
 
-        if let Err(e) = app_state.escrow_service.process_escrow_event(event.clone()).await {
+        if let Err(e) = app_state
+            .escrow_service
+            .process_escrow_event(event.clone())
+            .await
+        {
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse {
@@ -242,7 +251,11 @@ pub async fn get_collateral(
     State(app_state): State<AppState>,
     Path(collateral_id): Path<String>,
 ) -> Json<ApiResponse<Collateral>> {
-    match app_state.collateral_service.get_collateral(&collateral_id).await {
+    match app_state
+        .collateral_service
+        .get_collateral(&collateral_id)
+        .await
+    {
         Ok(Some(collateral)) => Json(ApiResponse {
             success: true,
             data: Some(collateral),
@@ -265,7 +278,11 @@ pub async fn get_collateral_by_metadata(
     State(app_state): State<AppState>,
     Path(metadata_hash): Path<String>,
 ) -> Json<ApiResponse<Collateral>> {
-    match app_state.collateral_service.get_collateral_by_metadata(&metadata_hash).await {
+    match app_state
+        .collateral_service
+        .get_collateral_by_metadata(&metadata_hash)
+        .await
+    {
         Ok(Some(collateral)) => Json(ApiResponse {
             success: true,
             data: Some(collateral),
@@ -300,7 +317,11 @@ pub async fn list_collateral(
 
     match query.owner_id {
         Some(owner_id) => {
-            match app_state.collateral_service.list_user_collateral(owner_id, limit, offset).await {
+            match app_state
+                .collateral_service
+                .list_user_collateral(owner_id, limit, offset)
+                .await
+            {
                 Ok(collateral) => Json(ApiResponse {
                     success: true,
                     data: Some(collateral),
@@ -317,6 +338,93 @@ pub async fn list_collateral(
             success: false,
             data: None,
             error: Some("owner_id parameter is required".to_string()),
+        }),
+    }
+}
+
+// ===== Loan Handlers =====
+
+/// Get list of loans
+pub async fn list_loans(
+    State(app_state): State<AppState>,
+    Query(query): Query<ListLoansQuery>,
+) -> Json<ApiResponse<Vec<Loan>>> {
+    match app_state
+        .loan_service
+        .list_loans(query.borrower_id, query.lender_id, query.status)
+        .await
+    {
+        Ok(loans) => Json(ApiResponse {
+            success: true,
+            data: Some(loans),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to list loans: {}", e)),
+        }),
+    }
+}
+
+/// Get a single loan by ID
+pub async fn get_loan(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Json<ApiResponse<Loan>> {
+    match app_state.loan_service.get_loan(&id).await {
+        Ok(Some(loan)) => Json(ApiResponse {
+            success: true,
+            data: Some(loan),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Loan not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+/// Issue a new loan
+pub async fn create_loan(
+    State(app_state): State<AppState>,
+    Json(req): Json<CreateLoanRequest>,
+) -> Json<ApiResponse<Loan>> {
+    match app_state.loan_service.issue_loan(req).await {
+        Ok(loan) => Json(ApiResponse {
+            success: true,
+            data: Some(loan),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to issue loan: {}", e)),
+        }),
+    }
+}
+
+/// Record a repayment
+pub async fn record_repayment(
+    State(app_state): State<AppState>,
+    Json(req): Json<RepaymentRequest>,
+) -> Json<ApiResponse<Repayment>> {
+    match app_state.loan_service.record_repayment(req).await {
+        Ok(repayment) => Json(ApiResponse {
+            success: true,
+            data: Some(repayment),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to record repayment: {}", e)),
         }),
     }
 }

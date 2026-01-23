@@ -4,15 +4,12 @@
 //! user management, trade analytics, risk scoring, and integration with
 //! Soroban smart contracts.
 
-use axum::{
-    routing::get,
-    Router,
-};
+use axum::http::{HeaderValue, Method};
+use axum::{routing::get, Router};
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-use axum::http::{HeaderValue, Method};
 
 mod app_state;
 mod collateral;
@@ -20,6 +17,8 @@ mod escrow;
 mod escrow_service;
 mod event_listener;
 mod handlers;
+mod loan;
+mod loan_service;
 mod models;
 mod routes;
 mod services;
@@ -42,8 +41,8 @@ async fn main() {
         .unwrap_or_else(|_| "https://horizon-testnet.stellar.org".to_string());
     let network_passphrase = std::env::var("NETWORK_PASSPHRASE")
         .unwrap_or_else(|_| "Test SDF Network ; September 2015".to_string());
-    let contract_id = std::env::var("CONTRACT_ID")
-        .unwrap_or_else(|_| "STELLOVAULT_CONTRACT_ID".to_string());
+    let contract_id =
+        std::env::var("CONTRACT_ID").unwrap_or_else(|_| "STELLOVAULT_CONTRACT_ID".to_string());
     let webhook_secret = std::env::var("WEBHOOK_SECRET").ok();
 
     // Initialize database connection pool
@@ -53,7 +52,7 @@ async fn main() {
         .connect(&database_url)
         .await
         .expect("Failed to connect to database");
-    
+
     tracing::info!("Database connected successfully");
 
     // Initialize WebSocket state
@@ -67,14 +66,18 @@ async fn main() {
     ));
 
     // Initialize collateral service
-    let collateral_service = Arc::new(collateral::CollateralService::new(
-        Arc::new(db_pool.clone()),
-    ));
+    let collateral_service = Arc::new(collateral::CollateralService::new(Arc::new(
+        db_pool.clone(),
+    )));
+
+    // Initialize loan service
+    let loan_service = Arc::new(loan_service::LoanService::new(db_pool.clone()));
 
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
+        loan_service,
         ws_state.clone(),
         webhook_secret,
     );
@@ -110,6 +113,7 @@ async fn main() {
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
+        .merge(routes::loan_routes())
         .merge(routes::analytics_routes())
         .with_state(app_state)
         .layer(configure_cors());
@@ -139,7 +143,7 @@ async fn health_check() -> &'static str {
 
 fn configure_cors() -> CorsLayer {
     let allowed_origins_str = std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
-    
+
     if allowed_origins_str.is_empty() {
         tracing::warn!("CORS_ALLOWED_ORIGINS not set, allowing all origins (permissive)");
         return CorsLayer::permissive();

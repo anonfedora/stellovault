@@ -25,7 +25,7 @@ mod tests {
         CreateEscrowRequest {
             buyer_id: Uuid::new_v4(),
             seller_id: Uuid::new_v4(),
-            collateral_id: Uuid::new_v4(),
+            collateral_id: Uuid::new_v4().to_string(),
             amount: 1000,
             oracle_address: "GABC123...".to_string(),
             release_conditions: r#"{"condition":"shipment_delivered"}"#.to_string(),
@@ -37,7 +37,7 @@ mod tests {
     #[ignore] // Requires database setup
     async fn test_escrow_creation_consistency() {
         let db_pool = setup_test_db().await;
-        
+
         let escrow_service = EscrowService::new(
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
@@ -45,19 +45,22 @@ mod tests {
         );
 
         let request = create_test_request();
-        
+
         // Create escrow
         let response = escrow_service.create_escrow(request).await;
-        
+
         // Verify creation was successful
-        assert!(response.is_ok(), "Escrow creation should succeed in simulation");
+        assert!(
+            response.is_ok(),
+            "Escrow creation should succeed in simulation"
+        );
     }
 
     #[tokio::test]
     #[ignore] // Requires database setup
     async fn test_escrow_status_reconciliation() {
         let db_pool = setup_test_db().await;
-        
+
         let escrow_service = EscrowService::new(
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
@@ -66,9 +69,9 @@ mod tests {
 
         // Test that tracking status updates database correctly
         let escrow_id = 12345i64;
-        
+
         let result = escrow_service.track_escrow_status(escrow_id).await;
-        
+
         // Verify result
         match result {
             Ok(status) => {
@@ -91,17 +94,17 @@ mod tests {
     #[tokio::test]
     async fn test_escrow_validation() {
         let mut request = create_test_request();
-        
+
         // Valid request
         assert!(request.validate().is_ok());
-        
+
         // Invalid amount
         request.amount = -100;
         assert!(request.validate().is_err());
-        
+
         // Reset amount
         request.amount = 1000;
-        
+
         // Same buyer and seller
         let same_id = Uuid::new_v4();
         request.buyer_id = same_id;
@@ -113,7 +116,7 @@ mod tests {
     #[ignore] // Requires database setup
     async fn test_timeout_detection() {
         let db_pool = setup_test_db().await;
-        
+
         let escrow_service = EscrowService::new(
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
@@ -122,11 +125,16 @@ mod tests {
 
         // Detect timeouts
         let result = escrow_service.detect_timeouts().await;
-        
+
         match result {
             Ok(timed_out_escrows) => {
                 // Verify it returns an empty list in a fresh simulation
-                assert_eq!(timed_out_escrows.len(), 0, "Expected 0 timed out escrows in fresh simulation, found {}", timed_out_escrows.len());
+                assert_eq!(
+                    timed_out_escrows.len(),
+                    0,
+                    "Expected 0 timed out escrows in fresh simulation, found {}",
+                    timed_out_escrows.len()
+                );
             }
             Err(_) => {
                 // Expected if database is not set up
@@ -138,7 +146,7 @@ mod tests {
     #[ignore] // Requires database setup
     async fn test_db_chain_consistency() {
         let db_pool = setup_test_db().await;
-        
+
         let escrow_service = EscrowService::new(
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
@@ -149,7 +157,7 @@ mod tests {
         // 1. Create an escrow in DB
         // 2. Query the on-chain status
         // 3. Verify they match
-        
+
         // For now, just verify service can be instantiated
         let request = create_test_request();
         let _result = escrow_service.create_escrow(request).await;
@@ -166,9 +174,9 @@ mod tests {
             EscrowStatus::TimedOut,
             EscrowStatus::Disputed,
         ];
-        
+
         assert_eq!(statuses.len(), 6);
-        
+
         // Test serialization
         for status in statuses {
             let json = serde_json::to_string(&status).unwrap();
