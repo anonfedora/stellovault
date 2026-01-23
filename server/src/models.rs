@@ -35,11 +35,13 @@ pub struct TradeEscrow {
     pub escrow_id: String, // Soroban contract escrow ID
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
+    pub lender_id: Uuid,
     pub collateral_token_id: String,
     pub amount: i64,
     pub status: EscrowStatus,
     pub oracle_address: String,
     pub release_conditions: String,
+    pub expiry_ts: DateTime<Utc>, // New field
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
