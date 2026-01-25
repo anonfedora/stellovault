@@ -1,4 +1,4 @@
-//! API handlers for StelloVault backend
+//! Escrow-related API handlers
 
 use axum::{
     extract::{Path, Query, State},
@@ -9,11 +9,14 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::app_state::AppState;
 use crate::collateral::CreateCollateralRequest;
-use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
+use crate::escrow::{
+    CreateEscrowRequest, CreateEscrowResponse, Escrow, EscrowEvent, ListEscrowsQuery,
+    WebhookPayload,
+};
 use crate::loan::{CreateLoanRequest, ListLoansQuery, Loan, Repayment, RepaymentRequest};
 use crate::models::{ApiResponse, Collateral, User};
+use crate::state::AppState;
 
 // Placeholder handlers - to be implemented
 
@@ -160,7 +163,7 @@ pub async fn list_escrows(
 pub async fn webhook_escrow_update(
     State(app_state): State<AppState>,
     headers: HeaderMap,
-    Json(payload): Json<crate::escrow::WebhookPayload>,
+    Json(payload): Json<WebhookPayload>,
 ) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
     // Authenticate webhook
     match &app_state.webhook_secret {
@@ -194,9 +197,10 @@ pub async fn webhook_escrow_update(
             ));
         }
     }
+
     // Process webhook payload
     if let Some(status) = payload.status {
-        let event = crate::escrow::EscrowEvent::StatusUpdated {
+        let event = EscrowEvent::StatusUpdated {
             escrow_id: payload.escrow_id,
             status,
         };

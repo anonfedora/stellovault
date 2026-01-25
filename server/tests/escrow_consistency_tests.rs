@@ -5,8 +5,7 @@ mod tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    use stellovault_server::escrow::{CreateEscrowRequest, EscrowStatus};
-    use stellovault_server::escrow_service::EscrowService;
+    use stellovault_server::escrow::{CreateEscrowRequest, EscrowService, EscrowStatus};
 
     /// Helper to create a test database pool
     async fn setup_test_db() -> PgPool {

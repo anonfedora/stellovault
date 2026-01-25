@@ -2,8 +2,8 @@
 
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
-use sqlx::PgPool;
 use rand::Rng;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::collateral::CollateralService;
@@ -163,7 +163,7 @@ impl EscrowService {
         let limit = query.limit.unwrap_or(20).clamp(1, 100);
         let offset = (page - 1) * limit;
 
-        let mut query_builder: sqlx::QueryBuilder<sqlx::Postgres> = 
+        let mut query_builder: sqlx::QueryBuilder<sqlx::Postgres> =
             sqlx::QueryBuilder::new("SELECT * FROM escrows WHERE 1=1");
 
         if let Some(status) = query.status {
@@ -329,7 +329,9 @@ impl EscrowService {
         let escrow_id = rand::thread_rng().gen_range(1..i64::MAX);
         let tx_hash = format!("sim_{}", Uuid::new_v4().to_string().replace("-", ""));
 
-        tracing::warn!("Using simulated on-chain escrow creation - implement Soroban SDK integration");
+        tracing::warn!(
+            "Using simulated on-chain escrow creation - implement Soroban SDK integration"
+        );
 
         Ok((escrow_id, tx_hash))
     }
@@ -340,12 +342,11 @@ impl EscrowService {
         tracing::info!("Querying on-chain status for escrow {}", escrow_id);
 
         // Simulate query
-        let status = sqlx::query_as::<_, (EscrowStatus,)>(
-            "SELECT status FROM escrows WHERE escrow_id = $1",
-        )
-        .bind(escrow_id as i64)
-        .fetch_one(&self.db_pool)
-        .await?;
+        let status =
+            sqlx::query_as::<_, (EscrowStatus,)>("SELECT status FROM escrows WHERE escrow_id = $1")
+                .bind(escrow_id as i64)
+                .fetch_one(&self.db_pool)
+                .await?;
 
         Ok(status.0)
     }

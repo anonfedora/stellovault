@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::collateral::CollateralService;
-use crate::escrow_service::EscrowService;
+use crate::escrow::EscrowService;
 use crate::loan_service::LoanService;
 use crate::websocket::WsState;
 
