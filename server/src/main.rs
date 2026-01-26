@@ -15,6 +15,10 @@ use tower_http::cors::{Any, CorsLayer};
 use axum::http::{HeaderValue, Method};
 
 mod app_state;
+mod collateral;
+mod collateral_handlers;
+mod collateral_indexer;
+mod collateral_service;
 mod escrow;
 mod escrow_service;
 mod event_listener;
@@ -65,17 +69,26 @@ async fn main() {
         network_passphrase.clone(),
     ));
 
+    // Initialize collateral service
+    let collateral_service = Arc::new(collateral_service::CollateralService::new(
+        db_pool.clone(),
+        horizon_url.clone(),
+        network_passphrase.clone(),
+        contract_id.clone(),
+    ));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
+        collateral_service.clone(),
         ws_state.clone(),
         webhook_secret,
     );
 
     // Start event listener in background
     let event_listener = event_listener::EventListener::new(
-        horizon_url,
-        contract_id,
+        horizon_url.clone(),
+        contract_id.clone(),
         escrow_service.clone(),
         ws_state.clone(),
         db_pool.clone(),
@@ -84,6 +97,18 @@ async fn main() {
         tracing::info!("Event listener task started");
         event_listener.start().await;
         tracing::error!("Event listener task exited unexpectedly");
+    });
+
+    // Start collateral indexer in background
+    let collateral_indexer = collateral_indexer::CollateralIndexer::new(
+        db_pool.clone(),
+        horizon_url.clone(),
+        contract_id.clone(),
+    );
+    tokio::spawn(async move {
+        tracing::info!("Collateral indexer task started");
+        collateral_indexer.start().await;
+        tracing::error!("Collateral indexer task exited unexpectedly");
     });
 
     // Start timeout detector in background
@@ -102,6 +127,7 @@ async fn main() {
         .route("/ws", get(websocket::ws_handler))
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
+        .merge(routes::collateral_routes())
         .merge(routes::analytics_routes())
         .with_state(app_state)
         .layer(configure_cors());

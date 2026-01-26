@@ -4,12 +4,21 @@ use axum::{routing::get, Router};
 
 use crate::app_state::AppState;
 use crate::handlers::*;
+use crate::collateral_handlers::*;
 
 // User routes
 pub fn user_routes() -> Router<AppState> {
     Router::new()
         .route("/api/users/:id", get(get_user))
         .route("/api/users", axum::routing::post(create_user))
+}
+
+// Collateral routes
+pub fn collateral_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/collateral", axum::routing::post(create_collateral))
+        .route("/api/collateral", get(list_collateral))
+        .route("/api/collateral/:id", get(get_collateral))
 }
 
 // Escrow routes
