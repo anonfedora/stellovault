@@ -31,7 +31,8 @@ impl EventHandler {
         };
 
         let value_xdr = general_purpose::STANDARD.decode(&event.value.xdr)?;
-        let data = ScVal::from_xdr(&value_xdr, Limits::none())?;
+        // Use a reasonable limit (e.g. 32KB) to prevent DoS
+        let data = ScVal::from_xdr(&value_xdr, Limits::len(32_768))?;
 
         match contract_type {
             "collateral" => self.handle_collateral_event(&event_name, &data).await?,
@@ -63,7 +64,7 @@ impl EventHandler {
                     )
                     .bind(id as i64)
                     .bind(owner)
-                    .bind(face_value as i64)
+                    .bind(i64::try_from(face_value).map_err(|_| anyhow!("face_value too large"))?)
                     .bind(expiry_ts as i64)
                     .bind(metadata_placeholder)
                     .execute(&self.pool)
@@ -72,6 +73,7 @@ impl EventHandler {
             },
             "coll_lock" => {
                 if let ScVal::Vec(Some(args)) = data {
+                    if args.is_empty() { return Err(anyhow!("Invalid args length for coll_lock")); }
                     let id = scval_to_u64(&args[0])?;
                     sqlx::query(
                         "UPDATE collateral SET locked = true, status = 'locked' WHERE collateral_id = $1"
@@ -83,6 +85,7 @@ impl EventHandler {
             },
             "coll_unlk" => {
                  if let ScVal::Vec(Some(args)) = data {
+                    if args.is_empty() { return Err(anyhow!("Invalid args length for coll_unlk")); }
                     let id = scval_to_u64(&args[0])?;
                     sqlx::query(
                         "UPDATE collateral SET locked = false, status = 'active' WHERE collateral_id = $1"
@@ -101,6 +104,7 @@ impl EventHandler {
         match name {
             "esc_crtd" => {
                 if let ScVal::Vec(Some(args)) = data {
+                    if args.len() < 4 { return Err(anyhow!("Invalid args length for esc_crtd")); }
                     let id = scval_to_u64(&args[0])?;
                     let buyer_addr = scval_to_address(&args[1])?;
                     let seller_addr = scval_to_address(&args[2])?;
@@ -121,7 +125,7 @@ impl EventHandler {
                         .bind(id as i64)
                         .bind(bid)
                         .bind(sid)
-                        .bind(amount as i64)
+                        .bind(i64::try_from(amount).map_err(|_| anyhow!("amount too large"))?)
                         .execute(&self.pool)
                         .await?;
 
@@ -139,6 +143,7 @@ impl EventHandler {
             },
              "esc_act" => {
                 if let ScVal::Vec(Some(args)) = data {
+                    if args.is_empty() { return Err(anyhow!("Invalid args length for esc_act")); }
                     let id = scval_to_u64(&args[0])?;
                     sqlx::query(
                         "UPDATE escrows SET status = 'active'::escrow_status WHERE escrow_id = $1"
@@ -154,6 +159,7 @@ impl EventHandler {
             },
              "esc_rel" => {
                 if let ScVal::Vec(Some(args)) = data {
+                    if args.is_empty() { return Err(anyhow!("Invalid args length for esc_rel")); }
                     let id = scval_to_u64(&args[0])?;
                     sqlx::query(
                         "UPDATE escrows SET status = 'released'::escrow_status WHERE escrow_id = $1"
@@ -172,10 +178,11 @@ impl EventHandler {
         Ok(())
     }
 
-    async fn handle_loan_event(&self, name: &str, _data: &ScVal) -> Result<()> {
+    async fn handle_loan_event(&self, name: &str, data: &ScVal) -> Result<()> {
         match name {
             "loan_iss" => {
-                // ... (implementation pending schema confirmation)
+                info!("Loan issuance event received: {:?}", data);
+                // TODO: Implement loan issuance handling when schema is confirmed
             },
             _ => {}
         }
@@ -197,7 +204,7 @@ fn decode_topics(topics: &[String]) -> Result<Vec<ScVal>> {
     let mut res = Vec::new();
     for t in topics {
         let bytes = general_purpose::STANDARD.decode(t)?;
-        let val = ScVal::from_xdr(&bytes, Limits::none())?;
+        let val = ScVal::from_xdr(&bytes, Limits::len(32_768))?;
         res.push(val);
     }
     Ok(res)

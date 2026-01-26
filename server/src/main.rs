@@ -138,11 +138,6 @@ async fn main() {
 
     let indexer_service = Arc::new(indexer::IndexerService::new(
         soroban_rpc_url,
-    let event_listener = EventListener::new(
-        config.horizon_url.clone(),
-        config.contract_id.clone(),
-        escrow_service.clone(),
-        ws_state.clone(),
         db_pool.clone(),
         contracts_map,
         ws_state.clone(),

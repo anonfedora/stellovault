@@ -33,7 +33,10 @@ impl IndexerService {
             rpc_url,
             pool: pool.clone(),
             contracts,
-            client: Client::new(),
+            client: Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .unwrap_or_else(|_| Client::new()),
             ws_state,
         }
     }
@@ -102,18 +105,33 @@ impl ContractIndexer {
     }
 
     async fn process_batch(&mut self) -> Result<()> {
-        let cursor = self.get_last_cursor().await?;
+        let (cursor, last_seen_ledger) = self.get_last_cursor().await?;
         
         let response = self.fetch_events(&cursor).await?;
         
+        // Reorg detection: If the latest ledger from RPC is behind our last seen ledger,
+        // it might indicate a network reset or reorg.
+        if last_seen_ledger > 0 && response.latestLedger < last_seen_ledger {
+             tracing::warn!("Reorg detected for {}: latest {} < seen {}. Resetting cursor.", 
+                 self.name, response.latestLedger, last_seen_ledger);
+             // Verify if we should really reset or just wait. A simple approach is to reset cursor.
+             // For strict correctness we might want to find common ancestor, but resetting is safe(r).
+             self.save_cursor("", 0).await?;
+             return Ok(());
+        }
+
         if response.events.is_empty() {
+             // Still allow updating last_seen_ledger if we saw a newer ledger
+             if response.latestLedger > last_seen_ledger {
+                 self.save_cursor(&cursor, response.latestLedger).await?;
+             }
              return Ok(());
         }
 
         tracing::debug!("Fetched {} events for {}", response.events.len(), self.name);
 
         let mut last_cursor = cursor.clone();
-        let mut max_ledger = 0;
+        let mut max_ledger = last_seen_ledger;
 
         for event in &response.events {
             self.handler.handle_event(event, &self.name).await?;
@@ -166,15 +184,19 @@ impl ContractIndexer {
         Ok(events_response)
     }
 
-    async fn get_last_cursor(&self) -> Result<String> {
-        let row: Option<(String,)> = sqlx::query_as(
-            "SELECT last_cursor FROM indexer_state WHERE contract_id = $1"
+    async fn get_last_cursor(&self) -> Result<(String, u64)> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT last_cursor, last_seen_ledger FROM indexer_state WHERE contract_id = $1"
         )
         .bind(&self.contract_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| r.0).unwrap_or_default())
+        if let Some((cursor, ledger)) = row {
+            Ok((cursor, ledger as u64))
+        } else {
+            Ok((String::new(), 0))
+        }
     }
 
     async fn save_cursor(&self, cursor: &str, ledger: u64) -> Result<()> {
