@@ -100,6 +100,18 @@ pub struct Config {
 
     /// Log level (RUST_LOG)
     pub log_level: String,
+
+    /// JWT secret for token signing
+    pub jwt_secret: String,
+
+    /// Access token TTL in seconds (default: 900 = 15 minutes)
+    pub jwt_access_token_ttl_seconds: i64,
+
+    /// Refresh token TTL in days (default: 7)
+    pub jwt_refresh_token_ttl_days: i64,
+
+    /// Auth nonce TTL in seconds (default: 300 = 5 minutes)
+    pub auth_nonce_ttl_seconds: i64,
 }
 
 impl Config {
@@ -148,6 +160,25 @@ impl Config {
 
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
 
+        // JWT and Auth configuration
+        let jwt_secret = env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "development-secret-change-in-production".to_string());
+
+        let jwt_access_token_ttl_seconds = env::var("JWT_ACCESS_TOKEN_TTL_SECONDS")
+            .unwrap_or_else(|_| "900".to_string())
+            .parse::<i64>()
+            .unwrap_or(900);
+
+        let jwt_refresh_token_ttl_days = env::var("JWT_REFRESH_TOKEN_TTL_DAYS")
+            .unwrap_or_else(|_| "7".to_string())
+            .parse::<i64>()
+            .unwrap_or(7);
+
+        let auth_nonce_ttl_seconds = env::var("AUTH_NONCE_TTL_SECONDS")
+            .unwrap_or_else(|_| "300".to_string())
+            .parse::<i64>()
+            .unwrap_or(300);
+
         Ok(Config {
             database_url,
             soroban_rpc_url,
@@ -161,6 +192,10 @@ impl Config {
             webhook_secret,
             cors_allowed_origins,
             log_level,
+            jwt_secret,
+            jwt_access_token_ttl_seconds,
+            jwt_refresh_token_ttl_days,
+            auth_nonce_ttl_seconds,
         })
     }
 
@@ -248,6 +283,10 @@ mod tests {
             webhook_secret: None,
             cors_allowed_origins: None,
             log_level: "info".to_string(),
+            jwt_secret: "test-secret".to_string(),
+            jwt_access_token_ttl_seconds: 900,
+            jwt_refresh_token_ttl_days: 7,
+            auth_nonce_ttl_seconds: 300,
         };
 
         let masked = config.database_url_masked();

@@ -4,11 +4,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+pub mod auth;
+pub use auth::*;
+
 /// User model
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct User {
     pub id: Uuid,
-    pub stellar_address: String,
+    pub primary_wallet_address: String,
     pub email: Option<String>,
     pub name: Option<String>,
     pub role: UserRole,
@@ -17,8 +20,21 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id,
+            primary_wallet_address: user.primary_wallet_address,
+            email: user.email,
+            name: user.name,
+            role: user.role.clone(),
+            created_at: user.created_at,
+        }
+    }
+}
+
 /// User roles
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
 pub enum UserRole {
     Buyer,
@@ -111,7 +127,6 @@ pub enum CollateralStatus {
     Expired,
     Burned,
 }
-
 
 /// Transaction model
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

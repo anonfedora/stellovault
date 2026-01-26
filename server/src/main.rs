@@ -13,8 +13,10 @@ use std::sync::Arc;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
 
+mod auth;
 mod collateral;
 mod config;
+mod error;
 mod escrow;
 mod handlers;
 mod loan;
@@ -108,11 +110,21 @@ async fn main() {
     // Initialize loan service
     let loan_service = Arc::new(loan_service::LoanService::new(db_pool.clone()));
 
+    // Initialize auth service
+    let auth_service = Arc::new(auth::AuthService::new(
+        db_pool.clone(),
+        config.jwt_secret.clone(),
+        config.auth_nonce_ttl_seconds,
+        config.jwt_access_token_ttl_seconds,
+        config.jwt_refresh_token_ttl_days,
+    ));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
         loan_service,
+        auth_service,
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -160,6 +172,8 @@ async fn main() {
         .route("/", get(root))
         .route("/health", get(move || health_check(health_db_pool.clone())))
         .route("/ws", get(websocket::ws_handler))
+        .merge(routes::auth_routes())
+        .merge(routes::wallet_routes())
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
