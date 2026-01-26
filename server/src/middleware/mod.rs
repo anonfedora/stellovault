@@ -8,7 +8,9 @@ mod rate_limiter;
 mod security;
 mod tracing;
 
+#[allow(unused_imports)]
 pub use auth::{AdminUser, AuthenticatedUser, OptionalUser};
 pub use rate_limiter::{rate_limit_layer, RateLimiter};
+#[allow(unused_imports)]
 pub use security::{hsts_header, security_headers};
 pub use tracing::request_tracing;

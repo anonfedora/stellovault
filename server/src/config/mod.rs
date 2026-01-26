@@ -20,6 +20,7 @@ pub enum ConfigError {
 }
 
 /// Application environment
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Environment {
     Development,
@@ -27,6 +28,7 @@ pub enum Environment {
     Production,
 }
 
+#[allow(dead_code)]
 impl Environment {
     /// Parse environment from string
     pub fn from_str(s: &str) -> Result<Self, ConfigError> {
@@ -63,6 +65,7 @@ impl Default for Environment {
 }
 
 /// Application configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Database connection URL
@@ -114,6 +117,7 @@ pub struct Config {
     pub auth_nonce_ttl_seconds: i64,
 }
 
+#[allow(dead_code)]
 impl Config {
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, ConfigError> {

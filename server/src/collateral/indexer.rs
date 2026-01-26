@@ -1,7 +1,7 @@
 use std::time::Duration;
 use anyhow::Result;
 use sqlx::PgPool;
-use crate::collateral::CollateralStatus;
+use crate::models::CollateralStatus;
 
 #[allow(dead_code)]
 pub struct CollateralIndexer {
@@ -66,7 +66,7 @@ impl CollateralIndexer {
                 
                 // Idempotent update
                 sqlx::query(
-                    "UPDATE collateral_tokens SET status = $1, updated_at = NOW() WHERE token_id = $2"
+                    "UPDATE collateral SET status = $1, updated_at = NOW() WHERE token_id = $2"
                 )
                 .bind(CollateralStatus::Active)
                 .bind(token_id)

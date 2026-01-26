@@ -2,7 +2,7 @@
 
 use axum::{routing::get, Router};
 
-use crate::handlers::*;
+use crate::handlers::collateral::{create_collateral, get_collateral, get_collateral_by_metadata, list_collateral};
 use crate::state::AppState;
 
 pub fn collateral_routes() -> Router<AppState> {

@@ -73,6 +73,7 @@ impl RateLimiter {
     }
 
     /// Cleanup old entries (call periodically)
+    #[allow(dead_code)]
     pub async fn cleanup(&self, max_age: std::time::Duration) {
         let mut buckets = self.buckets.write().await;
         let now = Instant::now();

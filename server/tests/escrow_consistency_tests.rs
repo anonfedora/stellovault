@@ -41,6 +41,7 @@ mod tests {
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
             "Test SDF Network ; September 2015".to_string(),
+            "test_contract_id".to_string(),
         );
 
         let request = create_test_request();
@@ -64,6 +65,7 @@ mod tests {
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
             "Test SDF Network ; September 2015".to_string(),
+            "test_contract_id".to_string(),
         );
 
         // Test that tracking status updates database correctly
@@ -120,6 +122,7 @@ mod tests {
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
             "Test SDF Network ; September 2015".to_string(),
+            "test_contract_id".to_string(),
         );
 
         // Detect timeouts
@@ -150,6 +153,7 @@ mod tests {
             db_pool.clone(),
             "https://horizon-testnet.stellar.org".to_string(),
             "Test SDF Network ; September 2015".to_string(),
+            "test_contract_id".to_string(),
         );
 
         // This test would:

@@ -11,7 +11,7 @@ use crate::escrow::{
     CreateEscrowRequest, CreateEscrowResponse, Escrow, EscrowEvent, EscrowStatus,
     EscrowWithCollateral, ListEscrowsQuery,
 };
-use crate::models::{CollateralToken, TokenStatus};
+use crate::models::CollateralStatus;
 
 /// Escrow service for managing escrow lifecycle
 pub struct EscrowService {
@@ -23,8 +23,8 @@ pub struct EscrowService {
 
 impl EscrowService {
     /// Create new escrow service instance
-    pub fn new(db_pool: PgPool, horizon_url: String, network_passphrase: String) -> Self {
-        let collateral_service = CollateralService::new(db_pool.clone().into());
+    pub fn new(db_pool: PgPool, horizon_url: String, network_passphrase: String, contract_id: String) -> Self {
+        let collateral_service = CollateralService::new(db_pool.clone().into(), horizon_url.clone(), network_passphrase.clone(), contract_id);
         Self {
             db_pool,
             collateral_service,
@@ -40,11 +40,11 @@ impl EscrowService {
     ) -> Result<CreateEscrowResponse> {
         // Validate collateral exists in registry and is not locked
         let collateral = self.collateral_service
-            .get_collateral(&request.collateral_id)
+            .get_collateral_by_token_id(&request.collateral_id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Collateral not found in registry"))?;
 
-        if collateral.locked {
+        if collateral.status == CollateralStatus::Locked {
             anyhow::bail!("Collateral is already locked in another escrow");
         }
 
@@ -53,17 +53,13 @@ impl EscrowService {
             .timeout_hours
             .map(|hours| Utc::now() + Duration::hours(hours));
 
-        // Parse collateral ID for on-chain operations
-        let collateral_id_u64 = request.collateral_id.parse::<u64>()
-            .map_err(|e| anyhow::anyhow!("Invalid collateral_id: {}. Error: {}", request.collateral_id, e))?;
-
         let collateral_id_str = request.collateral_id.clone();
 
         let (escrow_id, tx_hash) = self
             .create_on_chain_escrow(
                 &request.buyer_id,
                 &request.seller_id,
-                collateral_id_u64,
+                &collateral_id_str,
                 request.amount,
                 &request.oracle_address,
                 &request.release_conditions,
@@ -146,7 +142,7 @@ impl EscrowService {
                 c.asset_type::text,
                 c.asset_value
             FROM escrows e
-            JOIN collateral_tokens c ON e.collateral_id = c.id
+            JOIN collateral c ON e.collateral_id = c.token_id
             WHERE e.id = $1
             "#,
         )
@@ -286,8 +282,8 @@ impl EscrowService {
             UPDATE escrows 
             SET status = 'timedout', updated_at = $1
             WHERE timeout_at IS NOT NULL 
-              AND timeout_at < $1 
-              AND status IN ('pending', 'active')
+            AND timeout_at < $1 
+            AND status IN ('pending', 'active')
             RETURNING escrow_id
             "#,
         )
@@ -311,7 +307,7 @@ impl EscrowService {
         &self,
         _buyer_id: &Uuid,
         _seller_id: &Uuid,
-        collateral_token_id: u64,
+        collateral_token_id: &str,
         amount: i64,
         oracle_address: &str,
         _release_conditions: &str,
@@ -384,33 +380,6 @@ impl EscrowService {
         .await?;
 
         Ok(())
-    }
-
-    /// Get collateral by ID
-    async fn get_collateral(&self, id: &str) -> Result<CollateralToken> {
-        let collateral = self.collateral_service
-            .get_collateral(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Collateral not found"))?;
-
-        // Convert to old CollateralToken format for compatibility
-        // This is a temporary bridge until we fully migrate
-        Ok(CollateralToken {
-            id: Uuid::new_v4(), // Not used in new system
-            token_id: collateral.collateral_id.clone(),
-            owner_id: collateral.owner_id,
-            asset_type: crate::models::AssetType::Invoice, // Default for now
-            asset_value: collateral.face_value as i64,
-            metadata_hash: collateral.metadata_hash,
-            fractional_shares: 1, // Default for now
-            status: if collateral.locked {
-                TokenStatus::Locked
-            } else {
-                TokenStatus::Active
-            },
-            created_at: collateral.registered_at,
-            updated_at: Utc::now(),
-        })
     }
 
     /// Unlock collateral when escrow is released or cancelled
