@@ -4,11 +4,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+pub mod auth;
+pub use auth::*;
+
 /// User model
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct User {
     pub id: Uuid,
-    pub stellar_address: String,
+    pub primary_wallet_address: String,
     pub email: Option<String>,
     pub name: Option<String>,
     pub role: UserRole,
@@ -17,8 +20,21 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id,
+            primary_wallet_address: user.primary_wallet_address,
+            email: user.email,
+            name: user.name,
+            role: user.role.clone(),
+            created_at: user.created_at,
+        }
+    }
+}
+
 /// User roles
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
 pub enum UserRole {
     Buyer,
@@ -28,7 +44,6 @@ pub enum UserRole {
 }
 
 /// Trade escrow model
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TradeEscrow {
     pub id: Uuid,
@@ -45,7 +60,6 @@ pub struct TradeEscrow {
 }
 
 /// Escrow status
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "escrow_status", rename_all = "lowercase")]
 pub enum EscrowStatus {
@@ -84,7 +98,7 @@ pub enum AssetType {
 #[sqlx(type_name = "token_status", rename_all = "lowercase")]
 pub enum TokenStatus {
     Active,
-    Locked,  // Locked in escrow
+    Locked, // Locked in escrow
     Burned,
 }
 
@@ -114,9 +128,7 @@ pub enum CollateralStatus {
     Burned,
 }
 
-
 /// Transaction model
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Transaction {
     pub id: Uuid,
@@ -130,7 +142,6 @@ pub struct Transaction {
 }
 
 /// Transaction types
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "transaction_type", rename_all = "snake_case")]
 pub enum TransactionType {
@@ -141,7 +152,6 @@ pub enum TransactionType {
 }
 
 /// Transaction status
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "transaction_status", rename_all = "lowercase")]
 pub enum TransactionStatus {
@@ -159,7 +169,6 @@ pub struct ApiResponse<T> {
 }
 
 /// Pagination parameters
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct PaginationParams {
     pub page: Option<i32>,
@@ -167,7 +176,6 @@ pub struct PaginationParams {
 }
 
 /// Paginated response
-#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,
