@@ -10,19 +10,19 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use tokio::signal;
-use tower_http::cors::{Any, CorsLayer};
-
-mod auth;
+// Re-declare modules for binary
+mod app_state;
 mod collateral;
-mod config;
-mod error;
 mod escrow;
+mod escrow_service;
+mod event_listener;
+mod governance_service;
 mod handlers;
 mod loan;
 mod loan_service;
 mod middleware;
 mod models;
+mod oracle_service;
 mod routes;
 mod services;
 mod state;
@@ -93,32 +93,28 @@ async fn main() {
     ));
 
     // Initialize collateral service
-    let collateral_service = Arc::new(collateral::CollateralService::new(Arc::new(
-        db_pool.clone(),
-    )));
-
-    // Initialize loan service
-    let loan_service = Arc::new(loan_service::LoanService::new(db_pool.clone()));
-
-    // Initialize auth service
-    let auth_service = Arc::new(auth::AuthService::new(
-        db_pool.clone(),
-        config.jwt_secret.clone(),
-        config.auth_nonce_ttl_seconds,
-        config.jwt_access_token_ttl_seconds,
-        config.jwt_refresh_token_ttl_days,
+    let collateral_service = Arc::new(collateral::CollateralService::new(
+        Arc::new(db_pool.clone()),
     ));
 
-    // Initialize risk engine
-    let risk_engine = Arc::new(services::RiskEngine::new(db_pool.clone()));
+    // Initialize oracle service
+    let oracle_service = Arc::new(oracle_service::OracleService::new(
+        db_pool.clone(),
+    ));
+
+    // Initialize governance service
+    let governance_service = Arc::new(governance_service::GovernanceService::new(
+        db_pool.clone(),
+        contract_id.clone(), // governance contract ID (same as main contract for now)
+        network_passphrase.clone(),
+    ));
 
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
-        loan_service,
-        auth_service,
-        risk_engine,
+        oracle_service.clone(),
+        governance_service.clone(),
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -162,7 +158,8 @@ async fn main() {
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
-        .merge(routes::loan_routes())
+        .merge(routes::oracle_routes())
+        .merge(routes::governance_routes())
         .merge(routes::analytics_routes())
         .merge(routes::risk_routes())
         .with_state(app_state)
