@@ -109,12 +109,16 @@ async fn main() {
         config.jwt_refresh_token_ttl_days,
     ));
 
+    // Initialize risk engine
+    let risk_engine = Arc::new(services::RiskEngine::new(db_pool.clone()));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
         loan_service,
         auth_service,
+        risk_engine,
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -160,6 +164,7 @@ async fn main() {
         .merge(routes::collateral_routes())
         .merge(routes::loan_routes())
         .merge(routes::analytics_routes())
+        .merge(routes::risk_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))
