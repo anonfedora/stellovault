@@ -8,7 +8,7 @@ edition = "2021"
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace", "set-header"] }
 
 
 # Serialization
@@ -33,6 +33,13 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Cryptography and security
 bcrypt = "0.15"
 jsonwebtoken = "9.0"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+base32 = "0.5"
+sha2 = "0.10"
+
+# Auth header extraction
+axum-extra = { version = "0.9", features = ["typed-header"] }
+headers = "0.4"
 
 # HTTP client for external APIs
 reqwest = { version = "0.11", features = ["json"] }
