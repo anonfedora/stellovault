@@ -6,6 +6,7 @@ use crate::auth::AuthService;
 use crate::collateral::CollateralService;
 use crate::escrow::EscrowService;
 use crate::loan_service::LoanService;
+use crate::services::RiskEngine;
 use crate::websocket::WsState;
 
 use axum::extract::FromRef;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub collateral_service: Arc<CollateralService>,
     pub loan_service: Arc<LoanService>,
     pub auth_service: Arc<AuthService>,
+    pub risk_engine: Arc<RiskEngine>,
     pub ws_state: WsState,
     pub webhook_secret: Option<String>,
 }
@@ -27,6 +29,7 @@ impl AppState {
         collateral_service: Arc<CollateralService>,
         loan_service: Arc<LoanService>,
         auth_service: Arc<AuthService>,
+        risk_engine: Arc<RiskEngine>,
         ws_state: WsState,
         webhook_secret: Option<String>,
     ) -> Self {
@@ -35,6 +38,7 @@ impl AppState {
             collateral_service,
             loan_service,
             auth_service,
+            risk_engine,
             ws_state,
             webhook_secret,
         }
@@ -68,5 +72,11 @@ impl FromRef<AppState> for Arc<LoanService> {
 impl FromRef<AppState> for Arc<AuthService> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.auth_service.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<RiskEngine> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.risk_engine.clone()
     }
 }
