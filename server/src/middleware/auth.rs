@@ -21,6 +21,7 @@ use crate::auth::{verify_token, AuthService};
 use crate::models::UserRole;
 
 /// Authenticated user extracted from JWT token
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
@@ -146,6 +147,7 @@ where
 /// Optional authenticated user extractor
 ///
 /// This extractor attempts to authenticate but doesn't fail if no token is present.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct OptionalUser(pub Option<AuthenticatedUser>);
 
@@ -166,6 +168,7 @@ where
 }
 
 /// Middleware to require admin role
+#[allow(dead_code)]
 pub struct AdminUser(pub AuthenticatedUser);
 
 #[async_trait]

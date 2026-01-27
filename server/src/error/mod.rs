@@ -13,6 +13,7 @@ use thiserror::Error;
 
 /// API error type with HTTP status code mapping
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum ApiError {
     #[error("Resource not found: {0}")]
     NotFound(String),
@@ -164,6 +165,7 @@ impl From<serde_json::Error> for ApiError {
 }
 
 /// Result type alias using ApiError
+#[allow(dead_code)]
 pub type ApiResult<T> = Result<T, ApiError>;
 
 #[cfg(test)]

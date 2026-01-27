@@ -49,6 +49,7 @@ pub async fn security_headers(request: Request, next: Next) -> Response {
 }
 
 /// Middleware for adding HSTS header (use only in production with HTTPS)
+#[allow(dead_code)]
 pub async fn hsts_header(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
 

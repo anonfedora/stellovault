@@ -61,6 +61,7 @@ pub struct RepaymentRequest {
 }
 
 /// Query for listing loans
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ListLoansQuery {
     pub borrower_id: Option<Uuid>,

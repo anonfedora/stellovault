@@ -64,13 +64,13 @@ async fn main() {
     // Get configuration from environment
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/stellovault".to_string());
-    let horizon_url = std::env::var("HORIZON_URL")
+    let _horizon_url = std::env::var("HORIZON_URL")
         .unwrap_or_else(|_| "https://horizon-testnet.stellar.org".to_string());
-    let network_passphrase = std::env::var("NETWORK_PASSPHRASE")
+    let _network_passphrase = std::env::var("NETWORK_PASSPHRASE")
         .unwrap_or_else(|_| "Test SDF Network ; September 2015".to_string());
-    let contract_id =
+    let _contract_id =
         std::env::var("CONTRACT_ID").unwrap_or_else(|_| "STELLOVAULT_CONTRACT_ID".to_string());
-    let webhook_secret = std::env::var("WEBHOOK_SECRET").ok();
+    let _webhook_secret = std::env::var("WEBHOOK_SECRET").ok();
 
     // Initialize database connection pool
     tracing::info!("Connecting to database...");
@@ -90,12 +90,16 @@ async fn main() {
         db_pool.clone(),
         config.horizon_url.clone(),
         config.network_passphrase.clone(),
+        config.contract_id.clone(),
     ));
 
     // Initialize collateral service
-    let collateral_service = Arc::new(collateral::CollateralService::new(Arc::new(
+    let collateral_service = Arc::new(collateral::CollateralService::new(
         db_pool.clone(),
-    )));
+        config.horizon_url.clone(),
+        config.network_passphrase.clone(),
+        config.contract_id.clone(),
+    ));
 
     // Initialize loan service
     let loan_service = Arc::new(loan_service::LoanService::new(db_pool.clone()));
@@ -135,6 +139,18 @@ async fn main() {
         tracing::info!("Event listener task started");
         event_listener.start().await;
         tracing::error!("Event listener task exited unexpectedly");
+    });
+
+    // Start collateral indexer in background
+    let collateral_indexer = collateral::indexer::CollateralIndexer::new(
+        db_pool.clone(),
+        config.horizon_url.clone(),
+        config.contract_id.clone(),
+    );
+    tokio::spawn(async move {
+        tracing::info!("Collateral indexer task started");
+        collateral_indexer.start().await;
+        tracing::error!("Collateral indexer task exited unexpectedly");
     });
 
     // Start timeout detector in background

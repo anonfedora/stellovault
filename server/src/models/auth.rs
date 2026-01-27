@@ -68,6 +68,7 @@ pub struct ChallengeResponse {
 }
 
 /// Request to verify a signed message
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct VerifyRequest {
     pub wallet_address: String,
