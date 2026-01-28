@@ -8,11 +8,11 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct Escrow {
     pub id: Uuid,
-    pub escrow_id: i64,           // On-chain escrow ID from Soroban (i64 for PostgreSQL BIGINT)
+    pub escrow_id: i64, // On-chain escrow ID from Soroban (i64 for PostgreSQL BIGINT)
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
     pub lender_id: Uuid,
-    pub collateral_id: Uuid,
+    pub collateral_id: String,    // Collateral registry ID from Soroban contract
     pub amount: i64,              // Amount in stroops
     pub status: EscrowStatus,
     pub oracle_address: String,
@@ -27,12 +27,12 @@ pub struct Escrow {
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq, Eq)]
 #[sqlx(type_name = "escrow_status", rename_all = "lowercase")]
 pub enum EscrowStatus {
-    Pending,    // Created but not funded
-    Active,     // Funded and awaiting conditions
-    Released,   // Funds released to seller
-    Cancelled,  // Cancelled by parties
-    TimedOut,   // Expired without completion
-    Disputed,   // Under dispute resolution
+    Pending,   // Created but not funded
+    Active,    // Funded and awaiting conditions
+    Released,  // Funds released to seller
+    Cancelled, // Cancelled by parties
+    TimedOut,  // Expired without completion
+    Disputed,  // Under dispute resolution
 }
 
 /// Request DTO for creating an escrow
@@ -41,7 +41,7 @@ pub struct CreateEscrowRequest {
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
     pub lender_id: Uuid,
-    pub collateral_id: Uuid,
+    pub collateral_id: String,    // Collateral registry ID from Soroban contract
     pub amount: i64,
     pub oracle_address: String,
     pub release_conditions: String,
@@ -60,7 +60,6 @@ impl CreateEscrowRequest {
         Ok(())
     }
 }
-
 
 /// Response DTO for escrow creation
 #[derive(Debug, Serialize)]
@@ -90,7 +89,7 @@ pub struct EscrowWithCollateral {
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
     pub lender_id: Uuid,
-    pub collateral_id: Uuid,
+    pub collateral_id: String,
     pub amount: i64,
     pub status: EscrowStatus,
     pub oracle_address: String,
@@ -99,7 +98,7 @@ pub struct EscrowWithCollateral {
     pub disputed: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    
+
     // Collateral fields
     pub token_id: String,
     pub asset_type: String,
@@ -110,13 +109,31 @@ pub struct EscrowWithCollateral {
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum EscrowEvent {
-    Created { escrow_id: i64, buyer_id: Uuid, seller_id: Uuid },
-    Activated { escrow_id: i64 },
-    Released { escrow_id: i64 },
-    Cancelled { escrow_id: i64 },
-    TimedOut { escrow_id: i64 },
-    Disputed { escrow_id: i64, reason: String },
-    StatusUpdated { escrow_id: i64, status: EscrowStatus },
+    Created {
+        escrow_id: i64,
+        buyer_id: Uuid,
+        seller_id: Uuid,
+    },
+    Activated {
+        escrow_id: i64,
+    },
+    Released {
+        escrow_id: i64,
+    },
+    Cancelled {
+        escrow_id: i64,
+    },
+    TimedOut {
+        escrow_id: i64,
+    },
+    Disputed {
+        escrow_id: i64,
+        reason: String,
+    },
+    StatusUpdated {
+        escrow_id: i64,
+        status: EscrowStatus,
+    },
 }
 
 /// Webhook payload structure for escrow updates

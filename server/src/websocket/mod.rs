@@ -43,7 +43,6 @@ enum ClientMessage {
 /// Server message types
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-#[allow(dead_code)]
 enum ServerMessage {
     Event { event: EscrowEvent },
     Subscribed { escrow_ids: Vec<i64> },
@@ -98,10 +97,7 @@ impl WsState {
 }
 
 /// WebSocket handler - upgrades HTTP connection to WebSocket
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<WsState>,
-) -> Response {
+pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<WsState>) -> Response {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
@@ -173,7 +169,9 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                 if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
                     match client_msg {
                         ClientMessage::Subscribe { escrow_ids } => {
-                            state_recv.update_subscriptions(&client_id_recv, escrow_ids.clone()).await;
+                            state_recv
+                                .update_subscriptions(&client_id_recv, escrow_ids.clone())
+                                .await;
                             let response = ServerMessage::Subscribed { escrow_ids };
                             let _ = internal_tx.send(response).await;
                             tracing::info!("Client {} subscribed", client_id_recv);
@@ -185,7 +183,9 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                                 let mut current = client_info.subscribed_escrows.clone();
                                 current.retain(|id| !escrow_ids.contains(id));
                                 drop(clients); // Release lock
-                                state_recv.update_subscriptions(&client_id_recv, current).await;
+                                state_recv
+                                    .update_subscriptions(&client_id_recv, current)
+                                    .await;
                             }
                             let response = ServerMessage::Unsubscribed { escrow_ids };
                             let _ = internal_tx.send(response).await;

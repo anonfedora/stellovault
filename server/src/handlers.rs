@@ -5,12 +5,14 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::app_state::AppState;
+use crate::collateral::CreateCollateralRequest;
 use crate::escrow::{CreateEscrowRequest, CreateEscrowResponse, Escrow, ListEscrowsQuery};
-use crate::models::{ApiResponse, User};
+use crate::models::{ApiResponse, Collateral, Oracle, OracleConfirmation, OracleConfirmationRequest, OracleMetrics, OracleRegistrationRequest, User};
 
 
 // Placeholder handlers - to be implemented
@@ -214,4 +216,244 @@ pub async fn webhook_escrow_update(
         data: Some(()),
         error: None,
     }))
+}
+
+// ===== Collateral Handlers =====
+
+pub async fn create_collateral(
+    State(app_state): State<AppState>,
+    Json(req): Json<CreateCollateralRequest>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.create_collateral(req).await {
+        Ok(collateral) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to create collateral: {}", e)),
+        }),
+    }
+}
+
+pub async fn get_collateral(
+    State(app_state): State<AppState>,
+    Path(collateral_id): Path<String>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.get_collateral(&collateral_id).await {
+        Ok(Some(collateral)) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Collateral not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+pub async fn get_collateral_by_metadata(
+    State(app_state): State<AppState>,
+    Path(metadata_hash): Path<String>,
+) -> Json<ApiResponse<Collateral>> {
+    match app_state.collateral_service.get_collateral_by_metadata(&metadata_hash).await {
+        Ok(Some(collateral)) => Json(ApiResponse {
+            success: true,
+            data: Some(collateral),
+            error: None,
+        }),
+        Ok(None) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Collateral not found".to_string()),
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ListCollateralQuery {
+    pub owner_id: Option<Uuid>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+pub async fn list_collateral(
+    State(app_state): State<AppState>,
+    Query(query): Query<ListCollateralQuery>,
+) -> Json<ApiResponse<Vec<Collateral>>> {
+    let limit = query.limit.unwrap_or(50).min(100); // Max 100 items
+    let offset = query.offset.unwrap_or(0);
+
+    match query.owner_id {
+        Some(owner_id) => {
+            match app_state.collateral_service.list_user_collateral(owner_id, limit, offset).await {
+                Ok(collateral) => Json(ApiResponse {
+                    success: true,
+                    data: Some(collateral),
+                    error: None,
+                }),
+                Err(e) => Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Database error: {}", e)),
+                }),
+            }
+        }
+        None => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("owner_id parameter is required".to_string()),
+        }),
+    }
+}
+
+// ===== ORACLE HANDLERS =====
+
+// Register a new oracle
+pub async fn register_oracle(
+    State(app_state): State<AppState>,
+    Json(request): Json<OracleRegistrationRequest>,
+) -> Json<ApiResponse<Oracle>> {
+    match app_state.oracle_service.register_oracle(request, None).await {
+        Ok(oracle) => Json(ApiResponse {
+            success: true,
+            data: Some(oracle),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to register oracle: {}", e)),
+        }),
+    }
+}
+
+// Get oracle by address
+pub async fn get_oracle(
+    State(app_state): State<AppState>,
+    Path(address): Path<String>,
+) -> Json<ApiResponse<Option<Oracle>>> {
+    match app_state.oracle_service.get_oracle_by_address(&address).await {
+        Ok(oracle) => Json(ApiResponse {
+            success: true,
+            data: Some(oracle),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// List all active oracles
+pub async fn list_oracles(
+    State(app_state): State<AppState>,
+) -> Json<ApiResponse<Vec<Oracle>>> {
+    match app_state.oracle_service.get_active_oracles().await {
+        Ok(oracles) => Json(ApiResponse {
+            success: true,
+            data: Some(oracles),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Deactivate an oracle
+pub async fn deactivate_oracle(
+    State(app_state): State<AppState>,
+    Path(address): Path<String>,
+) -> Json<ApiResponse<String>> {
+    match app_state.oracle_service.deactivate_oracle(&address).await {
+        Ok(_) => Json(ApiResponse {
+            success: true,
+            data: Some(format!("Oracle {} deactivated", address)),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to deactivate oracle: {}", e)),
+        }),
+    }
+}
+
+// Submit oracle confirmation
+pub async fn submit_confirmation(
+    State(app_state): State<AppState>,
+    Json(request): Json<OracleConfirmationRequest>,
+) -> Json<ApiResponse<OracleConfirmation>> {
+    // Get oracle from request context (TODO: implement proper authentication)
+    // For now, we'll use a placeholder oracle address
+    let oracle_address = "oracle_placeholder_address";
+
+    match app_state.oracle_service.submit_confirmation(request, oracle_address).await {
+        Ok(confirmation) => Json(ApiResponse {
+            success: true,
+            data: Some(confirmation),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to submit confirmation: {}", e)),
+        }),
+    }
+}
+
+// Get confirmations for an escrow
+pub async fn get_confirmations(
+    State(app_state): State<AppState>,
+    Path(escrow_id): Path<String>,
+) -> Json<ApiResponse<Vec<OracleConfirmation>>> {
+    match app_state.oracle_service.get_confirmations_for_escrow(&escrow_id).await {
+        Ok(confirmations) => Json(ApiResponse {
+            success: true,
+            data: Some(confirmations),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
+}
+
+// Get oracle metrics
+pub async fn get_oracle_metrics(
+    State(app_state): State<AppState>,
+) -> Json<ApiResponse<OracleMetrics>> {
+    match app_state.oracle_service.get_oracle_metrics().await {
+        Ok(metrics) => Json(ApiResponse {
+            success: true,
+            data: Some(metrics),
+            error: None,
+        }),
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Database error: {}", e)),
+        }),
+    }
 }
