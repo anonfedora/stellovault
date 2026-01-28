@@ -3,6 +3,7 @@
 pub mod analytics;
 pub mod auth;
 mod escrow;
+pub mod oracle;
 pub mod risk;
 pub mod user;
 pub mod wallet;

@@ -164,6 +164,7 @@ async fn main() {
         .merge(routes::oracle_routes())
         .merge(routes::analytics_routes())
         .merge(routes::risk_routes())
+        .merge(routes::oracle_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))
