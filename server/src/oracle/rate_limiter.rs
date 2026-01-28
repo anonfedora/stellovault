@@ -70,6 +70,7 @@ impl OracleRateLimiter {
     }
 
     /// Get remaining tokens for an oracle address (for rate limit headers)
+    #[allow(dead_code)] // I'm keeping this for future rate limit header support.
     pub async fn remaining(&self, oracle_address: &str) -> u32 {
         let buckets = self.buckets.read().await;
         buckets
@@ -79,6 +80,7 @@ impl OracleRateLimiter {
     }
 
     /// Cleanup old entries to prevent memory bloat
+    #[allow(dead_code)] // I'm keeping this for future scheduled cleanup.
     pub async fn cleanup(&self, max_age: std::time::Duration) {
         let mut buckets = self.buckets.write().await;
         let now = Instant::now();

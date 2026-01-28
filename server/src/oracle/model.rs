@@ -44,6 +44,7 @@ pub struct OracleEvent {
 
 /// Oracle audit log model - tracks all oracle actions for compliance
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+#[allow(dead_code)] // I'm keeping this for future audit log queries.
 pub struct OracleAuditLog {
     pub id: Uuid,
     pub oracle_event_id: Option<Uuid>,
@@ -148,6 +149,7 @@ pub struct OracleDisputeRequest {
     pub escrow_id: i64,
     pub reason: String,
     pub disputer_address: String,
+    #[allow(dead_code)] // I'm keeping this for future signature verification on disputes.
     pub signature: String,
 }
 

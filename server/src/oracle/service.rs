@@ -17,6 +17,7 @@ use super::rate_limiter::OracleRateLimiter;
 pub struct OracleService {
     db_pool: PgPool,
     horizon_url: String,
+    #[allow(dead_code)] // I'm keeping this for Soroban tx signing.
     network_passphrase: String,
     soroban_rpc_url: String,
     rate_limiter: OracleRateLimiter,
@@ -64,7 +65,10 @@ impl OracleService {
             .map_err(|e| anyhow::anyhow!("Validation failed: {}", e))?;
 
         // Check for duplicate confirmation
-        if self.check_duplicate_confirmation(request.escrow_id, &request.oracle_address).await? {
+        if self
+            .check_duplicate_confirmation(request.escrow_id, &request.oracle_address)
+            .await?
+        {
             anyhow::bail!(
                 "Duplicate confirmation from oracle {} for escrow {}",
                 request.oracle_address,
@@ -158,8 +162,8 @@ impl OracleService {
     async fn verify_signature(&self, request: &OracleConfirmRequest) -> Result<()> {
         // I'm decoding the public key from the Stellar address format.
         let public_key_bytes = self.decode_stellar_address(&request.oracle_address)?;
-        let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
-            .context("Invalid oracle public key")?;
+        let verifying_key =
+            VerifyingKey::from_bytes(&public_key_bytes).context("Invalid oracle public key")?;
 
         // Decode base64 signature
         let signature_bytes = base32::decode(
@@ -168,8 +172,8 @@ impl OracleService {
         )
         .ok_or_else(|| anyhow::anyhow!("Invalid base32 signature encoding"))?;
 
-        let signature = Signature::from_slice(&signature_bytes)
-            .context("Invalid signature format")?;
+        let signature =
+            Signature::from_slice(&signature_bytes).context("Invalid signature format")?;
 
         // I'm constructing the canonical message to verify.
         let message = self.construct_signing_message(request)?;
@@ -289,11 +293,7 @@ impl OracleService {
 
         // TODO: Implement actual Soroban transaction building and submission
         // For now, returning a simulated tx hash
-        let simulated_hash = format!(
-            "TX_{}_{:x}",
-            escrow_id,
-            Utc::now().timestamp_millis()
-        );
+        let simulated_hash = format!("TX_{}_{:x}", escrow_id, Utc::now().timestamp_millis());
 
         Ok(simulated_hash)
     }
@@ -339,7 +339,10 @@ impl OracleService {
     }
 
     /// Get oracle events with filtering
-    pub async fn list_oracle_events(&self, query: ListOracleEventsQuery) -> Result<Vec<OracleEvent>> {
+    pub async fn list_oracle_events(
+        &self,
+        query: ListOracleEventsQuery,
+    ) -> Result<Vec<OracleEvent>> {
         let limit = query.limit.unwrap_or(50).min(100);
         let offset = query.offset.unwrap_or(0);
 
@@ -367,13 +370,11 @@ impl OracleService {
 
     /// Get a single oracle event by ID
     pub async fn get_oracle_event(&self, id: &Uuid) -> Result<Option<OracleEvent>> {
-        let event = sqlx::query_as::<_, OracleEvent>(
-            "SELECT * FROM oracle_events WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(&self.db_pool)
-        .await
-        .context("Failed to get oracle event")?;
+        let event = sqlx::query_as::<_, OracleEvent>("SELECT * FROM oracle_events WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.db_pool)
+            .await
+            .context("Failed to get oracle event")?;
 
         Ok(event)
     }
