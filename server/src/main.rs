@@ -23,6 +23,7 @@ mod loan;
 mod loan_service;
 mod middleware;
 mod models;
+mod oracle;
 mod routes;
 mod services;
 mod state;
@@ -112,6 +113,14 @@ async fn main() {
     // Initialize risk engine
     let risk_engine = Arc::new(services::RiskEngine::new(db_pool.clone()));
 
+    // I'm initializing the oracle service for off-chain data confirmations.
+    let oracle_service = Arc::new(oracle::OracleService::new(
+        db_pool.clone(),
+        config.horizon_url.clone(),
+        config.network_passphrase.clone(),
+        config.soroban_rpc_url.clone(),
+    ));
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
@@ -119,6 +128,7 @@ async fn main() {
         loan_service,
         auth_service,
         risk_engine,
+        oracle_service,
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -165,6 +175,7 @@ async fn main() {
         .merge(routes::loan_routes())
         .merge(routes::analytics_routes())
         .merge(routes::risk_routes())
+        .merge(routes::oracle_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))

@@ -12,6 +12,7 @@ pub mod loan;
 pub mod loan_service;
 pub mod middleware;
 pub mod models;
+pub mod oracle;
 pub mod routes;
 pub mod services;
 pub mod state;
