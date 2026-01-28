@@ -2,17 +2,15 @@
 //!
 //! This library exports the core modules for the StelloVault backend server.
 
-pub mod auth;
+pub mod app_state;
 pub mod collateral;
-pub mod config;
-pub mod error;
 pub mod escrow;
 pub mod handlers;
 pub mod loan;
 pub mod loan_service;
 pub mod middleware;
 pub mod models;
-pub mod oracle;
+pub mod oracle_service;
 pub mod routes;
 pub mod services;
 pub mod state;
