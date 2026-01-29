@@ -985,7 +985,7 @@ impl RiskAssessment {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Env};
 
     fn setup_env() -> (Env, Address, Address, Address, Address, Address) {
         let env = Env::default();
@@ -1481,6 +1481,7 @@ mod test {
 
         env.mock_all_auths();
 
+        // Initialize
         env.as_contract(&contract_id, || {
             RiskAssessment::initialize(
                 env.clone(),
@@ -1490,8 +1491,10 @@ mod test {
                 loan_mgr.clone(),
                 vault.clone(),
             ).unwrap();
+        });
 
-            // Propose new parameters
+        // Propose new parameters (separate block to avoid auth conflict)
+        env.as_contract(&contract_id, || {
             let new_params = RiskParameters {
                 liquidation_threshold: 7500,
                 liquidation_penalty: 600,
@@ -1500,10 +1503,11 @@ mod test {
                 grace_period: 7200,
                 liquidator_bonus: 600,
             };
-
             RiskAssessment::update_risk_parameters(env.clone(), new_params).unwrap();
+        });
 
-            // Cancel the update
+        // Cancel the update (separate block)
+        env.as_contract(&contract_id, || {
             let result = RiskAssessment::cancel_parameter_update(env.clone());
             assert!(result.is_ok());
 
@@ -1589,6 +1593,7 @@ mod test {
 
         env.mock_all_auths();
 
+        // Initialize
         env.as_contract(&contract_id, || {
             RiskAssessment::initialize(
                 env.clone(),
@@ -1598,12 +1603,16 @@ mod test {
                 loan_mgr.clone(),
                 vault.clone(),
             ).unwrap();
+        });
 
-            // Pause
+        // Pause (separate block)
+        env.as_contract(&contract_id, || {
             RiskAssessment::pause_liquidations(env.clone()).unwrap();
             assert!(RiskAssessment::is_paused(env.clone()));
+        });
 
-            // Unpause
+        // Unpause (separate block)
+        env.as_contract(&contract_id, || {
             let result = RiskAssessment::unpause_liquidations(env.clone());
             assert!(result.is_ok());
             assert!(!RiskAssessment::is_paused(env.clone()));
@@ -1621,6 +1630,7 @@ mod test {
 
         env.mock_all_auths();
 
+        // Initialize
         env.as_contract(&contract_id, || {
             RiskAssessment::initialize(
                 env.clone(),
@@ -1630,15 +1640,24 @@ mod test {
                 loan_mgr.clone(),
                 vault.clone(),
             ).unwrap();
+        });
 
+        // Set collateral registry (separate block)
+        env.as_contract(&contract_id, || {
             let new_coll_reg = Address::generate(&env);
             let result = RiskAssessment::set_collateral_registry(env.clone(), new_coll_reg.clone());
             assert!(result.is_ok());
+        });
 
+        // Set loan management (separate block)
+        env.as_contract(&contract_id, || {
             let new_loan_mgr = Address::generate(&env);
             let result = RiskAssessment::set_loan_management(env.clone(), new_loan_mgr.clone());
             assert!(result.is_ok());
+        });
 
+        // Set vault (separate block)
+        env.as_contract(&contract_id, || {
             let new_vault = Address::generate(&env);
             let result = RiskAssessment::set_vault(env.clone(), new_vault.clone());
             assert!(result.is_ok());
