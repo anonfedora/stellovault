@@ -209,6 +209,84 @@ impl LoanManagement {
         Ok(())
     }
 
+    /// Mark a loan as liquidated by the risk assessment engine
+    ///
+    /// # Arguments
+    /// * `loan_id` - The loan ID to mark as liquidated
+    /// * `liquidator` - Address of the liquidator who executed the liquidation
+    ///
+    /// # Authorization
+    /// Only callable by the registered risk engine contract
+    pub fn mark_liquidated(
+        env: Env,
+        loan_id: u64,
+        liquidator: Address,
+    ) -> Result<(), ContractError> {
+        // Verify caller is the risk engine
+        let risk_engine: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("risk_eng"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        risk_engine.require_auth();
+
+        let mut loan: Loan = env
+            .storage()
+            .persistent()
+            .get(&loan_id)
+            .ok_or(ContractError::LoanNotFound)?;
+
+        if loan.status != LoanStatus::Active {
+            return Err(ContractError::LoanNotActive);
+        }
+
+        loan.status = LoanStatus::Liquidated;
+        env.storage().persistent().set(&loan_id, &loan);
+
+        // Emit LoanLiquidated event
+        env.events().publish(
+            (symbol_short!("loan_liq"),),
+            (loan_id, liquidator),
+        );
+
+        Ok(())
+    }
+
+    /// Set the risk engine contract address
+    ///
+    /// # Arguments
+    /// * `risk_engine` - Address of the risk assessment contract
+    ///
+    /// # Authorization
+    /// Only callable by admin
+    pub fn set_risk_engine(env: Env, risk_engine: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("risk_eng"), &risk_engine);
+
+        // Emit RiskEngineSet event
+        env.events().publish(
+            (symbol_short!("risk_set"),),
+            (risk_engine,),
+        );
+
+        Ok(())
+    }
+
+    /// Get the registered risk engine address
+    pub fn get_risk_engine(env: Env) -> Option<Address> {
+        env.storage().instance().get(&symbol_short!("risk_eng"))
+    }
+
     /// Get loan details
     pub fn get_loan(env: Env, loan_id: u64) -> Option<Loan> {
         env.storage().persistent().get(&loan_id)
@@ -503,5 +581,97 @@ mod test {
 
         client.initialize(&admin);
         client.initialize(&admin);
+    }
+
+    #[test]
+    fn test_set_risk_engine() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let risk_engine = Address::generate(&env);
+
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.set_risk_engine(&risk_engine);
+
+        let stored_engine = client.get_risk_engine();
+        assert_eq!(stored_engine, Some(risk_engine));
+    }
+
+    #[test]
+    fn test_mark_liquidated_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let borrower = Address::generate(&env);
+        let lender = Address::generate(&env);
+        let risk_engine = Address::generate(&env);
+        let liquidator = Address::generate(&env);
+
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.set_risk_engine(&risk_engine);
+
+        let loan_id = client.issue_loan(&1, &borrower, &lender, &1000, &500, &3600);
+
+        client.mark_liquidated(&loan_id, &liquidator);
+
+        let loan = client.get_loan(&loan_id).unwrap();
+        assert_eq!(loan.status, LoanStatus::Liquidated);
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #1)")]
+    fn test_mark_liquidated_no_risk_engine() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let borrower = Address::generate(&env);
+        let lender = Address::generate(&env);
+        let liquidator = Address::generate(&env);
+
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+
+        let loan_id = client.issue_loan(&1, &borrower, &lender, &1000, &500, &3600);
+
+        // Should fail - no risk engine set
+        client.mark_liquidated(&loan_id, &liquidator);
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #5)")]
+    fn test_mark_liquidated_not_active() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let borrower = Address::generate(&env);
+        let lender = Address::generate(&env);
+        let risk_engine = Address::generate(&env);
+        let liquidator = Address::generate(&env);
+
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.set_risk_engine(&risk_engine);
+
+        let loan_id = client.issue_loan(&1, &borrower, &lender, &1000, &500, &3600);
+
+        // Repay the loan first
+        client.repay_loan(&loan_id, &1050);
+
+        // Should fail - loan is already repaid
+        client.mark_liquidated(&loan_id, &liquidator);
     }
 }
