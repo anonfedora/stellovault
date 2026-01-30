@@ -10,25 +10,26 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use tokio::signal;
-use tower_http::cors::{Any, CorsLayer};
-
-mod auth;
+// Re-declare modules for binary
+mod app_state;
 mod collateral;
-mod config;
-mod error;
 mod escrow;
+mod escrow_service;
+mod event_listener;
+mod governance_service;
 mod handlers;
 mod loan;
 mod loan_service;
 mod middleware;
 mod models;
+mod oracle_service;
 mod routes;
 mod services;
 mod state;
 
 // Domain modules
 mod websocket;
+mod indexer;
 
 use config::Config;
 use escrow::{timeout_detector, EscrowService, EventListener};
@@ -70,6 +71,15 @@ async fn main() {
         .unwrap_or_else(|_| "Test SDF Network ; September 2015".to_string());
     let contract_id =
         std::env::var("CONTRACT_ID").unwrap_or_else(|_| "STELLOVAULT_CONTRACT_ID".to_string());
+    
+    // Contract IDs for Indexer
+    let collateral_id = std::env::var("COLLATERAL_CONTRACT_ID").unwrap_or_else(|_| contract_id.clone());
+    let escrow_id = std::env::var("ESCROW_CONTRACT_ID").unwrap_or_else(|_| contract_id.clone());
+    let loan_id = std::env::var("LOAN_CONTRACT_ID").unwrap_or_else(|_| contract_id.clone());
+    
+    let soroban_rpc_url = std::env::var("SOROBAN_RPC_URL")
+        .unwrap_or_else(|_| "https://soroban-testnet.stellar.org".to_string());
+
     let webhook_secret = std::env::var("WEBHOOK_SECRET").ok();
 
     // Initialize database connection pool
@@ -102,40 +112,44 @@ async fn main() {
 
     let collateral_service = Arc::new(collateral_service);
 
-    // Initialize loan service
-    let loan_service = Arc::new(loan_service::LoanService::new(db_pool.clone()));
-
-    // Initialize auth service
-    let auth_service = Arc::new(auth::AuthService::new(
+    // Initialize oracle service
+    let oracle_service = Arc::new(oracle_service::OracleService::new(
         db_pool.clone(),
-        config.jwt_secret.clone(),
-        config.auth_nonce_ttl_seconds,
-        config.jwt_access_token_ttl_seconds,
-        config.jwt_refresh_token_ttl_days,
+    ));
+
+    // Initialize governance service
+    let governance_service = Arc::new(governance_service::GovernanceService::new(
+        db_pool.clone(),
+        contract_id.clone(), // governance contract ID (same as main contract for now)
+        network_passphrase.clone(),
     ));
 
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
-        loan_service,
-        auth_service,
+        oracle_service.clone(),
+        governance_service.clone(),
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
 
     // Start event listener in background
-    let event_listener = EventListener::new(
-        config.horizon_url.clone(),
-        config.contract_id.clone(),
-        escrow_service.clone(),
-        ws_state.clone(),
+    // Start Indexer Service
+    let mut contracts_map = std::collections::HashMap::new();
+    contracts_map.insert("collateral".to_string(), collateral_id);
+    contracts_map.insert("escrow".to_string(), escrow_id);
+    contracts_map.insert("loan".to_string(), loan_id);
+
+    let indexer_service = Arc::new(indexer::IndexerService::new(
+        soroban_rpc_url,
         db_pool.clone(),
-    );
+        contracts_map,
+        ws_state.clone(),
+    ));
+
     tokio::spawn(async move {
-        tracing::info!("Event listener task started");
-        event_listener.start().await;
-        tracing::error!("Event listener task exited unexpectedly");
+        indexer_service.start().await;
     });
 
     // Start collateral indexer
@@ -174,8 +188,11 @@ async fn main() {
         .merge(routes::user_routes())
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
-        .merge(routes::loan_routes())
+        .merge(routes::oracle_routes())
+        .merge(routes::governance_routes())
         .merge(routes::analytics_routes())
+        .merge(routes::risk_routes())
+        .merge(routes::oracle_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))

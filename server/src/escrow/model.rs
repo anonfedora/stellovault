@@ -11,6 +11,7 @@ pub struct Escrow {
     pub escrow_id: i64, // On-chain escrow ID from Soroban (i64 for PostgreSQL BIGINT)
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
+    pub lender_id: Uuid,
     pub collateral_id: String,    // Collateral registry ID from Soroban contract
     pub amount: i64,              // Amount in stroops
     pub status: EscrowStatus,
@@ -39,6 +40,7 @@ pub enum EscrowStatus {
 pub struct CreateEscrowRequest {
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
+    pub lender_id: Uuid,
     pub collateral_id: String,    // Collateral registry ID from Soroban contract
     pub amount: i64,
     pub oracle_address: String,
@@ -86,7 +88,8 @@ pub struct EscrowWithCollateral {
     pub escrow_id: i64,
     pub buyer_id: Uuid,
     pub seller_id: Uuid,
-    pub collateral_id: Uuid,
+    pub lender_id: Uuid,
+    pub collateral_id: String,
     pub amount: i64,
     pub status: EscrowStatus,
     pub oracle_address: String,
