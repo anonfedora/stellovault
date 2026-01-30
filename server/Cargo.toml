@@ -68,5 +68,10 @@ futures-util = "0.3"
 # Random for simulation
 rand = "0.8"
 
+# XDR decoding
+stellar-xdr = { version = "21.0.0", features = ["next"] }
+base64 = "0.21"
+hex = "0.4"
+
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }

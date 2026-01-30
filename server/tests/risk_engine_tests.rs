@@ -3,15 +3,7 @@
 //! These tests validate the risk scoring logic with various scenarios
 //! including edge cases, fraud detection, and score simulations.
 
-use stellovault_server::services::risk_engine::{RiskEngine, RiskTier, SimulationScenario};
-
-/// Test helper to create a mock database pool for testing
-/// In production, this would connect to a test database
-fn create_test_pool() -> sqlx::PgPool {
-    // For unit tests, we use a lazy connection that won't actually connect
-    // Integration tests should use a real test database
-    sqlx::PgPool::connect_lazy("postgres://localhost/stellovault_test").unwrap()
-}
+use stellovault_server::services::risk_engine::{RiskTier, SimulationScenario};
 
 // ============================================================================
 // Risk Tier Classification Tests
@@ -117,10 +109,7 @@ fn test_simulation_multiple_deals_description() {
 
 #[test]
 fn test_confidence_increases_with_deals() {
-    let _engine = RiskEngine::new(create_test_pool());
-
-    // Access private method through a test helper
-    // In production, we'd use the public API or expose test helpers
+    // I'm testing confidence formula directly without needing a DB pool.
     let conf_0 = calculate_confidence_helper(0);
     let conf_5 = calculate_confidence_helper(5);
     let conf_10 = calculate_confidence_helper(10);
@@ -217,7 +206,10 @@ fn test_time_decay_recent_transactions_weighted_more() {
     let weight_180_days = time_decay_weight(180, half_life_days);
     let weight_365_days = time_decay_weight(365, half_life_days);
 
-    assert!((weight_today - 1.0).abs() < 0.01, "Today's weight should be ~1.0");
+    assert!(
+        (weight_today - 1.0).abs() < 0.01,
+        "Today's weight should be ~1.0"
+    );
     assert!(
         (weight_90_days - 0.5).abs() < 0.01,
         "90 day weight should be ~0.5"
@@ -372,7 +364,10 @@ fn test_successful_repayment_improves_score() {
     let impact = ((amount as f64 / 1_000_000.0) * 10.0).min(50.0) as i32;
     let projected = (current_score + impact).min(1000);
 
-    assert!(projected > current_score, "Successful repayment should improve score");
+    assert!(
+        projected > current_score,
+        "Successful repayment should improve score"
+    );
 }
 
 #[test]
@@ -384,7 +379,10 @@ fn test_loan_default_decreases_score() {
     let impact = ((amount as f64 / 1_000_000.0) * 50.0).min(200.0) as i32;
     let projected = (current_score - impact).max(0);
 
-    assert!(projected < current_score, "Loan default should decrease score");
+    assert!(
+        projected < current_score,
+        "Loan default should decrease score"
+    );
 }
 
 #[test]
@@ -425,10 +423,7 @@ fn test_multiple_deals_bonus_capped() {
     let impact = (deal_count as i32 * 15).min(100);
     let projected = (current_score + impact).min(1000);
 
-    assert_eq!(
-        impact, 100,
-        "Multiple deals bonus should be capped at 100"
-    );
+    assert_eq!(impact, 100, "Multiple deals bonus should be capped at 100");
     assert_eq!(projected, 600, "Score should be increased by capped amount");
 }
 
@@ -444,7 +439,10 @@ fn test_empty_transaction_history() {
 
     let score = if total_deals == 0 { default_score } else { 0 };
 
-    assert_eq!(score, default_score, "Empty history should get default score");
+    assert_eq!(
+        score, default_score,
+        "Empty history should get default score"
+    );
 }
 
 #[test]
@@ -588,7 +586,10 @@ fn test_large_transaction_volumes() {
     let huge_deal_count = 100_000;
     let confidence = calculate_confidence_helper(huge_deal_count);
 
-    assert!(confidence > 0.0 && confidence < 1.0, "Confidence should be valid");
+    assert!(
+        confidence > 0.0 && confidence < 1.0,
+        "Confidence should be valid"
+    );
 }
 
 #[test]
@@ -598,7 +599,10 @@ fn test_extreme_amounts() {
 
     // Ensure calculations don't overflow
     let ratio = large_amount as f64 / 1_000_000_000.0; // Convert from stroops
-    assert!(ratio.is_finite(), "Large amount calculations should be finite");
+    assert!(
+        ratio.is_finite(),
+        "Large amount calculations should be finite"
+    );
 }
 
 #[test]

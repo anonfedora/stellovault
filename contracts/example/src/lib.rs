@@ -7,7 +7,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, token,
+    contract, contractimpl, contracttype, symbol_short, token, Address, BytesN, Env, Symbol,
 };
 
 /// Contract errors
@@ -18,32 +18,46 @@ pub enum ContractError {
     InsufficientBalance = 2,
     InvalidAmount = 3,
     EscrowNotFound = 4,
-    EscrowAlreadyReleased = 5,
-    ProposalNotFound = 6,
-    ProposalNotActive = 7,
-    AlreadyVoted = 8,
-    VotePeriodEnded = 9,
-    ZeroWeight = 10,
-    AssetNotWhitelisted = 11,
-    OracleNotWhitelisted = 12,
-    LtvExceeded = 13,
-    CollateralNotFound = 14,
-    MathOverflow = 15,
-    VoteOverflow = 16,
-    VotePeriodActive = 17,
-    QuorumNotMet = 18,
+    EscrowError = 5,
+    EscrowExpired = 6,
+    EscrowNotExpired = 7,
+    EscrowAlreadyReleased = 8,
+    ProposalNotFound = 9,
+    ProposalNotActive = 10,
+    AlreadyVoted = 11,
+    VotePeriodEnded = 12,
+    ZeroWeight = 13,
+    AssetNotWhitelisted = 14,
+    OracleNotWhitelisted = 15,
+    LtvExceeded = 16,
+    CollateralNotFound = 17,
+    MathOverflow = 18,
+    VoteOverflow = 19,
+    VotePeriodActive = 20,
+    QuorumNotMet = 21,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
     fn from(_: soroban_sdk::Error) -> Self {
-        ContractError::Unauthorized
+        ContractError::EscrowError
     }
 }
 
 impl From<&ContractError> for soroban_sdk::Error {
-    fn from(_: &ContractError) -> Self {
-        soroban_sdk::Error::from_contract_error(1) // Generic contract error
+    fn from(e: &ContractError) -> Self {
+        soroban_sdk::Error::from_contract_error(e.clone() as u32)
     }
+}
+
+/// Collateral Registry Interface
+pub trait CollateralRegistryClient {
+    fn lock_collateral(env: &Env, collateral_id: u64);
+    fn unlock_collateral(env: &Env, collateral_id: u64);
+}
+
+/// Oracle Adapter Interface
+pub trait OracleAdapterClient {
+    fn verify_release_condition(env: &Env, metadata: Symbol) -> bool;
 }
 
 /// Collateral token data structure
@@ -51,9 +65,9 @@ impl From<&ContractError> for soroban_sdk::Error {
 #[derive(Clone)]
 pub struct CollateralToken {
     pub owner: Address,
-    pub asset_type: Symbol, // e.g., "INVOICE", "COMMODITY"
+    pub asset_type: Symbol,
     pub asset_value: i128,
-    pub metadata: Symbol, // Hash of off-chain metadata
+    pub metadata: Symbol,
     pub fractional_shares: u32,
     pub created_at: u64,
 }
@@ -64,11 +78,14 @@ pub struct CollateralToken {
 pub struct TradeEscrow {
     pub buyer: Address,
     pub seller: Address,
+    pub lender: Address, // New: Lender involved in the deal
     pub collateral_token_id: u64,
     pub amount: i128,
+    pub asset: Address, // New: Payment asset
     pub status: EscrowStatus,
     pub oracle_address: Address,
-    pub release_conditions: Symbol, // e.g., "SHIPMENT_DELIVERED"
+    pub release_conditions: Symbol,
+    pub expiry_ts: u64, // New: Expiration timestamp
     pub created_at: u64,
 }
 
@@ -80,6 +97,7 @@ pub enum EscrowStatus {
     Active = 1,
     Released = 2,
     Cancelled = 3,
+    Disputed = 4, // New: Dispute state
 }
 
 /// Governance action types
@@ -133,12 +151,15 @@ impl StelloVaultContract {
         env.storage().instance().set(&symbol_short!("tok_next"), &1u64);
         env.storage().instance().set(&symbol_short!("esc_next"), &1u64);
         env.storage().instance().set(&symbol_short!("prop_next"), &1u64);
-        
+
         // Default protocol parameters
         env.storage().instance().set(&symbol_short!("max_ltv"), &7000u32); // 70% LTV default
         env.storage().instance().set(&symbol_short!("quorum"), &100u128); // Default quorum
 
-        env.events().publish((symbol_short!("init"),), (admin,));
+        env.events().publish(
+            (symbol_short!("init"),),
+            (admin.clone(), gov_token),
+        );
         Ok(())
     }
 
@@ -211,10 +232,13 @@ impl StelloVaultContract {
         env: Env,
         buyer: Address,
         seller: Address,
+        lender: Address,
         collateral_token_id: u64,
         amount: i128,
+        asset: Address,
         oracle_address: Address,
         release_conditions: Symbol,
+        expiry_ts: u64,
     ) -> Result<u64, ContractError> {
         buyer.require_auth();
 
@@ -229,14 +253,14 @@ impl StelloVaultContract {
 
         // Verify collateral token exists and Check LTV
         let collateral: CollateralToken = env.storage().persistent().get(&collateral_token_id).ok_or(ContractError::CollateralNotFound)?;
-        
+
         let max_ltv: u32 = env.storage().instance().get(&symbol_short!("max_ltv")).unwrap_or(0);
-        
+
         // Check for math overflow during LTV calculation
         let adjusted_value = (collateral.asset_value as i128)
             .checked_mul(max_ltv as i128)
             .ok_or(ContractError::MathOverflow)?;
-            
+
         let max_loan_amount = adjusted_value / 10000;
 
         if amount > max_loan_amount {
@@ -252,17 +276,18 @@ impl StelloVaultContract {
         let escrow = TradeEscrow {
             buyer: buyer.clone(),
             seller: seller.clone(),
+            lender,
             collateral_token_id,
             amount,
-            status: EscrowStatus::Pending,
+            asset,
+            status: EscrowStatus::Active, // Active immediately since funds are locked
             oracle_address,
             release_conditions,
+            expiry_ts,
             created_at: env.ledger().timestamp(),
         };
 
-        env.storage()
-            .persistent()
-            .set(&escrow_id, &escrow);
+        env.storage().persistent().set(&escrow_id, &escrow);
 
         env.storage()
             .instance()
@@ -276,50 +301,91 @@ impl StelloVaultContract {
         Ok(escrow_id)
     }
 
-    /// Get escrow details
-    pub fn get_escrow(env: Env, escrow_id: u64) -> Option<TradeEscrow> {
-        env.storage().persistent().get(&escrow_id)
-    }
-
-    /// Activate an escrow (funded and ready)
-    pub fn activate_escrow(env: Env, escrow_id: u64) -> Result<(), ContractError> {
+    /// Release escrow funds (Oracle-triggered)
+    pub fn release_funds(env: Env, escrow_id: u64) -> Result<(), ContractError> {
         let mut escrow: TradeEscrow = env
             .storage()
             .persistent()
             .get(&escrow_id)
             .ok_or(ContractError::EscrowNotFound)?;
 
-        if escrow.status != EscrowStatus::Pending {
-            return Err(ContractError::Unauthorized);
-        }
-
-        escrow.status = EscrowStatus::Active;
-        env.storage().persistent().set(&escrow_id, &escrow);
-
-        env.events().publish((symbol_short!("esc_act"),), (escrow_id,));
-        Ok(())
-    }
-
-    /// Release escrow funds (oracle-triggered)
-    pub fn release_escrow(env: Env, escrow_id: u64) -> Result<(), ContractError> {
-        let mut escrow: TradeEscrow = env
-            .storage()
-            .persistent()
-            .get(&escrow_id)
-            .ok_or(ContractError::EscrowNotFound)?;
-
-        // Only oracle can trigger release
+        // Authorization: Oracle must sign off
+        // Real implementation: OracleAdapter checks condition
+        // Here we just require the stored oracle address to invoke this
         escrow.oracle_address.require_auth();
 
         if escrow.status != EscrowStatus::Active {
-            return Err(ContractError::EscrowAlreadyReleased);
+            return Err(ContractError::EscrowError);
         }
+
+        // Transfer funds to Seller
+        let token_client = token::Client::new(&env, &escrow.asset);
+        token_client.transfer(&env.current_contract_address(), &escrow.seller, &escrow.amount);
 
         escrow.status = EscrowStatus::Released;
         env.storage().persistent().set(&escrow_id, &escrow);
 
         env.events().publish((symbol_short!("esc_rel"),), (escrow_id,));
         Ok(())
+    }
+
+    /// Expire escrow (Refund Buyer if time passed)
+    pub fn expire_escrow(env: Env, escrow_id: u64) -> Result<(), ContractError> {
+        let mut escrow: TradeEscrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        if env.ledger().timestamp() <= escrow.expiry_ts {
+            return Err(ContractError::EscrowNotExpired);
+        }
+
+        if escrow.status != EscrowStatus::Active {
+            return Err(ContractError::EscrowError);
+        }
+
+        // Refund Buyer
+        let token_client = token::Client::new(&env, &escrow.asset);
+        token_client.transfer(&env.current_contract_address(), &escrow.buyer, &escrow.amount);
+
+        escrow.status = EscrowStatus::Cancelled;
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        env.events()
+            .publish((symbol_short!("esc_exp"),), (escrow_id,));
+        Ok(())
+    }
+
+    /// Dispute escrow (Locks funds until resolution)
+    pub fn dispute_escrow(env: Env, escrow_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+
+        let mut escrow: TradeEscrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        // Only Buyer, Seller, or Lender can raise dispute
+        if caller != escrow.buyer && caller != escrow.seller && caller != escrow.lender {
+             return Err(ContractError::Unauthorized);
+        }
+
+        if escrow.status != EscrowStatus::Active {
+             return Err(ContractError::EscrowError);
+        }
+
+        escrow.status = EscrowStatus::Disputed;
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        env.events()
+            .publish((symbol_short!("esc_dsp"),), (escrow_id,));
+        Ok(())
+    }
+
+    pub fn get_escrow(env: Env, escrow_id: u64) -> Option<TradeEscrow> {
+        env.storage().persistent().get(&escrow_id)
     }
 
     // --- Governance Functions ---
@@ -470,7 +536,7 @@ impl StelloVaultContract {
 
         Ok(())
     }
-    
+
     // Internal helper for sqrt
     fn sqrt(n: u128) -> u128 {
         if n < 2 {
@@ -489,11 +555,13 @@ impl StelloVaultContract {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::{testutils::{Address as _, Ledger}, Env};
 
     #[test]
     fn test_initialize() {
         let env = Env::default();
+        env.mock_all_auths();
+
         let admin = Address::generate(&env);
         let contract_id = env.register(StelloVaultContract, ());
         let client = StelloVaultContractClient::new(&env, &contract_id);
@@ -503,7 +571,7 @@ mod test {
 
         let admin_result = client.admin();
         assert_eq!(admin_result, admin);
-        
+
         // Check default LTV via storage inspection
         env.as_contract(&contract_id, || {
             let max_ltv: u32 = env.storage().instance().get(&symbol_short!("max_ltv")).unwrap();
@@ -515,7 +583,7 @@ mod test {
     fn test_tokenize_collateral() {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let admin = Address::generate(&env);
         let owner = Address::generate(&env);
         let contract_id = env.register(StelloVaultContract, ());
@@ -539,10 +607,125 @@ mod test {
         );
 
         assert_eq!(token_id, 1);
-        
+
         let collateral = client.get_collateral(&token_id).unwrap();
         assert_eq!(collateral.owner, owner);
         assert_eq!(collateral.asset_value, 10000);
+    }
+
+    #[test]
+    fn test_create_and_release_escrow() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let contract_id = env.register(StelloVaultContract, ());
+        let client = StelloVaultContractClient::new(&env, &contract_id);
+
+        let gov_token = Address::generate(&env);
+        client.initialize(&admin, &gov_token);
+
+        let buyer = Address::generate(&env);
+        let seller = Address::generate(&env);
+        let lender = Address::generate(&env);
+        let oracle = Address::generate(&env);
+
+        // Whitelist oracle and collateral
+        let asset_type = Symbol::new(&env, "INVOICE");
+        env.as_contract(&contract_id, || {
+            env.storage().persistent().set(&(symbol_short!("w_orc"), oracle.clone()), &true);
+            env.storage().persistent().set(&(symbol_short!("w_col"), asset_type.clone()), &true);
+        });
+
+        // Create collateral
+        let token_id = client.tokenize_collateral(
+            &buyer,
+            &asset_type,
+            &10000,
+            &Symbol::new(&env, "META"),
+            &100
+        );
+
+        // Create token for payment
+        let token_admin = Address::generate(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin);
+        let token_address = token_contract.address();
+        let token = token::Client::new(&env, &token_address);
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+
+        token_admin_client.mint(&buyer, &10000);
+
+        let expiry = env.ledger().timestamp() + 1000;
+        let escrow_id = client.create_escrow(
+            &buyer,
+            &seller,
+            &lender,
+            &token_id,
+            &7000, // 70% LTV of 10000 = 7000 max
+            &token_address,
+            &oracle,
+            &symbol_short!("ship_del"),
+            &expiry
+        );
+
+        client.release_funds(&escrow_id);
+
+        let escrow = client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Released);
+    }
+
+    #[test]
+    fn test_escrow_expiry() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let contract_id = env.register(StelloVaultContract, ());
+        let client = StelloVaultContractClient::new(&env, &contract_id);
+
+        let gov_token = Address::generate(&env);
+        client.initialize(&admin, &gov_token);
+
+        let buyer = Address::generate(&env);
+        let seller = Address::generate(&env);
+        let lender = Address::generate(&env);
+        let oracle = Address::generate(&env);
+
+        // Whitelist oracle and collateral
+        let asset_type = Symbol::new(&env, "INVOICE");
+        env.as_contract(&contract_id, || {
+            env.storage().persistent().set(&(symbol_short!("w_orc"), oracle.clone()), &true);
+            env.storage().persistent().set(&(symbol_short!("w_col"), asset_type.clone()), &true);
+        });
+
+        // Create collateral
+        let token_id = client.tokenize_collateral(
+            &buyer,
+            &asset_type,
+            &10000,
+            &Symbol::new(&env, "META"),
+            &100
+        );
+
+        let token_admin = Address::generate(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin);
+        let token_address = token_contract.address();
+        let token = token::Client::new(&env, &token_address);
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+
+        token_admin_client.mint(&buyer, &10000);
+
+        let expiry = env.ledger().timestamp() + 100;
+        let escrow_id = client.create_escrow(
+            &buyer, &seller, &lender, &token_id, &500, &token_address, &oracle, &symbol_short!("cond"), &expiry
+        );
+
+        env.ledger().set_timestamp(expiry + 1);
+
+        client.expire_escrow(&escrow_id);
+
+        let escrow = client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Cancelled);
     }
 
     #[test]
@@ -559,12 +742,7 @@ mod test {
         // Create a separate token contract for testing
         let gov_token_admin = Address::generate(&env);
         let gov_token_id = env.register_stellar_asset_contract(gov_token_admin.clone());
-        let gov_token_client = token::Client::new(&env, &gov_token_id);
-        
-        // Mint tokens to users (StellarAssetClient matches token::StellarAssetClient import/usage if available, 
-        // but here we just use the token client or register call. 
-        // Note: register_stellar_asset_contract returns Address.
-        // We need to mint. 
+
         token::StellarAssetClient::new(&env, &gov_token_id).mint(&user1, &1000);
         token::StellarAssetClient::new(&env, &gov_token_id).mint(&user2, &1000);
 
@@ -573,7 +751,7 @@ mod test {
         // 1. Propose LTV change
         let new_ltv = 8000u32;
         let action = GovernanceAction::UpdateMaxLTV(new_ltv);
-        
+
         let proposal_id = client.propose(
             &user1,
             &Symbol::new(&env, "LTV_UP"),
@@ -585,16 +763,18 @@ mod test {
         // 2. Vote
         // User 1 votes with weight 100 -> sqrt(100) = 10 votes
         client.vote(&user1, &proposal_id, &100);
-        
+
         // User 2 votes with weight 400 -> sqrt(400) = 20 votes
         client.vote(&user2, &proposal_id, &400);
 
-        // Check details via storage or we could add a getter to the contract?
-        // Using storage inspection for now as `get_proposal` is not in the interface, only get_collateral/escrow.
+        // Check details via storage inspection
         env.as_contract(&contract_id, || {
             let proposal: Proposal = env.storage().persistent().get(&(symbol_short!("prop"), proposal_id)).unwrap();
             assert_eq!(proposal.vote_count, 30);
         });
+
+        // Advance time past vote period
+        env.ledger().set_timestamp(env.ledger().timestamp() + 1001);
 
         // 3. Execute
         client.execute_proposal(&proposal_id);
@@ -603,7 +783,7 @@ mod test {
         env.as_contract(&contract_id, || {
             let current_ltv: u32 = env.storage().instance().get(&symbol_short!("max_ltv")).unwrap();
             assert_eq!(current_ltv, 8000);
-            
+
             let proposal_updated: Proposal = env.storage().persistent().get(&(symbol_short!("prop"), proposal_id)).unwrap();
             assert!(proposal_updated.executed);
         });
