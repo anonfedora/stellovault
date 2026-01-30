@@ -111,6 +111,7 @@ pub struct Collateral {
     pub face_value: i64,
     pub expiry_ts: i64,
     pub metadata_hash: String,
+    pub tx_hash: Option<String>,
     pub registered_at: DateTime<Utc>,
     pub locked: bool,
     pub status: CollateralStatus,

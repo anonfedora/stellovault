@@ -23,8 +23,12 @@ pub struct EscrowService {
 
 impl EscrowService {
     /// Create new escrow service instance
-    pub fn new(db_pool: PgPool, horizon_url: String, network_passphrase: String) -> Self {
-        let collateral_service = CollateralService::new(db_pool.clone().into());
+    pub fn new(
+        db_pool: PgPool,
+        horizon_url: String,
+        network_passphrase: String,
+        collateral_service: CollateralService,
+    ) -> Self {
         Self {
             db_pool,
             collateral_service,
@@ -40,9 +44,9 @@ impl EscrowService {
     ) -> Result<CreateEscrowResponse> {
         // Validate collateral exists in registry and is not locked
         let collateral = self.collateral_service
-            .get_collateral(&request.collateral_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Collateral not found in registry"))?;
+            .get_collateral_by_id_string(&request.collateral_id)
+            .await
+            .context("Collateral not found in registry")?;
 
         if collateral.locked {
             anyhow::bail!("Collateral is already locked in another escrow");
@@ -389,9 +393,9 @@ impl EscrowService {
     /// Get collateral by ID
     async fn get_collateral(&self, id: &str) -> Result<CollateralToken> {
         let collateral = self.collateral_service
-            .get_collateral(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Collateral not found"))?;
+            .get_collateral_by_id_string(id)
+            .await
+            .context("Collateral not found")?;
 
         // Convert to old CollateralToken format for compatibility
         // This is a temporary bridge until we fully migrate
