@@ -31,6 +31,12 @@ impl CollateralService {
             return Err(ApiError::BadRequest("Face value must be positive".to_string()));
         }
 
+        // Validate expiry timestamp
+        let now = Utc::now().timestamp();
+        if request.expiry_ts <= now {
+            return Err(ApiError::BadRequest("Expiry timestamp must be in the future".to_string()));
+        }
+
         // 2. Register on-chain (Simulated for now)
         tracing::info!(
             "Registering collateral on Soroban: contract={}, id={}, value={}",
@@ -161,7 +167,7 @@ impl CollateralService {
     pub async fn update_lock_status(&self, collateral_id: &str, locked: bool) -> Result<(), ApiError> {
         let status = if locked { CollateralStatus::Locked } else { CollateralStatus::Active };
         
-        sqlx::query(
+        let result = sqlx::query(
             "UPDATE collateral SET locked = $1, status = $2 WHERE collateral_id = $3"
         )
         .bind(locked)
@@ -170,6 +176,10 @@ impl CollateralService {
         .execute(&self.db_pool)
         .await
         .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(ApiError::NotFound(format!("Collateral with ID {} not found", collateral_id)));
+        }
 
         Ok(())
     }

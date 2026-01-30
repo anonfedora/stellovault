@@ -71,37 +71,49 @@ impl CollateralIndexer {
                 // We assume the service already created the record, but if we are "syncing from chain",
                 // we might need to UPSERT here.
                 // For now, let's update the status to ensure it matches chain.
-                sqlx::query(
+                let result = sqlx::query(
                     "UPDATE collateral SET status = $1, tx_hash = COALESCE(tx_hash, $2) WHERE collateral_id = $3"
                 )
                 .bind(CollateralStatus::Active)
                 .bind(tx_hash)
-                .bind(collateral_id)
+                .bind(&collateral_id)
                 .execute(&self.db_pool)
                 .await
                 .map_err(|e| e.to_string())?;
+
+                if result.rows_affected() == 0 {
+                    tracing::warn!("Registered event processed but no collateral found in DB: {}", collateral_id);
+                }
             }
             CollateralEvent::Locked { collateral_id } => {
                 tracing::info!("Processing Locked event for {}", collateral_id);
-                sqlx::query(
+                let result = sqlx::query(
                     "UPDATE collateral SET locked = true, status = $1 WHERE collateral_id = $2"
                 )
                 .bind(CollateralStatus::Locked)
-                .bind(collateral_id)
+                .bind(&collateral_id)
                 .execute(&self.db_pool)
                 .await
                 .map_err(|e| e.to_string())?;
+
+                if result.rows_affected() == 0 {
+                    tracing::warn!("Locked event processed but no collateral found in DB: {}", collateral_id);
+                }
             }
             CollateralEvent::Unlocked { collateral_id } => {
                  tracing::info!("Processing Unlocked event for {}", collateral_id);
-                 sqlx::query(
+                 let result = sqlx::query(
                     "UPDATE collateral SET locked = false, status = $1 WHERE collateral_id = $2"
                 )
                 .bind(CollateralStatus::Active)
-                .bind(collateral_id)
+                .bind(&collateral_id)
                 .execute(&self.db_pool)
                 .await
                 .map_err(|e| e.to_string())?;
+
+                if result.rows_affected() == 0 {
+                    tracing::warn!("Unlocked event processed but no collateral found in DB: {}", collateral_id);
+                }
             }
         }
         Ok(())
