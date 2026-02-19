@@ -1,4 +1,4 @@
-import { NotFoundError, ValidationError } from "../config/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "../config/errors";
 import { contracts } from "../config/contracts";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
@@ -11,6 +11,7 @@ const ZERO = new Prisma.Decimal("0");
 type LoanStatus = "PENDING" | "ACTIVE" | "REPAID" | "DEFAULTED";
 
 interface IssueLoanRequest {
+    requestingUserId?: string;
     borrowerId?: string;
     lenderId?: string;
     amount?: number | string;
@@ -20,6 +21,7 @@ interface IssueLoanRequest {
 }
 
 interface RecordRepaymentRequest {
+    requestingUserId?: string;
     loanId?: string;
     amount?: number | string;
     paidAt?: string | Date;
@@ -40,6 +42,11 @@ function parsePositiveDecimal(value: number | string | undefined, fieldName: str
 
 export class LoanService {
     async issueLoan(payload: IssueLoanRequest) {
+        const requestingUserId = payload.requestingUserId?.trim();
+        if (!requestingUserId) {
+            throw new ValidationError("requestingUserId is required");
+        }
+
         const borrowerId = payload.borrowerId?.trim();
         const lenderId = payload.lenderId?.trim();
         if (!borrowerId) {
@@ -50,6 +57,9 @@ export class LoanService {
         }
         if (borrowerId === lenderId) {
             throw new ValidationError("Borrower and lender must be different");
+        }
+        if (requestingUserId !== borrowerId && requestingUserId !== lenderId) {
+            throw new ForbiddenError("Only the borrower or lender can create this loan");
         }
 
         const amount = parsePositiveDecimal(payload.amount, "amount");
@@ -148,6 +158,11 @@ export class LoanService {
     }
 
     async recordRepayment(payload: RecordRepaymentRequest) {
+        const requestingUserId = payload.requestingUserId?.trim();
+        if (!requestingUserId) {
+            throw new ValidationError("requestingUserId is required");
+        }
+
         const loanId = payload.loanId?.trim();
         if (!loanId) {
             throw new ValidationError("loanId is required");
@@ -170,6 +185,9 @@ export class LoanService {
             });
             if (!loan) {
                 throw new NotFoundError("Loan not found");
+            }
+            if (requestingUserId !== loan.borrowerId && requestingUserId !== loan.lenderId) {
+                throw new ForbiddenError("Only the borrower or lender can record repayments");
             }
             if (loan.status === "DEFAULTED") {
                 throw new ValidationError("Cannot record repayment for a defaulted loan");
@@ -204,14 +222,20 @@ export class LoanService {
                 nextStatus = "ACTIVE";
             }
 
-            const updatedLoan =
-                nextStatus === loan.status
-                    ? loan
-                    : await tx.loan.update({
-                        where: { id: loanId },
-                        data: { status: nextStatus },
-                        include: { repayments: true, borrower: true, lender: true },
-                    });
+            if (nextStatus !== loan.status) {
+                await tx.loan.update({
+                    where: { id: loanId },
+                    data: { status: nextStatus },
+                });
+            }
+
+            const updatedLoan = await tx.loan.findUnique({
+                where: { id: loanId },
+                include: { repayments: true, borrower: true, lender: true },
+            });
+            if (!updatedLoan) {
+                throw new NotFoundError("Loan not found");
+            }
 
             return {
                 repayment,

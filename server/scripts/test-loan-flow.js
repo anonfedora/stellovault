@@ -68,9 +68,11 @@ async function seedUser(id) {
 async function run() {
     const borrowerId = randomUUID();
     const lenderId = randomUUID();
+    const outsiderId = randomUUID();
 
     const borrower = await seedUser(borrowerId);
     const lender = await seedUser(lenderId);
+    const outsider = await seedUser(outsiderId);
     console.log(`BORROWER_ID=${borrower.id}`);
     console.log(`LENDER_ID=${lender.id}`);
 
@@ -92,6 +94,15 @@ async function run() {
             userId: borrower.id,
             jti: `loan-test-${Date.now()}`,
             walletAddress: borrower.stellarAddress,
+        },
+        JWT_ACCESS_SECRET,
+        { expiresIn: "1h" }
+    );
+    const outsiderToken = jwt.sign(
+        {
+            userId: outsider.id,
+            jti: `loan-test-outsider-${Date.now()}`,
+            walletAddress: outsider.stellarAddress,
         },
         JWT_ACCESS_SECRET,
         { expiresIn: "1h" }
@@ -119,6 +130,15 @@ async function run() {
     assertCondition("issue loan returns loanId", Boolean(loanId), issueLoan.body);
     assertCondition("issue loan returns unsigned xdr", typeof xdr === "string" && xdr.length > 0, issueLoan.body);
 
+    const outsiderIssueLoan = await request("POST", "/loans", outsiderToken, {
+        borrowerId: borrower.id,
+        lenderId: lender.id,
+        amount: "100",
+        collateralAmt: "160",
+        assetCode: "USDC",
+    });
+    assertStatus("outsider issue loan returns 403", outsiderIssueLoan.status, 403, outsiderIssueLoan.body);
+
     const getLoan = await request("GET", `/loans/${loanId}`, token);
     assertStatus("get loan", getLoan.status, 200, getLoan.body);
     assertCondition("new loan starts as PENDING", getLoan.body?.data?.status === "PENDING", getLoan.body);
@@ -136,6 +156,12 @@ async function run() {
     assertCondition("partial repayment not fully repaid", repayPartial.body?.data?.fullyRepaid === false, repayPartial.body);
     assertCondition("partial repayment sets ACTIVE", repayPartial.body?.data?.loan?.status === "ACTIVE", repayPartial.body);
     assertCondition("partial repayment outstanding values are strings", typeof repayPartial.body?.data?.outstandingBefore === "string" && typeof repayPartial.body?.data?.outstandingAfter === "string", repayPartial.body);
+
+    const outsiderRepay = await request("POST", "/loans/repay", outsiderToken, {
+        loanId,
+        amount: "10",
+    });
+    assertStatus("outsider repayment returns 403", outsiderRepay.status, 403, outsiderRepay.body);
 
     const overpay = await request("POST", "/loans/repay", token, {
         loanId,

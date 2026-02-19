@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { UnauthorizedError } from "../config/errors";
 import loanService from "../services/loan.service";
 
 export async function listLoans(req: Request, res: Response, next: NextFunction) {
@@ -22,7 +23,15 @@ export async function getLoan(req: Request, res: Response, next: NextFunction) {
 
 export async function createLoan(req: Request, res: Response, next: NextFunction) {
     try {
-        const result = await loanService.issueLoan(req.body);
+        const requestingUserId = req.user?.userId;
+        if (!requestingUserId) {
+            throw new UnauthorizedError("Authentication required");
+        }
+
+        const result = await loanService.issueLoan({
+            ...req.body,
+            requestingUserId,
+        });
         res.status(201).json({
             success: true,
             data: {
@@ -36,7 +45,15 @@ export async function createLoan(req: Request, res: Response, next: NextFunction
 
 export async function recordRepayment(req: Request, res: Response, next: NextFunction) {
     try {
-        const result = await loanService.recordRepayment(req.body);
+        const requestingUserId = req.user?.userId;
+        if (!requestingUserId) {
+            throw new UnauthorizedError("Authentication required");
+        }
+
+        const result = await loanService.recordRepayment({
+            ...req.body,
+            requestingUserId,
+        });
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 }
