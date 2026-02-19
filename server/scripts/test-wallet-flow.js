@@ -45,6 +45,13 @@ function assertStatus(name, actual, expected, payload) {
     console.log(`[PASS] ${name}: ${actual}`);
 }
 
+function assertCondition(name, condition, payload) {
+    if (!condition) {
+        throw new Error(`${name} failed\nPayload: ${JSON.stringify(payload, null, 2)}`);
+    }
+    console.log(`[PASS] ${name}`);
+}
+
 async function run() {
     const wallet1 = Keypair.random();
     const wallet2 = Keypair.random();
@@ -142,6 +149,47 @@ async function run() {
 
     const deleteLast = await request("DELETE", `/wallets/${wallet2Row.id}`, token);
     assertStatus("unlink last wallet returns 400", deleteLast.status, 400, deleteLast.body);
+
+    // Race test: same challenge consumed concurrently must allow only one success.
+    const raceWallet = Keypair.random();
+    const raceChallenge = await request("POST", "/wallets/challenge", token, {
+        walletAddress: raceWallet.publicKey(),
+    });
+    assertStatus("race challenge", raceChallenge.status, 200, raceChallenge.body);
+    const raceNonce = raceChallenge.body?.data?.nonce;
+    const raceMessage = raceChallenge.body?.data?.message;
+    assertCondition(
+        "race challenge returns nonce+message",
+        typeof raceNonce === "string" && typeof raceMessage === "string",
+        raceChallenge.body
+    );
+
+    const raceSignature = raceWallet.sign(Buffer.from(raceMessage)).toString("base64");
+    const racePayload = {
+        walletAddress: raceWallet.publicKey(),
+        nonce: raceNonce,
+        signature: raceSignature,
+        label: "Race Wallet",
+    };
+
+    const [race1, race2] = await Promise.all([
+        request("POST", "/wallets", token, racePayload),
+        request("POST", "/wallets", token, racePayload),
+    ]);
+
+    console.log("race resp1:", race1.status, race1.body?.error || "ok");
+    console.log("race resp2:", race2.status, race2.body?.error || "ok");
+
+    const raceStatuses = [race1.status, race2.status];
+    const raceSuccessCount = raceStatuses.filter((status) => status === 201).length;
+    const raceFailureCount = raceStatuses.filter((status) => status >= 400 && status < 500).length;
+    assertCondition("race exactly one success", raceSuccessCount === 1, raceStatuses);
+    assertCondition("race exactly one 4xx failure", raceFailureCount === 1, raceStatuses);
+
+    const raceRows = await prisma.wallet.findMany({
+        where: { userId: user.id, address: raceWallet.publicKey() },
+    });
+    assertCondition("race creates only one wallet row", raceRows.length === 1, raceRows);
 
     console.log("\nWallet flow test passed.");
 }

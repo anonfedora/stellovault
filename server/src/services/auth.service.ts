@@ -18,8 +18,15 @@ type ChallengePurpose = (typeof CHALLENGE_PURPOSE)[keyof typeof CHALLENGE_PURPOS
 type DbClient = any;
 
 export class AuthService {
-    private normalizeAddress(address: string): string {
-        return address.trim().toUpperCase();
+    private requireNonEmptyString(value: unknown, fieldName: string): string {
+        if (typeof value !== "string" || value.trim().length === 0) {
+            throw new ValidationError(`${fieldName} is required`);
+        }
+        return value.trim();
+    }
+
+    private normalizeAddress(address: unknown): string {
+        return this.requireNonEmptyString(address, "walletAddress").toUpperCase();
     }
 
     private assertValidStellarAddress(address: string): void {
@@ -35,11 +42,8 @@ export class AuthService {
         return `stellovault:${action}:${nonce}`;
     }
 
-    private decodeSignature(signature: string): Buffer {
-        const value = signature.trim();
-        if (!value) {
-            throw new ValidationError("Signature is required");
-        }
+    private decodeSignature(signature: unknown): Buffer {
+        const value = this.requireNonEmptyString(signature, "signature");
 
         if (/^[0-9a-fA-F]+$/.test(value) && value.length % 2 === 0) {
             const decoded = Buffer.from(value, "hex");
@@ -66,10 +70,19 @@ export class AuthService {
         purpose: ChallengePurpose,
         userId?: string
     ): Promise<void> {
+        const normalizedNonce = this.requireNonEmptyString(nonce, "nonce");
         const now = new Date();
+
+        const message = Buffer.from(this.buildChallengeMessage(purpose, normalizedNonce));
+        const signatureBytes = this.decodeSignature(signature);
+        const isValid = Keypair.fromPublicKey(address).verify(message, signatureBytes);
+        if (!isValid) {
+            throw new UnauthorizedError("Invalid signature");
+        }
+
         const where: Record<string, unknown> = {
             walletAddress: address,
-            nonce,
+            nonce: normalizedNonce,
             purpose,
             usedAt: null,
             expiresAt: { gt: now },
@@ -78,26 +91,14 @@ export class AuthService {
             where.userId = userId;
         }
 
-        const challenge = await db.walletChallenge.findFirst({
+        // Atomic consume prevents concurrent double-use of the same challenge.
+        const consumeResult = await db.walletChallenge.updateMany({
             where,
-            orderBy: { createdAt: "desc" },
-        });
-
-        if (!challenge) {
-            throw new UnauthorizedError("Invalid or expired challenge");
-        }
-
-        const message = Buffer.from(this.buildChallengeMessage(purpose, nonce));
-        const signatureBytes = this.decodeSignature(signature);
-        const isValid = Keypair.fromPublicKey(address).verify(message, signatureBytes);
-        if (!isValid) {
-            throw new UnauthorizedError("Invalid signature");
-        }
-
-        await db.walletChallenge.update({
-            where: { id: challenge.id },
             data: { usedAt: now },
         });
+        if (consumeResult.count !== 1) {
+            throw new UnauthorizedError("Invalid or expired challenge");
+        }
     }
 
     async generateChallenge(
@@ -114,8 +115,9 @@ export class AuthService {
 
         const nonce = randomBytes(24).toString("hex");
         const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
+        const db: any = prisma;
 
-        await prisma.walletChallenge.create({
+        await db.walletChallenge.create({
             data: {
                 walletAddress: normalizedAddress,
                 nonce,
@@ -133,7 +135,8 @@ export class AuthService {
     }
 
     async getUserWallets(userId: string) {
-        return prisma.wallet.findMany({
+        const db: any = prisma;
+        return db.wallet.findMany({
             where: { userId },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
         });
@@ -284,12 +287,13 @@ export class AuthService {
     }
 
     async updateWalletLabel(userId: string, walletId: string, label?: string) {
-        const wallet = await prisma.wallet.findFirst({ where: { id: walletId, userId } });
+        const db: any = prisma;
+        const wallet = await db.wallet.findFirst({ where: { id: walletId, userId } });
         if (!wallet) {
             throw new NotFoundError("Wallet not found");
         }
 
-        return prisma.wallet.update({
+        return db.wallet.update({
             where: { id: walletId },
             data: { label: label?.trim() || null },
         });

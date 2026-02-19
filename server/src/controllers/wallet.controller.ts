@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { UnauthorizedError } from "../config/errors";
+import { UnauthorizedError, ValidationError } from "../config/errors";
 import authService from "../services/auth.service";
 
 function getUserId(req: Request): string {
@@ -8,6 +8,13 @@ function getUserId(req: Request): string {
         throw new UnauthorizedError("Unauthorized");
     }
     return userId;
+}
+
+function requireNonEmptyString(value: unknown, field: string): string {
+    if (typeof value !== "string" || value.trim().length === 0) {
+        throw new ValidationError(`${field} is required`);
+    }
+    return value.trim();
 }
 
 /**
@@ -25,7 +32,7 @@ export async function listWallets(req: Request, res: Response, next: NextFunctio
  */
 export async function walletChallenge(req: Request, res: Response, next: NextFunction) {
     try {
-        const { walletAddress } = req.body;
+        const walletAddress = requireNonEmptyString(req.body?.walletAddress, "walletAddress");
         const challenge = await authService.generateChallenge(
             walletAddress,
             "LINK_WALLET",
@@ -40,7 +47,13 @@ export async function walletChallenge(req: Request, res: Response, next: NextFun
  */
 export async function linkWallet(req: Request, res: Response, next: NextFunction) {
     try {
-        const { walletAddress, nonce, signature, label } = req.body;
+        const walletAddress = requireNonEmptyString(req.body?.walletAddress, "walletAddress");
+        const nonce = requireNonEmptyString(req.body?.nonce, "nonce");
+        const signature = requireNonEmptyString(req.body?.signature, "signature");
+        const label = req.body?.label;
+        if (label !== undefined && typeof label !== "string") {
+            throw new ValidationError("label must be a string");
+        }
         const wallet = await authService.linkWallet(
             getUserId(req),
             walletAddress,
