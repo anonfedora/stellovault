@@ -19,12 +19,17 @@ import analyticsRoutes from "./routes/analytics.routes";
 
 // Middleware
 import { rateLimitMiddleware } from "./middleware/rate-limit.middleware";
-import { errorMiddleware, notFoundMiddleware } from "./middleware/error.middleware";
+import {
+  errorMiddleware,
+  notFoundMiddleware,
+} from "./middleware/error.middleware";
+import { requestTraceMiddleware } from "./middleware/request-trace.middleware";
 
 const app = express();
 
 // ── Global Middleware ────────────────────────────────────────────────────────
 app.use(helmet());
+app.use(requestTraceMiddleware);
 app.use(cors({ origin: env.corsAllowedOrigins }));
 app.use(morgan("dev"));
 app.use(express.json());
@@ -32,7 +37,7 @@ app.use(rateLimitMiddleware);
 
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
-    res.json({ status: "ok", version: "1.0.0", timestamp: new Date() });
+  res.json({ status: "ok", version: "1.0.0", timestamp: new Date() });
 });
 
 // ── API Routes ───────────────────────────────────────────────────────────────
@@ -56,8 +61,8 @@ app.use(errorMiddleware);
 
 const port = env.port;
 app.listen(port, () => {
-    console.log(`StelloVault server running on http://localhost:${port}`);
-    console.log(`Routes mounted at ${api}`);
+  console.log(`StelloVault server running on http://localhost:${port}`);
+  console.log(`Routes mounted at ${api}`);
 });
 
 export default app;
