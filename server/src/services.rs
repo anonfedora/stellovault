@@ -1,5 +1,7 @@
 //! Business logic services for StelloVault
 
+pub mod event_monitoring_service;
+
 // Placeholder services - to be implemented
 
 pub struct UserService;

@@ -14,6 +14,7 @@ use tower_http::cors::CorsLayer;
 mod handlers;
 mod models;
 mod routes;
+mod config;
 mod services;
 
 #[tokio::main]
@@ -32,6 +33,12 @@ async fn main() {
         .merge(routes::escrow_routes())
         .merge(routes::analytics_routes())
         .layer(CorsLayer::permissive()); // TODO: Configure CORS properly
+
+    // Start background Soroban event indexer.
+    let event_indexer = services::event_monitoring_service::EventMonitoringService::from_env().await;
+    tokio::spawn(async move {
+        event_indexer.start().await;
+    });
 
     // Get port from environment or default to 3001
     let port = std::env::var("PORT")
