@@ -1,13 +1,22 @@
 import { Request, Response, NextFunction } from "express";
+import { UnauthorizedError } from "../config/errors";
+import authService from "../services/auth.service";
 
-// TODO: Inject WalletService / AuthService
+function getUserId(req: Request): string {
+    const userId = req.user?.userId;
+    if (!userId) {
+        throw new UnauthorizedError("Unauthorized");
+    }
+    return userId;
+}
 
 /**
  * GET /api/wallets
  */
 export async function listWallets(req: Request, res: Response, next: NextFunction) {
     try {
-        res.json({ success: true, data: [] });
+        const wallets = await authService.getUserWallets(getUserId(req));
+        res.json({ success: true, data: wallets });
     } catch (err) { next(err); }
 }
 
@@ -17,7 +26,12 @@ export async function listWallets(req: Request, res: Response, next: NextFunctio
 export async function walletChallenge(req: Request, res: Response, next: NextFunction) {
     try {
         const { walletAddress } = req.body;
-        res.json({ success: true, data: { nonce: "TODO", expiresAt: new Date() } });
+        const challenge = await authService.generateChallenge(
+            walletAddress,
+            "LINK_WALLET",
+            getUserId(req)
+        );
+        res.json({ success: true, data: challenge });
     } catch (err) { next(err); }
 }
 
@@ -27,7 +41,14 @@ export async function walletChallenge(req: Request, res: Response, next: NextFun
 export async function linkWallet(req: Request, res: Response, next: NextFunction) {
     try {
         const { walletAddress, nonce, signature, label } = req.body;
-        res.status(201).json({ success: true, data: null });
+        const wallet = await authService.linkWallet(
+            getUserId(req),
+            walletAddress,
+            nonce,
+            signature,
+            label
+        );
+        res.status(201).json({ success: true, data: wallet });
     } catch (err) { next(err); }
 }
 
@@ -36,6 +57,7 @@ export async function linkWallet(req: Request, res: Response, next: NextFunction
  */
 export async function unlinkWallet(req: Request, res: Response, next: NextFunction) {
     try {
+        await authService.unlinkWallet(getUserId(req), req.params.id);
         res.status(204).send();
     } catch (err) { next(err); }
 }
@@ -45,7 +67,8 @@ export async function unlinkWallet(req: Request, res: Response, next: NextFuncti
  */
 export async function setPrimaryWallet(req: Request, res: Response, next: NextFunction) {
     try {
-        res.json({ success: true, data: null });
+        const wallet = await authService.setPrimaryWallet(getUserId(req), req.params.id);
+        res.json({ success: true, data: wallet });
     } catch (err) { next(err); }
 }
 
@@ -55,6 +78,7 @@ export async function setPrimaryWallet(req: Request, res: Response, next: NextFu
 export async function updateWallet(req: Request, res: Response, next: NextFunction) {
     try {
         const { label } = req.body;
-        res.json({ success: true, data: null });
+        const wallet = await authService.updateWalletLabel(getUserId(req), req.params.id, label);
+        res.json({ success: true, data: wallet });
     } catch (err) { next(err); }
 }
