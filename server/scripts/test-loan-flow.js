@@ -3,18 +3,24 @@
 const path = require("path");
 const { randomUUID } = require("crypto");
 const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
 const { Keypair } = require("@stellar/stellar-sdk");
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const API_BASE = process.env.API_BASE || "http://localhost:3001/api";
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "change-me-in-prod";
+const LOAN_CONTRACT_ID = process.env.LOAN_CONTRACT_ID || "";
 const prisma = new PrismaClient();
 
-async function request(method, endpoint, body) {
+async function request(method, endpoint, token, body) {
     const response = await fetch(`${API_BASE}${endpoint}`, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
+        headers: {
+            ...(body ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: body ? JSON.stringify(body) : undefined,
     });
 
@@ -53,21 +59,56 @@ async function seedUser(id) {
             stellarAddress: keypair.publicKey(),
         },
     });
-    return user.id;
+    return {
+        id: user.id,
+        stellarAddress: user.stellarAddress,
+    };
 }
 
 async function run() {
     const borrowerId = randomUUID();
     const lenderId = randomUUID();
 
-    await seedUser(borrowerId);
-    await seedUser(lenderId);
-    console.log(`BORROWER_ID=${borrowerId}`);
-    console.log(`LENDER_ID=${lenderId}`);
+    const borrower = await seedUser(borrowerId);
+    const lender = await seedUser(lenderId);
+    console.log(`BORROWER_ID=${borrower.id}`);
+    console.log(`LENDER_ID=${lender.id}`);
 
-    const issueLoan = await request("POST", "/loans", {
-        borrowerId,
-        lenderId,
+    assertCondition("LOAN_CONTRACT_ID is configured", LOAN_CONTRACT_ID.trim().length > 0, {
+        LOAN_CONTRACT_ID,
+    });
+
+    const unauthIssueLoan = await request("POST", "/loans", undefined, {
+        borrowerId: borrower.id,
+        lenderId: lender.id,
+        amount: "100",
+        collateralAmt: "160",
+        assetCode: "USDC",
+    });
+    assertStatus("unauthenticated issue loan returns 401", unauthIssueLoan.status, 401, unauthIssueLoan.body);
+
+    const token = jwt.sign(
+        {
+            userId: borrower.id,
+            jti: `loan-test-${Date.now()}`,
+            walletAddress: borrower.stellarAddress,
+        },
+        JWT_ACCESS_SECRET,
+        { expiresIn: "1h" }
+    );
+
+    const selfLending = await request("POST", "/loans", token, {
+        borrowerId: borrower.id,
+        lenderId: borrower.id,
+        amount: "100",
+        collateralAmt: "160",
+        assetCode: "USDC",
+    });
+    assertStatus("self-lending returns 400", selfLending.status, 400, selfLending.body);
+
+    const issueLoan = await request("POST", "/loans", token, {
+        borrowerId: borrower.id,
+        lenderId: lender.id,
         amount: "100",
         collateralAmt: "160",
         assetCode: "USDC",
@@ -78,24 +119,31 @@ async function run() {
     assertCondition("issue loan returns loanId", Boolean(loanId), issueLoan.body);
     assertCondition("issue loan returns unsigned xdr", typeof xdr === "string" && xdr.length > 0, issueLoan.body);
 
-    const getLoan = await request("GET", `/loans/${loanId}`);
+    const getLoan = await request("GET", `/loans/${loanId}`, token);
     assertStatus("get loan", getLoan.status, 200, getLoan.body);
     assertCondition("new loan starts as PENDING", getLoan.body?.data?.status === "PENDING", getLoan.body);
 
-    const listPending = await request("GET", "/loans?status=PENDING");
+    const listPending = await request("GET", "/loans?status=PENDING", token);
     assertStatus("list pending loans", listPending.status, 200, listPending.body);
     const pendingIds = (listPending.body?.data || []).map((loan) => loan.id);
     assertCondition("pending list includes created loan", pendingIds.includes(loanId), listPending.body);
 
-    const repayPartial = await request("POST", "/loans/repay", {
+    const repayPartial = await request("POST", "/loans/repay", token, {
         loanId,
         amount: "40",
     });
     assertStatus("record partial repayment", repayPartial.status, 200, repayPartial.body);
     assertCondition("partial repayment not fully repaid", repayPartial.body?.data?.fullyRepaid === false, repayPartial.body);
     assertCondition("partial repayment sets ACTIVE", repayPartial.body?.data?.loan?.status === "ACTIVE", repayPartial.body);
+    assertCondition("partial repayment outstanding values are strings", typeof repayPartial.body?.data?.outstandingBefore === "string" && typeof repayPartial.body?.data?.outstandingAfter === "string", repayPartial.body);
 
-    const repayFinal = await request("POST", "/loans/repay", {
+    const overpay = await request("POST", "/loans/repay", token, {
+        loanId,
+        amount: "70",
+    });
+    assertStatus("overpayment returns 400", overpay.status, 400, overpay.body);
+
+    const repayFinal = await request("POST", "/loans/repay", token, {
         loanId,
         amount: "60",
     });
@@ -103,17 +151,17 @@ async function run() {
     assertCondition("final repayment fully repaid", repayFinal.body?.data?.fullyRepaid === true, repayFinal.body);
     assertCondition("final repayment sets REPAID", repayFinal.body?.data?.loan?.status === "REPAID", repayFinal.body);
 
-    const listRepaid = await request("GET", "/loans?status=REPAID");
+    const listRepaid = await request("GET", "/loans?status=REPAID", token);
     assertStatus("list repaid loans", listRepaid.status, 200, listRepaid.body);
     const repaidIds = (listRepaid.body?.data || []).map((loan) => loan.id);
     assertCondition("repaid list includes created loan", repaidIds.includes(loanId), listRepaid.body);
 
-    const invalidStatus = await request("GET", "/loans?status=INVALID");
+    const invalidStatus = await request("GET", "/loans?status=INVALID", token);
     assertStatus("invalid status filter returns 400", invalidStatus.status, 400, invalidStatus.body);
 
-    const badCollateral = await request("POST", "/loans", {
-        borrowerId,
-        lenderId,
+    const badCollateral = await request("POST", "/loans", token, {
+        borrowerId: borrower.id,
+        lenderId: lender.id,
         amount: "100",
         collateralAmt: "120",
         assetCode: "USDC",

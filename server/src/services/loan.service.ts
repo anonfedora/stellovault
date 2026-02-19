@@ -2,10 +2,11 @@ import { NotFoundError, ValidationError } from "../config/errors";
 import { contracts } from "../config/contracts";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
+import { Prisma } from "@prisma/client";
 
-const MIN_COLLATERAL_RATIO = 1.5;
+const MIN_COLLATERAL_RATIO = new Prisma.Decimal("1.5");
 const VALID_LOAN_STATUSES = new Set(["PENDING", "ACTIVE", "REPAID", "DEFAULTED"]);
-const EPSILON = 1e-9;
+const ZERO = new Prisma.Decimal("0");
 
 type LoanStatus = "PENDING" | "ACTIVE" | "REPAID" | "DEFAULTED";
 
@@ -24,9 +25,14 @@ interface RecordRepaymentRequest {
     paidAt?: string | Date;
 }
 
-function parsePositiveAmount(value: number | string | undefined, fieldName: string): number {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+function parsePositiveDecimal(value: number | string | undefined, fieldName: string): Prisma.Decimal {
+    let parsed: Prisma.Decimal;
+    try {
+        parsed = new Prisma.Decimal(value as string | number);
+    } catch {
+        throw new ValidationError(`${fieldName} must be a positive number`);
+    }
+    if (!parsed.isFinite() || parsed.lte(ZERO)) {
         throw new ValidationError(`${fieldName} must be a positive number`);
     }
     return parsed;
@@ -42,11 +48,14 @@ export class LoanService {
         if (!lenderId) {
             throw new ValidationError("lenderId is required");
         }
+        if (borrowerId === lenderId) {
+            throw new ValidationError("Borrower and lender must be different");
+        }
 
-        const amount = parsePositiveAmount(payload.amount, "amount");
-        const collateralAmt = parsePositiveAmount(payload.collateralAmt, "collateralAmt");
-        const collateralRatio = collateralAmt / amount;
-        if (collateralRatio < MIN_COLLATERAL_RATIO) {
+        const amount = parsePositiveDecimal(payload.amount, "amount");
+        const collateralAmt = parsePositiveDecimal(payload.collateralAmt, "collateralAmt");
+        const collateralRatio = collateralAmt.div(amount);
+        if (collateralRatio.lt(MIN_COLLATERAL_RATIO)) {
             throw new ValidationError(
                 `Collateral ratio must be at least ${MIN_COLLATERAL_RATIO.toFixed(2)}`
             );
@@ -60,9 +69,13 @@ export class LoanService {
         if (users.length !== 2) {
             throw new ValidationError("borrowerId or lenderId does not exist");
         }
+        const loanContractId = contracts.loan?.trim();
+        if (!loanContractId) {
+            throw new ValidationError("LOAN_CONTRACT_ID not configured");
+        }
 
         const xdr = await contractService.buildContractInvokeXDR(
-            contracts.loan || "LOAN_CONTRACT_ID_NOT_SET",
+            loanContractId,
             "issue_loan",
             [
                 borrowerId,
@@ -140,7 +153,7 @@ export class LoanService {
             throw new ValidationError("loanId is required");
         }
 
-        const amount = parsePositiveAmount(payload.amount, "amount");
+        const amount = parsePositiveDecimal(payload.amount, "amount");
         let paidAt: Date | undefined;
         if (payload.paidAt) {
             paidAt = new Date(payload.paidAt);
@@ -163,14 +176,15 @@ export class LoanService {
             }
 
             const totalRepaid = loan.repayments.reduce(
-                (sum: number, repayment: { amount: string | number }) => sum + Number(repayment.amount),
-                0
+                (sum: Prisma.Decimal, repayment: { amount: string | number }) =>
+                    sum.plus(new Prisma.Decimal(repayment.amount.toString())),
+                ZERO
             );
-            const outstandingBefore = Number(loan.amount) - totalRepaid;
-            if (outstandingBefore <= EPSILON) {
+            const outstandingBefore = new Prisma.Decimal(loan.amount.toString()).minus(totalRepaid);
+            if (outstandingBefore.lte(ZERO)) {
                 throw new ValidationError("Loan is already fully repaid");
             }
-            if (amount - outstandingBefore > EPSILON) {
+            if (amount.gt(outstandingBefore)) {
                 throw new ValidationError("Repayment exceeds outstanding balance");
             }
 
@@ -182,9 +196,9 @@ export class LoanService {
                 },
             });
 
-            const outstandingAfter = Math.max(0, outstandingBefore - amount);
+            const outstandingAfter = outstandingBefore.minus(amount);
             let nextStatus: LoanStatus = loan.status;
-            if (outstandingAfter <= EPSILON) {
+            if (outstandingAfter.eq(ZERO)) {
                 nextStatus = "REPAID";
             } else if (loan.status === "PENDING") {
                 nextStatus = "ACTIVE";
@@ -201,12 +215,12 @@ export class LoanService {
 
             return {
                 repayment,
-                outstandingBefore,
-                outstandingAfter,
-                fullyRepaid: outstandingAfter <= EPSILON,
+                outstandingBefore: outstandingBefore.toString(),
+                outstandingAfter: outstandingAfter.toString(),
+                fullyRepaid: outstandingAfter.eq(ZERO),
                 loan: updatedLoan,
             };
-        });
+        }, { isolationLevel: "Serializable" });
     }
 }
 
