@@ -101,6 +101,13 @@ export class AuthService {
         }
     }
 
+    private async lockUserRow(tx: DbClient, userId: string): Promise<void> {
+        const rows = await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+        if (!Array.isArray(rows) || rows.length === 0) {
+            throw new NotFoundError("User not found");
+        }
+    }
+
     async generateChallenge(
         address: string,
         purpose: ChallengePurpose = CHALLENGE_PURPOSE.LOGIN,
@@ -154,10 +161,7 @@ export class AuthService {
 
         try {
             return await prisma.$transaction(async (tx: any) => {
-                const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
-                if (!user) {
-                    throw new NotFoundError("User not found");
-                }
+                await this.lockUserRow(tx, userId);
 
                 const existingWallet = await tx.wallet.findUnique({
                     where: { address: normalizedAddress },
@@ -220,6 +224,8 @@ export class AuthService {
 
     async unlinkWallet(userId: string, walletId: string): Promise<void> {
         await prisma.$transaction(async (tx: any) => {
+            await this.lockUserRow(tx, userId);
+
             const wallets = await tx.wallet.findMany({
                 where: { userId },
                 orderBy: { createdAt: "asc" },
@@ -260,6 +266,8 @@ export class AuthService {
 
     async setPrimaryWallet(userId: string, walletId: string) {
         return prisma.$transaction(async (tx: any) => {
+            await this.lockUserRow(tx, userId);
+
             const wallet = await tx.wallet.findFirst({
                 where: { id: walletId, userId },
             });
