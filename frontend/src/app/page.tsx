@@ -1,116 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
-import { ChevronRight, Lock, Zap, TrendingUp, CheckCircle2, ArrowUpRight, Wallet, LogOut } from 'lucide-react'
+import React from 'react'
+import { ChevronRight, Lock, Zap, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react'
+import { Navbar, Footer } from '@/components'
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false)
-
-  const handleWalletConnect = async () => {
-    const mockAddress = 'G' + Math.random().toString(16).slice(2, 54).toUpperCase()
-    setWalletAddress(mockAddress)
-    setIsConnected(true)
-    setIsWalletMenuOpen(false)
-  }
-
-  const handleWalletDisconnect = () => {
-    setWalletAddress(null)
-    setIsConnected(false)
-  }
-
-  const shortenAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
   return (
     <div className="w-full min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed w-full top-0 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="text-2xl font-bold text-blue-900 flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-900 rounded-lg flex items-center justify-center">
-              <span className="text-white text-sm font-bold">SV</span>
-            </div>
-            StelloVault
-          </div>
-          <div className="hidden md:flex gap-8 text-sm text-gray-600">
-            <a href="#features" className="hover:text-gray-900 transition">Features</a>
-            <a href="#innovation" className="hover:text-gray-900 transition">Innovation</a>
-            <a href="#impact" className="hover:text-gray-900 transition">Impact</a>
-          </div>
-          
-          {/* Wallet Connect Button */}
-          <div className="relative">
-            {isConnected ? (
-              <button
-                onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
-                className="flex items-center gap-2 bg-blue-100 text-blue-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors"
-              >
-                <Wallet className="w-4 h-4" />
-                {shortenAddress(walletAddress || '')}
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
-                className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2 rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
-              >
-                <Wallet className="w-4 h-4" />
-                Connect Wallet
-              </button>
-            )}
-
-            {isWalletMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-900 mb-3">Connect Your Wallet</h3>
-                  <p className="text-xs text-gray-600 mb-4">
-                    Select a Stellar wallet provider to sign in
-                  </p>
-                </div>
-
-                <div className="p-3 space-y-2">
-                  <button
-                    onClick={handleWalletConnect}
-                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300"
-                  >
-                    <div className="font-medium text-sm text-gray-900">Freighter</div>
-                    <div className="text-xs text-gray-600">Stellar native wallet</div>
-                  </button>
-
-                  <button
-                    onClick={handleWalletConnect}
-                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300"
-                  >
-                    <div className="font-medium text-sm text-gray-900">Albedo</div>
-                    <div className="text-xs text-gray-600">Web-based Stellar wallet</div>
-                  </button>
-
-                  <button
-                    onClick={handleWalletConnect}
-                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300"
-                  >
-                    <div className="font-medium text-sm text-gray-900">Rabet</div>
-                    <div className="text-xs text-gray-600">Stellar browser extension</div>
-                  </button>
-                </div>
-
-                {isConnected && (
-                  <div className="p-3 border-t border-gray-100">
-                    <button
-                      onClick={handleWalletDisconnect}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors rounded-lg"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Disconnect
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 text-center bg-gradient-to-br from-white via-white to-gray-50">
@@ -127,7 +24,6 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button
-              onClick={() => setIsWalletMenuOpen(true)}
               className="bg-blue-900 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 group"
             >
               Connect Wallet
@@ -419,7 +315,6 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button
-              onClick={() => setIsWalletMenuOpen(true)}
               className="bg-blue-900 text-white px-10 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all"
             >
               Connect Wallet & Start Trading
@@ -431,57 +326,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 pb-12 border-b border-white/10">
-            <div>
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                  <span className="text-sm font-bold">SV</span>
-                </div>
-                StelloVault
-              </h3>
-              <p className="text-white/70 text-sm">
-                Tokenizing trade. Financing futures.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li><a href="#" className="hover:text-white transition">Features</a></li>
-                <li><a href="#" className="hover:text-white transition">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition">Security</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li><a href="#" className="hover:text-white transition">About</a></li>
-                <li><a href="#" className="hover:text-white transition">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition">Careers</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li><a href="#" className="hover:text-white transition">Privacy</a></li>
-                <li><a href="#" className="hover:text-white transition">Terms</a></li>
-                <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row justify-between items-center pt-8 text-sm text-white/60">
-            <p>&copy; 2025 StelloVault. All rights reserved.</p>
-            <div className="flex gap-6 mt-4 md:mt-0">
-              <a href="#" className="hover:text-white transition">Twitter</a>
-              <a href="#" className="hover:text-white transition">LinkedIn</a>
-              <a href="#" className="hover:text-white transition">GitHub</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }
