@@ -215,14 +215,26 @@ export class EscrowService {
             );
         }
 
-        const updated = await db.escrow.update({
-            where: { id: escrowId },
+        const updateResult = await db.escrow.updateMany({
+            where: { id: escrowId, status: existing.status },
             data: {
                 status,
                 ...(event.stellarTxHash ? { stellarTxHash: event.stellarTxHash } : {}),
             },
+        });
+        if (updateResult.count !== 1) {
+            throw new ValidationError(
+                "Escrow status changed concurrently. Please retry with latest state."
+            );
+        }
+
+        const updated = await db.escrow.findUnique({
+            where: { id: escrowId },
             include: { buyer: true, seller: true },
         });
+        if (!updated) {
+            throw new NotFoundError("Escrow not found");
+        }
 
         if (existing.status !== updated.status) {
             websocketService.broadcastEscrowUpdated(updated.id, updated.status);
@@ -259,7 +271,15 @@ export class EscrowService {
                     data: { status: "EXPIRED" },
                 });
 
-                for (const escrow of overdueEscrows) {
+                const expiredEscrows = await db.escrow.findMany({
+                    where: {
+                        id: { in: overdueEscrows.map((item: { id: string }) => item.id) },
+                        status: "EXPIRED",
+                    },
+                    select: { id: true },
+                });
+
+                for (const escrow of expiredEscrows) {
                     websocketService.broadcastEscrowUpdated(escrow.id, "EXPIRED");
                 }
             } catch (error) {

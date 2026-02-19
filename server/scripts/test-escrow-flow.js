@@ -11,8 +11,10 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const API_BASE = process.env.API_BASE || "http://localhost:3001/api";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 const SKIP_TIMEOUT_TEST = process.env.SKIP_TIMEOUT_TEST === "1";
-const TIMEOUT_WAIT_MS = Number(process.env.ESCROW_TIMEOUT_WAIT_MS || 70000);
+const TIMEOUT_WAIT_MS = Number(process.env.ESCROW_TIMEOUT_WAIT_MS || 130000);
 const prisma = new PrismaClient();
+const seededUserIds = new Set();
+const createdEscrowIds = new Set();
 
 async function request(method, endpoint, body, extraHeaders = {}) {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -58,6 +60,8 @@ function futureIso(offsetMs) {
 async function seedUsers() {
     const buyerId = randomUUID();
     const sellerId = randomUUID();
+    seededUserIds.add(buyerId);
+    seededUserIds.add(sellerId);
 
     await prisma.user.create({
         data: {
@@ -74,6 +78,38 @@ async function seedUsers() {
     });
 
     return { buyerId, sellerId };
+}
+
+async function cleanup() {
+    const userIds = Array.from(seededUserIds);
+    const escrowIds = Array.from(createdEscrowIds);
+
+    if (escrowIds.length > 0) {
+        await prisma.escrow.deleteMany({
+            where: { id: { in: escrowIds } },
+        });
+    }
+
+    if (userIds.length > 0) {
+        await prisma.escrow.deleteMany({
+            where: {
+                OR: [
+                    { buyerId: { in: userIds } },
+                    { sellerId: { in: userIds } },
+                ],
+            },
+        });
+    }
+
+    for (const userId of userIds) {
+        try {
+            await prisma.user.delete({ where: { id: userId } });
+        } catch (error) {
+            if (!(error && typeof error === "object" && error.code === "P2025")) {
+                throw error;
+            }
+        }
+    }
 }
 
 async function run() {
@@ -99,6 +135,9 @@ async function run() {
     });
     assertStatus("create escrow", create.status, 201, create.body);
     const escrowId = create.body?.data?.escrowId;
+    if (typeof escrowId === "string" && escrowId.length > 0) {
+        createdEscrowIds.add(escrowId);
+    }
     const xdr = create.body?.data?.xdr;
     assertCondition("create returns escrowId", typeof escrowId === "string" && escrowId.length > 0, create.body);
     assertCondition("create returns base64 xdr", typeof xdr === "string" && xdr.length > 0, create.body);
@@ -145,6 +184,9 @@ async function run() {
         });
         assertStatus("create short-lived escrow", createShort.status, 201, createShort.body);
         const shortEscrowId = createShort.body?.data?.escrowId;
+        if (typeof shortEscrowId === "string" && shortEscrowId.length > 0) {
+            createdEscrowIds.add(shortEscrowId);
+        }
 
         const activateShort = await request(
             "POST",
@@ -176,5 +218,13 @@ run()
         process.exitCode = 1;
     })
     .finally(async () => {
-        await prisma.$disconnect();
+        try {
+            await cleanup();
+        } catch (cleanupError) {
+            console.error("\nEscrow flow cleanup failed.");
+            console.error(cleanupError?.stack || cleanupError);
+            process.exitCode = 1;
+        } finally {
+            await prisma.$disconnect();
+        }
     });

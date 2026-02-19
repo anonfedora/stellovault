@@ -13,6 +13,10 @@ export interface EscrowUpdatedPayload {
 export class WebSocketService {
     private bus = new EventEmitter();
 
+    constructor() {
+        this.bus.setMaxListeners(100);
+    }
+
     broadcastEscrowUpdated(escrowId: string, status: string): void {
         const payload: EscrowUpdatedPayload = {
             type: "ESCROW_UPDATED",
