@@ -1,15 +1,17 @@
 // Stellar/Soroban utility functions for StelloVault
 
-import { Address, Contract, networks, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Address, Contract, Networks, scValToNative, xdr } from '@stellar/stellar-sdk';
 
 // Network configurations
 export const NETWORKS = {
   testnet: {
-    ...networks.testnet,
+    networkPassphrase: Networks.TESTNET,
+    horizonUrl: 'https://horizon-testnet.stellar.org',
     soroban: 'https://soroban-testnet.stellar.org',
   },
   mainnet: {
-    ...networks.public,
+    networkPassphrase: Networks.PUBLIC,
+    horizonUrl: 'https://horizon.stellar.org',
     soroban: 'https://soroban.stellar.org',
   },
 };
