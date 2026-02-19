@@ -1,219 +1,229 @@
 # StelloVault
 
-**A secure trade finance decentralized application (dApp) built on Stellar & Soroban**  
+**A secure trade finance dApp built on Stellar & Soroban**  
 Tokenizing collateral (invoices, commodities, etc.) to unlock instant liquidity for exporters and importers, bridging the massive trade finance gap.
 
 [![Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue?logo=stellar)](https://stellar.org)
 [![Soroban](https://img.shields.io/badge/Smart%20Contracts-Soroban-orange)](https://soroban.stellar.org)
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js-black?logo=next.js)](https://nextjs.org)
-[![Rust](https://img.shields.io/badge/Backend-Rust-orange?logo=rust)](https://www.rust-lang.org)
-
-## 🚀 Overview
-
-StelloVault is a trade finance dApp that enables SMEs to tokenize real-world assets (e.g., invoices, commodities) as Stellar assets with embedded metadata, use them as collateral in multi-signature escrows managed by **Soroban smart contracts**, and unlock instant cross-border liquidity.
-
-Key innovations:
-- **Collateral Tokenization** — Real assets become fractional, traceable Stellar tokens.
-- **Automated Escrows** — Multi-sig + conditional release triggered by shipment verification oracles (e.g., IoT/Maersk integration).
-- **Dynamic Financing** — Algorithmic loans based on on-chain history and utilization.
-- **Risk Scoring** — Backend uses transaction history for creditworthiness.
-- **Governance** — Quadratic voting for stakeholders to decide accepted collateral types.
-
-### Why It Matters
-
-A **trade finance gap of over $100–120 billion annually** (sources: Afreximbank, African Development Bank, World Bank estimates), disproportionately affecting SMEs — which represent >90% of businesses but are underserved by traditional finance. This stifles **$100B+ in potential exports** and intra-African trade under the **AfCFTA**.
-
-StelloVault leverages:
-- Stellar's low-cost, fast settlements and native asset issuance
-- Soroban's Rust-based smart contracts for secure, programmable logic
-- To reduce intermediary costs by up to **50%**, enable fractional ownership, and foster inclusive trade.
-
-Target: Scalable to **1,000+ deals/month** with real-time oracle verification.
-
-## ✨ Key Features
-
-- **Collateral Tokenization** — Mint Stellar assets from invoices/commodities with provenance metadata.
-- **Multi-Sig Escrows & Automated Release** — Soroban enforces release upon oracle confirmation (shipment delivered, quality verified).
-- **Oracle Integration** — Real-time data feeds (planned: Maersk APIs, IoT devices, Chainlink-style oracles).
-- **Risk Scoring Engine** — Rust backend analyzes on-chain history for dynamic loan terms.
-- **Frontend Dashboard** — Next.js interface for deal origination, collateral upload, escrow monitoring, and repayments.
-- **Governance Module** — On-chain voting (quadratic mechanisms) for protocol parameters and collateral acceptance.
-- **Flash Settlements** — Instant cross-border payments using Stellar's built-in DEX/path payments.
-
-## 📂 Repository Structure (Monorepo)
-
-```
-stellovault/
-├── contracts/                    # Soroban Smart Contracts (Rust)
-│   ├── Cargo.toml               # Rust dependencies for contracts
-│   ├── rust-toolchain.toml      # Rust toolchain configuration
-│   └── src/
-│       └── lib.rs               # Main contract: StelloVault trade finance logic
-│
-├── frontend/                     # Next.js Frontend Application
-│   ├── package.json             # Node.js dependencies
-│   ├── next.config.ts           # Next.js configuration
-│   ├── tailwind.config.js       # Tailwind CSS configuration
-│   ├── src/
-│   │   ├── app/                 # Next.js App Router
-│   │   │   ├── layout.tsx       # Root layout
-│   │   │   ├── page.tsx         # Home page
-│   │   │   ├── dashboard/       # User dashboard
-│   │   │   ├── escrows/         # Escrow management
-│   │   │   ├── collateral/      # Collateral tokenization
-│   │   │   └── profile/         # User profile
-│   │   ├── components/          # Reusable React components
-│   │   │   ├── ui/              # UI primitives (Button, etc.)
-│   │   │   ├── forms/           # Form components
-│   │   │   └── dashboard/       # Dashboard-specific components
-│   │   ├── lib/                 # Library utilities and configurations
-│   │   ├── hooks/               # Custom React hooks
-│   │   ├── types/               # TypeScript type definitions
-│   │   └── utils/               # Utility functions
-│   └── public/                  # Static assets
-│
-├── server/                      # Rust Backend API Server
-│   ├── Cargo.toml               # Rust dependencies for backend
-│   ├── src/
-│   │   ├── main.rs              # Server entry point
-│   │   ├── lib.rs               # Library exports
-│   │   ├── handlers.rs          # API route handlers
-│   │   ├── models.rs            # Data models and types
-│   │   ├── routes.rs            # Route definitions
-│   │   ├── services.rs          # Business logic services
-│   │   ├── middleware.rs        # HTTP middleware
-│   │   └── utils.rs             # Utility functions
-│   └── tests/                   # Integration tests
-│
-└── README.md                    # Project documentation
-```
-
-### Directory Details
-
-#### Contracts (`/contracts`)
-- **Purpose**: Soroban smart contracts for trade finance operations
-- **Tech**: Rust with Soroban SDK
-- **Key Contract**: `StelloVaultContract` - handles collateral tokenization and escrow management
-- **Build**: `cargo build --release --target wasm32-unknown-unknown`
-
-#### Frontend (`/frontend`)
-- **Purpose**: User interface for the dApp
-- **Tech**: Next.js 14+, TypeScript, Tailwind CSS
-- **Features**: Dashboard, escrow management, collateral tokenization
-- **Scripts**: `npm run dev` (development), `npm run build` (production)
-
-#### Server (`/server`)
-- **Purpose**: Backend API server for analytics, user management, and external integrations
-- **Tech**: Rust with Axum web framework
-- **Features**: REST API, database integration, risk scoring engine
-- **Scripts**: `cargo run` (development), `cargo build --release` (production)
-
-### Getting Started
-
-#### Prerequisites
-- Rust (latest stable)
-- Node.js 18+
-- PostgreSQL (for backend database)
-- Soroban CLI (for contract development)
-
-## 🤝 Contributing: Forking & Cloning Guide
-
-We welcome contributions from the community! To contribute effectively, follow these steps:
-
-### 1. Fork the Repository
-
-1. Navigate to the [StelloVault GitHub repository](https://github.com/your-org/stellovault).
-2. Click **Fork** in the top-right corner.
-3. This creates a personal copy of the repository under your GitHub account.
-
-### 2. Clone Your Fork Locally
-
-```bash
-git clone https://github.com/<your-username>/stellovault.git
-cd stellovault
-```
-
-> Replace `<your-username>` with your GitHub username.
-
-### 3. Add the Original Repository as Upstream
-
-```bash
-git remote add upstream https://github.com/your-org/stellovault.git
-git fetch upstream
-```
-
-> This allows you to pull the latest changes from the main repository.
-
-### 4. Create a Feature Branch
-
-```bash
-git checkout -b feature/awesome-feature
-```
-
-> Always branch off `main` (or `develop` if using a dev branch) and use descriptive names for your feature branches.
-
-### 5. Make Changes & Commit
-
-* Make your code changes.
-* Test thoroughly (frontend, backend, and contracts as applicable).
-* Commit changes with clear, descriptive messages:
-
-```bash
-git add .
-git commit -m "Add feature: awesome-feature description"
-```
-
-### 6. Keep Your Branch Updated
-
-```bash
-git fetch upstream
-git checkout main
-git merge upstream/main
-git checkout feature/awesome-feature
-git rebase main
-```
-
-> This ensures your branch is compatible with the latest codebase.
-
-### 7. Push Changes to Your Fork
-
-```bash
-git push origin feature/awesome-feature
-```
-
-### 8. Open a Pull Request (PR)
-
-1. Go to your fork on GitHub.
-2. Click **Compare & pull request**.
-3. Provide a descriptive title and summary of your changes.
-4. Submit the PR against the `main` branch of the original repository.
-
-### 9. Review & Iterate
-
-* Project maintainers will review your PR.
-* Address any feedback and push updates to your branch.
-* Once approved, your PR will be merged.
+[![TypeScript](https://img.shields.io/badge/Backend-TypeScript-3178C6?logo=typescript)](https://www.typescriptlang.org)
+[![CI](https://github.com/anonfedora/stellovault/actions/workflows/ci.yml/badge.svg)](https://github.com/anonfedora/stellovault/actions/workflows/ci.yml)
 
 ---
 
-### Contribution Guidelines
+## 🚀 Overview
 
-* Follow consistent coding style (Rust: `rustfmt`, JS/TS: Prettier).
-* Write tests for any new functionality.
-* Ensure all CI checks pass before submitting a PR.
-* Document new modules or features in the README or relevant docs.
+StelloVault is a trade finance dApp that enables SMEs to tokenize real-world assets (invoices, commodities) as Stellar assets with embedded metadata, use them as collateral in multi-signature escrows managed by **Soroban smart contracts**, and unlock instant cross-border liquidity.
 
-### Development Workflow
+Key innovations:
+- **Collateral Tokenization** — Real assets become fractional, traceable Stellar tokens.
+- **Automated Escrows** — Multi-sig + conditional release triggered by shipment verification oracles.
+- **Dynamic Financing** — Algorithmic loans based on on-chain history and utilization.
+- **Risk Scoring** — On-chain creditworthiness scoring using transaction history.
+- **Governance** — Quadratic voting for protocol parameters and accepted collateral types.
 
-1. **Contracts**: Modify smart contract logic in `contracts/src/lib.rs`
-2. **Frontend**: Add UI components and pages in respective directories
-3. **Backend**: Implement API endpoints and business logic in server modules
-4. **Testing**: Run tests for each component separately
-5. **Deployment**: Deploy contracts to Stellar, build and deploy frontend/backend
+> **Trade finance gap:** $100–120B+ annually (Afreximbank, African Development Bank), disproportionately affecting SMEs under the AfCFTA. StelloVault targets reducing intermediary costs by up to **50%**.
 
-### Key Integration Points
+---
 
-- **Contract ↔ Frontend**: Direct Soroban contract calls from React components
-- **Frontend ↔ Backend**: REST API calls for analytics and user data
-- **Backend ↔ Contracts**: Indexer services to track on-chain events
-- **External APIs**: Integration with shipping providers (Maersk) and oracles
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| Collateral Tokenization | Mint Stellar assets from invoices/goods with provenance metadata |
+| Multi-Sig Escrows | Soroban enforces release on oracle confirmation |
+| Oracle Integration | Real-time data feeds for shipment & quality verification |
+| Risk Scoring Engine | On-chain history → dynamic loan terms |
+| Frontend Dashboard | Next.js UI for deal origination, escrow monitoring, repayments |
+| Governance Module | On-chain quadratic voting for protocol parameters |
+| Flash Settlements | Instant cross-border payments via Stellar DEX/path payments |
+| Real-time Updates | WebSocket push for escrow/loan state changes |
+
+---
+
+## 📂 Repository Structure
+
+```
+stellovault/
+├── contracts/          # Soroban Smart Contracts (Rust)
+├── frontend/           # Next.js Frontend Application
+├── server/             # TypeScript/Express Backend API  ← active
+├── backend/            # Rust/Axum Backend  (archived — superseded by /server)
+└── .github/
+    └── workflows/
+        └── ci.yml      # CI: server (TS) + contracts (Rust)
+```
+
+### `contracts/` — Soroban Smart Contracts (Rust)
+
+- **Tech:** Rust · Soroban SDK
+- **Purpose:** On-chain escrow, collateral tokenization, governance, fee management
+- **Build:** `cargo build --release --target wasm32-unknown-unknown`
+
+### `frontend/` — User Interface
+
+- **Tech:** Next.js 14+, TypeScript, Tailwind CSS
+- **Features:** Dashboard, escrow management, collateral upload, governance voting
+- **Dev:** `npm run dev`
+
+### `server/` — TypeScript Backend API *(active backend)*
+
+- **Tech:** Express.js · TypeScript · Prisma · PostgreSQL · `@stellar/stellar-sdk`
+- **Pattern:** Non-custodial · Account Abstraction (Fee Payer) · Event-driven
+- **Dev:** `npm run dev`
+
+```
+server/
+├── prisma/
+│   └── schema.prisma               # DB models (User, Loan, Escrow, Collateral …)
+├── src/
+│   ├── app.ts                      # Express app entry point
+│   ├── config/
+│   │   ├── env.ts                  # Typed environment variables
+│   │   ├── contracts.ts            # Soroban contract IDs
+│   │   └── errors.ts               # Custom error classes
+│   ├── controllers/                # HTTP request handlers (thin orchestration layer)
+│   │   ├── auth.controller.ts
+│   │   ├── wallet.controller.ts
+│   │   ├── user.controller.ts
+│   │   ├── escrow.controller.ts
+│   │   ├── collateral.controller.ts
+│   │   ├── loan.controller.ts
+│   │   ├── oracle.controller.ts
+│   │   ├── governance.controller.ts
+│   │   ├── risk.controller.ts
+│   │   └── user.controller.ts      # also handles /analytics
+│   ├── routes/                     # Express routers mounted under /api/v1
+│   ├── services/                   # Core business & blockchain logic
+│   │   ├── blockchain.service.ts   # Horizon / native Stellar ops
+│   │   ├── contract.service.ts     # Soroban XDR builder (Account Abstraction)
+│   │   ├── database.service.ts     # Prisma ORM wrappers
+│   │   └── event-monitoring.service.ts  # On-chain event poller
+│   └── middleware/
+│       ├── auth.middleware.ts      # JWT Bearer verification
+│       ├── error.middleware.ts     # Central error → HTTP status mapping
+│       └── rate-limit.middleware.ts
+├── package.json
+├── tsconfig.json
+├── .env.example
+└── migration_issues.md             # GitHub issues for full feature implementation
+```
+
+**API Routes (all under `/api/v1`):**
+
+| Prefix | Domain |
+|--------|--------|
+| `/auth` | Wallet challenge/sign/verify, JWT rotation |
+| `/wallets` | Link, unlink, set-primary wallet |
+| `/users` | User profiles |
+| `/escrows` | Escrow lifecycle + webhook |
+| `/collateral` | Collateral records |
+| `/loans` | Loan issuance + repayments |
+| `/oracles` | Oracle node registry + confirmations |
+| `/confirmations` | Oracle event confirmations |
+| `/governance` | Proposals, votes, audit log |
+| `/risk` | Risk scoring + historical + simulation |
+| `/analytics` | Platform-wide aggregated stats |
+
+### `backend/` — Rust/Axum Backend *(archived)*
+
+The original Rust backend is preserved here for reference. It has been superseded by the TypeScript server above. See `backend/README.md` for details.
+
+---
+
+## 🛠 Getting Started
+
+### Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Node.js | 20+ |
+| npm | 9+ |
+| PostgreSQL | 14+ |
+| Rust | stable |
+| Soroban CLI | latest |
+
+### TypeScript Server
+
+```bash
+cd server
+cp .env.example .env   # fill in DATABASE_URL, FEE_PAYER_SECRET, contract IDs
+npm install
+npx prisma migrate dev
+npm run dev            # starts on http://localhost:3001
+```
+
+### Soroban Contracts
+
+```bash
+cd contracts
+cargo build --release --target wasm32-unknown-unknown
+cargo test
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev            # starts on http://localhost:3000
+```
+
+---
+
+## 🔄 Transaction Flow (Non-Custodial / Account Abstraction)
+
+```
+User                    Server                    Stellar/Soroban
+ │                         │                            │
+ │  POST /api/v1/escrows   │                            │
+ │────────────────────────▶│                            │
+ │                         │  Build XDR (Fee Payer src) │
+ │                         │───────────────────────────▶│
+ │  { escrowId, xdr }      │                            │
+ │◀────────────────────────│                            │
+ │                         │                            │
+ │  Sign auth entries      │                            │
+ │  (client-side only)     │                            │
+ │────────────────────────▶│                            │
+ │                         │  Sign as Fee Payer         │
+ │                         │  Submit signed XDR         │
+ │                         │───────────────────────────▶│
+ │                         │         { txHash }         │
+ │  { success, txHash }    │                            │
+ │◀────────────────────────│                            │
+```
+
+The backend **never holds user private keys**. It only acts as Fee Payer for sponsoring gas costs.
+
+---
+
+## ⚙️ CI
+
+Two parallel jobs run on every push/PR to `main` or `contract`:
+
+| Job | Directory | Checks |
+|-----|-----------|--------|
+| `server` | `./server` | `npm ci` → `prisma generate` → `tsc --noEmit` → `npm test` |
+| `contracts` | `./contracts` | `cargo fmt` → `cargo clippy` → `cargo build` → `cargo test` |
+
+---
+
+## 🤝 Contributing
+
+1. Fork → clone → `git remote add upstream https://github.com/anonfedora/stellovault.git`
+2. `git checkout -b feature/my-feature`
+3. Implement + test
+4. `git push origin feature/my-feature` → open a PR against `main`
+
+**Guidelines:**
+- TypeScript: follow `prettier` formatting (`server/`)
+- Rust: `cargo fmt` + `cargo clippy` must pass (`contracts/`)
+- All new endpoints need controller + route + service
+- Use the issue tracker — see `server/migration_issues.md` for the full feature backlog
+
+---
+
+## 📄 License
+
+MIT © StelloVault Contributors

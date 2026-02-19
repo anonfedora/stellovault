@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  stellarAddress String    @unique
+  name           String?
+  role           Role      @default(USER)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  loans          Loan[]
+  investments    Investment[]
+}
+
+model Loan {
+  id             String    @id @default(uuid())
+  borrowerId     String
+  borrower       User      @relation(fields: [borrowerId], references: [id])
+  amount         Decimal
+  assetCode      String    @default("USDC")
+  status         LoanStatus @default(PENDING)
+  collateralAmt  Decimal
+  escrowAddress  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Investment {
+  id             String    @id @default(uuid())
+  investorId     String
+  investor       User      @relation(fields: [investorId], references: [id])
+  amount         Decimal
+  createdAt      DateTime  @default(now())
+}
+
+enum Role {
+  USER
+  MERCHANT
+  ADMIN
+}
+
+enum LoanStatus {
+  PENDING
+  ACTIVE
+  REPAID
+  DEFAULTED
+}

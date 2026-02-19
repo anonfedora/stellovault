@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: stellovault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stellovault}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stellovault_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-stellovault}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stellovault} -d ${POSTGRES_DB:-stellovault}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test database for running integration tests
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: stellovault-db-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stellovault}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stellovault_dev}
+      POSTGRES_DB: stellovault_test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stellovault} -d stellovault_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
