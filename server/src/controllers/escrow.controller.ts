@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "crypto";
 import { env } from "../config/env";
 import escrowService from "../services/escrow.service";
 
@@ -47,7 +48,7 @@ export async function getEscrow(req: Request, res: Response, next: NextFunction)
  */
 export async function webhookEscrowUpdate(req: Request, res: Response, next: NextFunction) {
     try {
-        const secret = req.headers["x-webhook-secret"];
+        const secretHeader = req.headers["x-webhook-secret"];
         const configuredSecret = env.webhookSecret;
         if (!configuredSecret) {
             return res.status(503).json({
@@ -55,7 +56,21 @@ export async function webhookEscrowUpdate(req: Request, res: Response, next: Nex
                 error: "Webhook not configured",
             });
         }
-        if (secret !== configuredSecret) {
+
+        const incomingSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
+        if (typeof incomingSecret !== "string") {
+            return res.status(401).json({
+                success: false,
+                error: "Unauthorized",
+            });
+        }
+
+        const incomingBuffer = Buffer.from(incomingSecret);
+        const configuredBuffer = Buffer.from(configuredSecret);
+        if (
+            incomingBuffer.length !== configuredBuffer.length ||
+            !timingSafeEqual(incomingBuffer, configuredBuffer)
+        ) {
             return res.status(401).json({
                 success: false,
                 error: "Unauthorized",

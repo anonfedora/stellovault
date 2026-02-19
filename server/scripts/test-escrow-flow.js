@@ -81,6 +81,15 @@ async function run() {
     console.log(`BUYER_ID=${buyerId}`);
     console.log(`SELLER_ID=${sellerId}`);
 
+    const selfEscrow = await request("POST", "/escrows", {
+        buyerId,
+        sellerId: buyerId,
+        amount: "100",
+        assetCode: "USDC",
+        expiresAt: futureIso(2 * 60 * 1000),
+    });
+    assertStatus("self escrow returns 400", selfEscrow.status, 400, selfEscrow.body);
+
     const create = await request("POST", "/escrows", {
         buyerId,
         sellerId,

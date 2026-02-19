@@ -5,6 +5,13 @@ import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
 
 const ESCROW_STATUSES = new Set(["PENDING", "ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]);
+const ESCROW_ALLOWED_TRANSITIONS: Record<EscrowStatus, ReadonlySet<EscrowStatus>> = {
+    PENDING: new Set(["PENDING", "ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]),
+    ACTIVE: new Set(["ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]),
+    COMPLETED: new Set(["COMPLETED"]),
+    DISPUTED: new Set(["DISPUTED", "ACTIVE", "COMPLETED", "EXPIRED"]),
+    EXPIRED: new Set(["EXPIRED"]),
+};
 const MIN_PAGE = 1;
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
@@ -95,6 +102,9 @@ export class EscrowService {
         const sellerId = payload.sellerId?.trim();
         if (!buyerId) throw new ValidationError("buyerId is required");
         if (!sellerId) throw new ValidationError("sellerId is required");
+        if (buyerId === sellerId) {
+            throw new ValidationError("buyerId and sellerId must be different");
+        }
 
         const amount = parsePositiveAmount(payload.amount, "amount");
         const expiresAt = parseDate(payload.expiresAt, "expiresAt");
@@ -111,8 +121,13 @@ export class EscrowService {
             throw new ValidationError("buyerId or sellerId does not exist");
         }
 
+        const escrowContractId = contracts.escrow?.trim();
+        if (!escrowContractId) {
+            throw new Error("Escrow contract ID not configured: contracts.escrow is empty");
+        }
+
         const unsignedXdr = await contractService.buildContractInvokeXDR(
-            contracts.escrow || "ESCROW_CONTRACT_ID_NOT_SET",
+            escrowContractId,
             "create_escrow",
             [buyerId, sellerId, amount.toString(), payload.assetCode || "USDC", expiresAt.toISOString()]
         );
@@ -193,6 +208,12 @@ export class EscrowService {
         if (!existing) {
             throw new NotFoundError("Escrow not found");
         }
+        const allowedNextStatuses = ESCROW_ALLOWED_TRANSITIONS[existing.status as EscrowStatus];
+        if (!allowedNextStatuses || !allowedNextStatuses.has(status)) {
+            throw new ValidationError(
+                `Illegal escrow status transition: ${existing.status} -> ${status}`
+            );
+        }
 
         const updated = await db.escrow.update({
             where: { id: escrowId },
@@ -232,6 +253,7 @@ export class EscrowService {
 
                 await db.escrow.updateMany({
                     where: {
+                        status: "ACTIVE",
                         id: { in: overdueEscrows.map((item: { id: string }) => item.id) },
                     },
                     data: { status: "EXPIRED" },
