@@ -14,14 +14,17 @@ model User {
   role           Role      @default(USER)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  loans          Loan[]
+  loans          Loan[]    @relation("BorrowerLoans")
+  lentLoans      Loan[]    @relation("LenderLoans")
   investments    Investment[]
 }
 
 model Loan {
   id             String    @id @default(uuid())
   borrowerId     String
-  borrower       User      @relation(fields: [borrowerId], references: [id])
+  borrower       User      @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+  lenderId       String?
+  lender         User?     @relation("LenderLoans", fields: [lenderId], references: [id])
   amount         Decimal
   assetCode      String    @default("USDC")
   status         LoanStatus @default(PENDING)
@@ -29,6 +32,11 @@ model Loan {
   escrowAddress  String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  repayments     Repayment[]
+
+  @@index([borrowerId])
+  @@index([lenderId])
+  @@index([status])
 }
 
 model Investment {
@@ -37,6 +45,17 @@ model Investment {
   investor       User      @relation(fields: [investorId], references: [id])
   amount         Decimal
   createdAt      DateTime  @default(now())
+}
+
+model Repayment {
+  id             String    @id @default(uuid())
+  loanId         String
+  loan           Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount         Decimal
+  paidAt         DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([loanId])
 }
 
 enum Role {
