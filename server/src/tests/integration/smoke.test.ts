@@ -64,7 +64,7 @@ async function testBlockchainService() {
 
     const decoded = TransactionBuilder.fromXDR(
         xdrString,
-        Networks.TESTNET,
+       env.stellar.networkPassphrase,
     ) as Transaction;
     log("Decoded tx source", decoded.source);
     log("Operation count", decoded.operations.length);
