@@ -68,6 +68,9 @@ export class ContractService {
     if (SorobanRpc.Api.isSimulationRestore(simulated)) {
       throw new Error("Contract state needs restoration before invocation");
     }
+    if (SorobanRpc.Api.isSimulationError(simulated)) {
+      throw new Error(`Simulation failed: ${simulated.error}`);
+    }
 
     const assembled = SorobanRpc.assembleTransaction(tx, simulated).build();
 
