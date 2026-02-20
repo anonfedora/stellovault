@@ -25,6 +25,17 @@ export class BlockchainService {
         const account = await this.server.loadAccount(address);
         return account.balances.find((b: any) => b.asset_code === assetCode);
     }
+
+    /**
+     * Fetch transaction history for an account from Horizon (for risk scoring).
+     * Returns up to 200 most recent transactions.
+     */
+    async getTransactionHistory(accountId: string, limit: number = 200): Promise<Horizon.TransactionResponse[]> {
+        const coll = (this.server as any).transactions();
+        const builder = coll.forAccount(accountId).order("desc").limit(limit);
+        const resp = await builder.call();
+        return resp.records ?? [];
+    }
 }
 
 export default new BlockchainService();

@@ -77,6 +77,17 @@ enum Role {
   ADMIN
 }
 
+model RiskScore {
+  id           String   @id @default(uuid())
+  wallet       String
+  score        Int      // 0-1000
+  grade        String   // A | B | C | D | F
+  components   Json     // { transactionHistory, repaymentRecord, collateralCoverage, disputeHistory }
+  computedAt   DateTime @default(now())
+
+  @@index([wallet, computedAt])
+}
+
 enum LoanStatus {
   PENDING
   ACTIVE
