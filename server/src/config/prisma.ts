@@ -1,7 +1,6 @@
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client'; // Import from YOUR custom folder
-
+import { PrismaClient } from "../generated/prisma/client";
 // 1. Database Connection Logic
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });

@@ -15,6 +15,9 @@
         "types": [
             "node"
         ],
+        "paths": {
+      "@prisma-generated/*": ["./prisma/generated/prisma/*"]
+    }
     },
     "include": [
         "src/**/*",

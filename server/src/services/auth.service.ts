@@ -49,11 +49,7 @@ export class AuthService {
 
     // --- ORIGINAL FUNCTIONS (KEPT AS IS) ---
 
-    async generateChallenge(
-        walletAddress: string,
-        purpose: ChallengePurpose = "LOGIN", // Default to LOGIN
-        userId?: string                       // Optional, required for LINK_WALLET
-    ) {
+    async generateChallenge(walletAddress: string, purpose: ChallengePurpose = "LOGIN", userId?: string) {
         if (!isValidStellarAddress(walletAddress)) {
             throw new ValidationError("Invalid Stellar wallet address");
         }
@@ -61,26 +57,18 @@ export class AuthService {
         const nonce = uuidv4();
         const expiresAt = new Date(Date.now() + JWT_CONFIG.CHALLENGE_EXPIRY_SECONDS * 1000);
 
-        let wallet = await prisma.wallet.findUnique({
+        // Atomic wallet + user creation
+        const wallet = await prisma.wallet.upsert({
             where: { stellarAddress: walletAddress },
+            update: {},
+            create: {
+                user: { create: { name: null } },
+                stellarAddress: walletAddress,
+                isPrimary: true,
+                status: "ACTIVE",
+            },
             include: { user: true },
         });
-
-        if (!wallet) {
-            const user = await prisma.user.create({
-                data: { name: null },
-            });
-
-            wallet = await prisma.wallet.create({
-                data: {
-                    userId: user.id,
-                    stellarAddress: walletAddress,
-                    isPrimary: true,
-                    status: "ACTIVE",
-                },
-                include: { user: true },
-            });
-        }
 
         const challenge = await prisma.challenge.create({
             data: {
@@ -210,10 +198,41 @@ export class AuthService {
         };
 
         const newAccessToken = jwt.sign(tokenPayload, env.jwt.accessSecret, { expiresIn: accessTokenExpiresIn } as SignOptions);
+        const newJti = uuidv4();
+        const newRefreshTokenPayload: TokenPayload = {
+            userId: user.id,
+            jti: newJti,
+            walletAddress: session.wallet.stellarAddress,
+        };
+
+        const newRefreshToken = jwt.sign(
+            newRefreshTokenPayload,
+            env.jwt.refreshSecret,
+            { expiresIn: JWT_CONFIG.REFRESH_TOKEN_EXPIRY } as SignOptions
+        );
+        // 6️⃣ Revoke old session
+        await prisma.$transaction(async (tx: any) => {
+
+            await tx.session.update({
+                where: { jti: session.jti },
+                data: { revoked: true },
+            });
+
+            // 7️⃣ Create new session for rotated refresh token
+            await tx.session.create({
+                data: {
+                    jti: newJti,
+                    userId: user.id,
+                    walletId: session.walletId,
+                    revoked: false,
+                    expiresAt: new Date(Date.now() + Number(JWT_CONFIG.REFRESH_TOKEN_EXPIRY) * 1000),
+                },
+            });
+        });
 
         return {
             accessToken: newAccessToken,
-            refreshToken,
+            refreshToken: newRefreshToken,
             user: {
                 id: user.id,
                 name: user.name,
@@ -285,7 +304,7 @@ export class AuthService {
             },
         });
         if (!user) throw new NotFoundError("User not found");
-        return user.wallets.map(wallet => ({
+        return user.wallets.map((wallet: { id: string; stellarAddress: string; isPrimary: any; label: any; status: any; createdAt: any; updatedAt: any; }) => ({
             id: wallet.id,
             address: wallet.stellarAddress,
             primary: wallet.isPrimary,
@@ -304,7 +323,7 @@ export class AuthService {
             throw new ValidationError("Invalid Stellar wallet address");
         }
 
-        return await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx: any) => {
             await this.lockUserRow(tx, userId);
 
             const existingWallet = await tx.wallet.findUnique({
@@ -350,7 +369,7 @@ export class AuthService {
     }
 
     async unlinkWallet(userId: string, walletId: string): Promise<void> {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
             await this.lockUserRow(tx, userId);
 
             const wallets = await tx.wallet.findMany({
@@ -378,7 +397,7 @@ export class AuthService {
     }
 
     async setPrimaryWallet(userId: string, walletId: string) {
-        return prisma.$transaction(async (tx) => {
+        return prisma.$transaction(async (tx: any) => {
             await this.lockUserRow(tx, userId);
 
             const wallet = await tx.wallet.findFirst({
@@ -408,9 +427,12 @@ export class AuthService {
         });
     }
 
-    private parseExpiry(expiryStr: string): number {
+       private parseExpiry(expiryStr: string): number {
         const match = expiryStr.match(/^(\d+)([smhd])$/);
-        if (!match) return 900;
+        if (!match) {
+            console.warn(`Unrecognized expiry format "${expiryStr}", defaulting to 900s`);
+            return 900;
+        }
         const value = parseInt(match[1], 10);
         const unit = match[2];
         switch (unit) {

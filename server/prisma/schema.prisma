@@ -1,7 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
-
 datasource db {
   provider = "postgresql"
 }
@@ -69,6 +69,7 @@ model Challenge {
   nonce     String
   expiresAt DateTime
   consumed  Boolean  @default(false)
+  purpose   ChallengePurpose @default(LOGIN)
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
@@ -78,6 +79,7 @@ model Challenge {
 
   @@index([userId])
   @@index([walletId])
+  @@index([nonce])
 }
 
 model Session {

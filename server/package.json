@@ -3,17 +3,18 @@
   "version": "1.0.0",
   "description": "TypeScript backend for StelloVault",
   "main": "dist/app.js",
+  "type": "module",
   "scripts": {
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
     "compile": "tsc --w",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev && prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
-    "@prisma/client": "^7.4.0",
+    "@prisma/client": "^7.4.1",
     "@prisma/config": "^7.4.0",
     "@stellar/stellar-sdk": "^12.3.0",
     "cors": "^2.8.5",
