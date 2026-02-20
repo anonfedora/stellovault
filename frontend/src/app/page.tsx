@@ -39,7 +39,7 @@ export default function Home() {
             <a href="#innovation" className="hover:text-gray-900 transition">Innovation</a>
             <a href="#impact" className="hover:text-gray-900 transition">Impact</a>
           </div>
-          
+
           {/* Wallet Connect Button */}
           <div className="relative">
             {isConnected ? (
@@ -144,7 +144,7 @@ export default function Home() {
           </div>
         </div>
 
-      
+
       </section>
 
       {/* Features Grid */}
@@ -200,7 +200,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
               <h2 className="text-4xl font-bold text-gray-900">The Trade Finance Crisis</h2>
-              
+
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="w-6 h-6 rounded-full bg-blue-100 shrink-0 flex items-center justify-center mt-1">
@@ -236,7 +236,7 @@ export default function Home() {
 
             <div className="space-y-8">
               <h2 className="text-4xl font-bold text-gray-900">Our Solution</h2>
-              
+
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="w-6 h-6 rounded-full bg-blue-100 shrink-0 flex items-center justify-center mt-1">
@@ -244,7 +244,7 @@ export default function Home() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-1 ">50% Cost Reduction</h4>
-                    <p className="text-blue-900">Eliminate intermediaries using Stellar's low-cost settlements and Soroban smart contracts.</p>
+                    <p className="text-blue-900">Eliminate intermediaries using Stellar&apos;s low-cost settlements and Soroban smart contracts.</p>
                   </div>
                 </div>
 
@@ -371,7 +371,7 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex gap-4">
                 <div className="flex-shrink-0">
                   <div className="flex items-center justify-center h-12 w-12 rounded-md bg-cyan-100">
@@ -416,7 +416,7 @@ export default function Home() {
           <p className="text-xl text-gray-600">
             Join the revolution. Be among the first SMEs and investors reshaping global trade.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button
               onClick={() => setIsWalletMenuOpen(true)}

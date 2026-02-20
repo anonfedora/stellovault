@@ -36,7 +36,7 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // ── API Routes ───────────────────────────────────────────────────────────────
-const api = "/api/v1";
+const api = "/api";
 
 app.use(`${api}/auth`, authRoutes);
 app.use(`${api}/wallets`, walletRoutes);
