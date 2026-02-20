@@ -4,51 +4,42 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id             String    @id @default(uuid())
-  stellarAddress String    @unique
-  name           String?
-  role           Role      @default(USER)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  wallets        Wallet[]
-  challenges     WalletChallenge[]
-  loans          Loan[]
-  investments    Investment[]
+  id        String   @id @default(uuid())
+  name      String?
+  role      Role     @default(USER)
+  wallets   Wallet[]
+  loans     Loan[]
+  investments Investment[]
+  sessions  Session[]
+  challenges Challenge[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Wallet {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  address    String   @unique
-  isPrimary  Boolean  @default(false)
-  label      String?
-  verifiedAt DateTime @default(now())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String
+  stellarAddress String
+  isPrimary      Boolean  @default(false)
+  label          String?  // "Ledger", "Freighter", etc.
 
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status WalletStatus @default(ACTIVE)
+
+  sessions       Session[]
+  challenges     Challenge[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([stellarAddress])
   @@index([userId])
 }
 
-model WalletChallenge {
-  id            String           @id @default(uuid())
-  userId        String?
-  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  walletAddress String
-  nonce         String
-  purpose       ChallengePurpose
-  expiresAt     DateTime
-  usedAt        DateTime?
-  createdAt     DateTime         @default(now())
 
-  @@unique([walletAddress, nonce, purpose])
-  @@index([walletAddress, purpose])
-  @@index([userId, purpose])
-}
 
 model Loan {
   id             String    @id @default(uuid())
@@ -71,6 +62,52 @@ model Investment {
   createdAt      DateTime  @default(now())
 }
 
+model Challenge {
+  id        String   @id @default(uuid())
+  userId    String
+  walletId  String
+  nonce     String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  walletId  String
+  jti       String   @unique
+
+  ipAddress String?
+  userAgent String?
+  revoked   Boolean  @default(false)
+  revokedAt DateTime?
+  expiresAt DateTime
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+enum WalletStatus {
+  ACTIVE
+  UNLINKED
+  SUSPENDED
+}
+
+ 
 enum Role {
   USER
   MERCHANT
