@@ -18,6 +18,8 @@ model User {
   lentLoans      Loan[]    @relation("LenderLoans")
   wallets        Wallet[]
   challenges     WalletChallenge[]
+  boughtEscrows  Escrow[]  @relation("BuyerEscrows")
+  soldEscrows    Escrow[]  @relation("SellerEscrows")
   loans          Loan[]
   investments    Investment[]
 }
@@ -50,6 +52,26 @@ model WalletChallenge {
   @@unique([walletAddress, nonce, purpose])
   @@index([walletAddress, purpose])
   @@index([userId, purpose])
+}
+
+model Escrow {
+  id            String       @id @default(uuid())
+  buyerId       String
+  buyer         User         @relation("BuyerEscrows", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User         @relation("SellerEscrows", fields: [sellerId], references: [id])
+  amount        Decimal
+  assetCode     String       @default("USDC")
+  status        EscrowStatus @default(PENDING)
+  stellarTxHash String?
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model Loan {
@@ -107,4 +129,12 @@ enum LoanStatus {
 enum ChallengePurpose {
   LOGIN
   LINK_WALLET
+}
+
+enum EscrowStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  EXPIRED
 }
