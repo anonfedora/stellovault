@@ -10,7 +10,13 @@ export async function createCollateral(req: Request, res: Response, next: NextFu
 
 export async function listCollateral(req: Request, res: Response, next: NextFunction) {
     try {
-        const result = await collateralService.listCollateral(req.query);
+        const query = {
+            escrowId: typeof req.query.escrowId === "string" ? req.query.escrowId : undefined,
+            status: typeof req.query.status === "string" ? req.query.status : undefined,
+            page: typeof req.query.page === "string" ? req.query.page : undefined,
+            limit: typeof req.query.limit === "string" ? req.query.limit : undefined,
+        };
+        const result = await collateralService.listCollateral(query);
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 }

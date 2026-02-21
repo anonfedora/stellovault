@@ -1,7 +1,9 @@
-import { NotFoundError, ValidationError } from "../config/errors";
+import { ConflictError, NotFoundError, ValidationError } from "../config/errors";
 import { prisma } from "./database.service";
+import { CollateralStatus } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
-type CollateralStatus = "PENDING" | "DEPOSITED";
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 interface CreateCollateralRequest {
     escrowId: string;
@@ -55,6 +57,7 @@ function coerceLimit(value: string | number | undefined): number {
 
 export class CollateralService {
     private indexerTimer: NodeJS.Timeout | null = null;
+    private polling = false;
     
     constructor() {
         // Will be started explicitly by app.ts instead, or we can auto-start
@@ -69,8 +72,7 @@ export class CollateralService {
 
         const amount = parsePositiveAmount(payload.amount, "amount");
 
-        const db: any = prisma;
-        const escrow = await db.escrow.findUnique({
+        const escrow = await prisma.escrow.findUnique({
             where: { id: escrowId },
             select: { id: true },
         });
@@ -79,23 +81,33 @@ export class CollateralService {
             throw new ValidationError("escrowId does not exist");
         }
 
-        const collateral = await db.collateral.create({
-            data: {
-                escrowId,
-                amount: amount.toString(),
-                assetCode: payload.assetCode || "USDC",
-                metadataHash,
-                status: "PENDING",
-            },
-        });
-
-        return collateral;
+        try {
+            const collateral = await prisma.collateral.create({
+                data: {
+                    escrowId,
+                    amount: amount.toString(),
+                    assetCode: payload.assetCode || "USDC",
+                    metadataHash,
+                    status: "PENDING",
+                },
+            });
+            return collateral;
+        } catch (error) {
+            if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+                throw new ConflictError("Collateral with this metadataHash already exists");
+            }
+            throw error;
+        }
     }
 
     async getCollateralById(id: string) {
-        const db: any = prisma;
-        const collateral = await db.collateral.findUnique({
-            where: { id },
+        const trimmedId = id?.trim();
+        if (!trimmedId || !UUID_REGEX.test(trimmedId)) {
+            throw new ValidationError("Invalid collateral ID format");
+        }
+
+        const collateral = await prisma.collateral.findUnique({
+            where: { id: trimmedId },
         });
 
         if (!collateral) {
@@ -105,9 +117,13 @@ export class CollateralService {
     }
 
     async getCollateralByMetadataHash(hash: string) {
-        const db: any = prisma;
-        const collateral = await db.collateral.findUnique({
-            where: { metadataHash: hash },
+        const trimmedHash = hash?.trim();
+        if (!trimmedHash) {
+            throw new ValidationError("Metadata hash is required");
+        }
+
+        const collateral = await prisma.collateral.findUnique({
+            where: { metadataHash: trimmedHash },
         });
 
         if (!collateral) {
@@ -117,7 +133,6 @@ export class CollateralService {
     }
 
     async listCollateral(query: CollateralListQuery) {
-        const db: any = prisma;
         const page = coercePage(query.page);
         const limit = coerceLimit(query.limit);
         const skip = (page - 1) * limit;
@@ -127,13 +142,13 @@ export class CollateralService {
         if (query.status?.trim()) where.status = normalizeStatus(query.status, "status");
 
         const [items, total] = await Promise.all([
-            db.collateral.findMany({
+            prisma.collateral.findMany({
                 where,
                 orderBy: { createdAt: "desc" },
                 skip,
                 take: limit,
             }),
-            db.collateral.count({ where }),
+            prisma.collateral.count({ where }),
         ]);
 
         const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -157,20 +172,16 @@ export class CollateralService {
         
         // Background polling of Soroban RPC for CollateralDeposited events
         this.indexerTimer = setInterval(async () => {
+            if (this.polling) return;
+            this.polling = true;
+
             try {
-                const db: any = prisma;
-                // Currently simulating Soroban event polling.
-                // In a true implementation, we'd query Soroban RPC for `CollateralDeposited` events
-                // and extract `metadataHash` from the event data to match against our DB.
-                
-                // For instance, pseudo code:
+                // TODO: Implement actual RPC querying logic for `CollateralDeposited` events
+                // Currently simulated:
                 // const events = await rpc.getEvents({ ... });
                 // const hashes = events.map(e => extractHash(e));
                 
-                // For acceptance criteria: "indexer runs in background and updates status when matches detected"
-                // Simulate looking up pending collaterals to check if their hash is deposited on-chain
-                
-                const pendingCollaterals = await db.collateral.findMany({
+                const pendingCollaterals = await prisma.collateral.findMany({
                     where: { status: "PENDING" },
                     select: { id: true, metadataHash: true },
                 });
@@ -181,14 +192,25 @@ export class CollateralService {
 
                 // If on-chain indexed events match, update to DEPOSITED.
                 // E.g.
-                // await db.collateral.update({ where: { id: ... }, data: { status: "DEPOSITED" } })
+                // await prisma.collateral.update({ where: { id: ... }, data: { status: "DEPOSITED" } })
 
             } catch (error) {
                 console.error("Collateral indexer polling failed:", error);
+            } finally {
+                this.polling = false;
             }
         }, 30_000); // run every 30s
 
         this.indexerTimer.unref();
+    }
+
+    stopIndexer() {
+        if (this.indexerTimer) {
+            clearInterval(this.indexerTimer);
+            this.indexerTimer = null;
+            this.polling = false;
+            console.log("Collateral indexer stopped.");
+        }
     }
 }
 

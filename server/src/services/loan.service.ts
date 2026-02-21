@@ -71,7 +71,7 @@ export class LoanService {
             );
         }
 
-        const db: any = prisma;
+        const db = prisma;
         const users = await db.user.findMany({
             where: { id: { in: [borrowerId, lenderId] } },
             select: { id: true },
@@ -117,7 +117,7 @@ export class LoanService {
     }
 
     async getLoan(id: string) {
-        const db: any = prisma;
+        const db = prisma;
         const loan = await db.loan.findUnique({
             where: { id },
             include: {
@@ -135,7 +135,7 @@ export class LoanService {
     }
 
     async listLoans(borrowerId?: string, lenderId?: string, status?: string) {
-        const db: any = prisma;
+        const db = prisma;
         const normalizedStatus = status?.trim().toUpperCase();
         if (normalizedStatus && !VALID_LOAN_STATUSES.has(normalizedStatus)) {
             throw new ValidationError("Invalid status. Use PENDING, ACTIVE, REPAID, or DEFAULTED");
@@ -177,7 +177,7 @@ export class LoanService {
             }
         }
 
-        const db: any = prisma;
+        const db = prisma;
         return db.$transaction(async (tx: any) => {
             const loan = await tx.loan.findUnique({
                 where: { id: loanId },

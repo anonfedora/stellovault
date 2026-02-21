@@ -56,12 +56,29 @@ app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
 const port = env.port;
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`StelloVault server running on http://localhost:${port}`);
     console.log(`Routes mounted at ${api}`);
     
     // Start background jobs
     collateralService.startIndexer();
 });
+
+function gracefulShutdown(signal: string) {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    collateralService.stopIndexer();
+    server.close(() => {
+        console.log("Server closed.");
+        process.exit(0);
+    });
+    
+    setTimeout(() => {
+        console.error("Could not close connections in time, forcefully shutting down");
+        process.exit(1);
+    }, 10000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 export default app;
