@@ -107,7 +107,6 @@ model Oracle {
   updatedAt    DateTime @updatedAt
   confirmations OracleConfirmation[]
 
-  @@index([address])
   @@index([isActive])
 }
 
@@ -139,6 +138,27 @@ model Escrow {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   confirmations OracleConfirmation[]
+  disputes     Dispute[]
 
   @@index([status])
+}
+
+model Dispute {
+  id              String   @id @default(uuid())
+  escrowId        String
+  escrow          Escrow   @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  reporterAddress String
+  reason          String
+  status          DisputeStatus @default(OPEN)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([escrowId])
+  @@index([status])
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
 }

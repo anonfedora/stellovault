@@ -11,11 +11,18 @@ export async function registerOracle(req: Request, res: Response, next: NextFunc
     }
 }
 
+function parsePaginationParam(value: unknown, defaultValue: number, min = 0, max = 1000): number {
+    if (value === undefined || value === null || value === "") return defaultValue;
+    const parsed = parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) return defaultValue;
+    return Math.max(min, Math.min(max, parsed));
+}
+
 export async function listOracles(req: Request, res: Response, next: NextFunction) {
     try {
         const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
-        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+        const limit = parsePaginationParam(req.query.limit, 50, 1, 100);
+        const offset = parsePaginationParam(req.query.offset, 0, 0, 10000);
 
         const result = await oracleService.listOracles({ isActive, limit, offset });
         res.json({ success: true, data: result });
@@ -64,8 +71,8 @@ export async function submitConfirmation(req: Request, res: Response, next: Next
 export async function getConfirmations(req: Request, res: Response, next: NextFunction) {
     try {
         const { escrowId } = req.params;
-        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+        const limit = parsePaginationParam(req.query.limit, 50, 1, 100);
+        const offset = parsePaginationParam(req.query.offset, 0, 0, 10000);
 
         const result = await oracleService.getConfirmations({ escrowId, limit, offset });
         res.json({ success: true, data: result });

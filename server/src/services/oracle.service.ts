@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import { Keypair } from "@stellar/stellar-sdk";
 import {
     ConflictError,
@@ -47,6 +48,27 @@ type ListConfirmationsQuery = {
     offset?: number;
 };
 
+function sortObjectKeys(obj: unknown): unknown {
+    if (obj === null || typeof obj !== "object") {
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(sortObjectKeys);
+    }
+    const sorted: Record<string, unknown> = {};
+    const keys = Object.keys(obj).sort();
+    for (const key of keys) {
+        sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+    }
+    return sorted;
+}
+
+function canonicalStringify(data: unknown): string {
+    return JSON.stringify(sortObjectKeys(data));
+}
+
+export const oracleEventEmitter = new EventEmitter();
+
 export class OracleService {
     private requireNonEmptyString(value: unknown, fieldName: string): string {
         if (typeof value !== "string" || value.trim().length === 0) {
@@ -67,6 +89,24 @@ export class OracleService {
         }
     }
 
+    /**
+     * Decodes a 64-byte Ed25519 signature from hex or base64 encoding.
+     *
+     * Accepted formats:
+     * - Hex: 128 characters (0-9a-fA-F), decodes to 64 bytes
+     * - Base64: Standard base64 with optional = padding, decodes to 64 bytes
+     *
+     * @param signature - The encoded signature string
+     * @returns Buffer containing the 64-byte raw signature
+     * @throws ValidationError if the signature is empty, malformed, or not 64 bytes
+     *
+     * @example
+     * // Hex format (128 chars)
+     * decodeSignature("a1b2c3...") // 128 hex characters
+     *
+     * // Base64 format
+     * decodeSignature("abc123+==") // base64 string
+     */
     private decodeSignature(signature: unknown): Buffer {
         const value = this.requireNonEmptyString(signature, "signature");
 
@@ -119,9 +159,21 @@ export class OracleService {
             });
         }
 
-        return prisma.oracle.create({
-            data: { address },
-        });
+        try {
+            return await prisma.oracle.create({
+                data: { address },
+            });
+        } catch (error) {
+            if (
+                typeof error === "object" &&
+                error !== null &&
+                "code" in error &&
+                (error as { code?: string }).code === "P2002"
+            ) {
+                throw new ConflictError("Oracle already registered and active");
+            }
+            throw error;
+        }
     }
 
     async deactivateOracle(address: string) {
@@ -191,7 +243,7 @@ export class OracleService {
         }
 
         const message = Buffer.from(
-            JSON.stringify({
+            canonicalStringify({
                 escrowId,
                 eventType,
                 nonce,
@@ -205,15 +257,27 @@ export class OracleService {
             throw new UnauthorizedError("Invalid oracle signature");
         }
 
-        return prisma.oracleConfirmation.create({
-            data: {
-                oracleId: oracle.id,
-                escrowId,
-                eventType,
-                signature: input.signature,
-                payload: toJsonValue(input.payload),
-            },
-        });
+        try {
+            return await prisma.oracleConfirmation.create({
+                data: {
+                    oracleId: oracle.id,
+                    escrowId,
+                    eventType,
+                    signature: input.signature,
+                    payload: toJsonValue(input.payload),
+                },
+            });
+        } catch (error) {
+            if (
+                typeof error === "object" &&
+                error !== null &&
+                "code" in error &&
+                (error as { code?: string }).code === "P2002"
+            ) {
+                throw new ConflictError("Duplicate confirmation for this event");
+            }
+            throw error;
+        }
     }
 
     async listOracles(query: ListOraclesQuery) {
@@ -306,24 +370,57 @@ export class OracleService {
             throw new ConflictError("Escrow is already disputed");
         }
 
-        const updatedEscrow = await prisma.escrow.update({
-            where: { id: escrowId },
+        const updateResult = await prisma.escrow.updateMany({
+            where: {
+                id: escrowId,
+                status: { not: "DISPUTED" },
+            },
             data: { status: "DISPUTED" },
         });
 
-        return {
+        if (updateResult.count === 0) {
+            throw new ConflictError("Escrow is already disputed");
+        }
+
+        const dispute = await prisma.dispute.create({
+            data: {
+                escrowId,
+                reporterAddress: normalizedDisputer,
+                reason: disputeReason,
+            },
+        });
+
+        const updatedEscrow = await prisma.escrow.findUnique({
+            where: { id: escrowId },
+        });
+
+        const disputeEvent = {
             escrow: updatedEscrow,
             dispute: {
+                id: dispute.id,
                 escrowId,
                 reason: disputeReason,
                 disputerAddress: normalizedDisputer,
-                createdAt: new Date(),
+                createdAt: dispute.createdAt,
             },
         };
+
+        oracleEventEmitter.emit("dispute", disputeEvent);
+
+        return disputeEvent;
     }
 
     async getOracleMetrics() {
-        const [activeOracles, totalOracles, totalConfirmations, escrowsByStatus] = await Promise.all([
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+        const [
+            activeOracles,
+            totalOracles,
+            totalConfirmations,
+            escrowsByStatus,
+            recentConfirmations,
+            confirmationsPerOracle,
+        ] = await Promise.all([
             prisma.oracle.count({ where: { isActive: true } }),
             prisma.oracle.count(),
             prisma.oracleConfirmation.count(),
@@ -331,22 +428,18 @@ export class OracleService {
                 by: ["status"],
                 _count: { id: true },
             }),
+            prisma.oracleConfirmation.count({
+                where: { createdAt: { gte: thirtyDaysAgo } },
+            }),
+            prisma.oracleConfirmation.groupBy({
+                by: ["oracleId"],
+                _count: { id: true },
+            }),
         ]);
 
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const recentConfirmations = await prisma.oracleConfirmation.count({
-            where: { createdAt: { gte: thirtyDaysAgo } },
-        });
-
-        const confirmationsPerOracle = await prisma.oracleConfirmation.groupBy({
-            by: ["oracleId"],
-            _count: { id: true },
-        });
-
         const avgConfirmationsPerOracle =
-            confirmationsPerOracle.length > 0
-                ? confirmationsPerOracle.reduce((sum, o) => sum + o._count.id, 0) /
-                  confirmationsPerOracle.length
+            totalOracles > 0
+                ? confirmationsPerOracle.reduce((sum, o) => sum + o._count.id, 0) / totalOracles
                 : 0;
 
         const escrowCounts: Record<string, number> = {};
