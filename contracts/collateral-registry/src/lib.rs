@@ -9,7 +9,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, B
 
 /// Contract errors
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ContractError {
     Unauthorized = 1,
     AlreadyInitialized = 2,
@@ -20,6 +20,18 @@ pub enum ContractError {
     DuplicateMetadata = 7,
 }
 
+impl From<soroban_sdk::Error> for ContractError {
+    fn from(_: soroban_sdk::Error) -> Self {
+        ContractError::Unauthorized
+    }
+}
+
+impl From<&ContractError> for soroban_sdk::Error {
+    fn from(err: &ContractError) -> Self {
+        soroban_sdk::Error::from_contract_error(*err as u32)
+    }
+}
+
 /// Collateral data structure
 #[contracttype]
 #[derive(Clone)]
@@ -27,9 +39,11 @@ pub struct Collateral {
     pub id: u64,
     pub owner: Address,
     pub face_value: i128,
+    pub realized_value: i128,
     pub expiry_ts: u64,
     pub metadata_hash: BytesN<32>,
     pub registered_at: u64,
+    pub last_valuation_ts: u64,
     pub locked: bool,
 }
 
@@ -96,8 +110,8 @@ impl CollateralRegistry {
         }
 
         // Check for duplicate metadata hash
-        let metadata_key = symbol_short!("meta");
-        if env.storage().persistent().has(&(metadata_key, metadata_hash.clone())) {
+        let metadata_key = Symbol::new(&env, "metadata");
+        if env.storage().persistent().has(&(metadata_key.clone(), metadata_hash.clone())) {
             return Err(ContractError::DuplicateMetadata);
         }
 
@@ -113,9 +127,11 @@ impl CollateralRegistry {
             id: collateral_id,
             owner: owner.clone(),
             face_value,
+            realized_value: face_value,
             expiry_ts,
             metadata_hash: metadata_hash.clone(),
             registered_at: current_ts,
+            last_valuation_ts: current_ts,
             locked: false,
         };
 
@@ -151,7 +167,7 @@ impl CollateralRegistry {
         let escrow_manager: Address = env
             .storage()
             .instance()
-            .get(&symbol_short!("escrow_mgr"))
+            .get(&Symbol::new(&env, "escrow_mgr"))
             .ok_or(ContractError::Unauthorized)?;
 
         escrow_manager.require_auth();
@@ -189,7 +205,7 @@ impl CollateralRegistry {
         let escrow_manager: Address = env
             .storage()
             .instance()
-            .get(&symbol_short!("escrow_mgr"))
+            .get(&Symbol::new(&env, "escrow_mgr"))
             .ok_or(ContractError::Unauthorized)?;
 
         escrow_manager.require_auth();
@@ -210,6 +226,56 @@ impl CollateralRegistry {
         env.events().publish(
             (symbol_short!("coll_unlk"),),
             (id,),
+        );
+
+        Ok(())
+    }
+
+    /// Update collateral valuation (only callable by registered Valuation Oracle)
+    ///
+    /// # Arguments
+    /// * `collateral_id` - ID of the collateral to update
+    /// * `new_value` - New realized value
+    ///
+    /// # Events
+    /// Emits `CollateralValued` event
+    pub fn update_valuation(
+        env: Env,
+        collateral_id: u64,
+        new_value: i128,
+    ) -> Result<(), ContractError> {
+        // Check authorization
+        let valuation_oracle: Address = env
+            .storage()
+            .instance()
+            .get(&Symbol::new(&env, "val_oracle"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        valuation_oracle.require_auth();
+
+        // Validate inputs
+        if new_value <= 0 {
+            return Err(ContractError::InvalidAmount);
+        }
+
+        // Fetch collateral
+        let mut collateral: Collateral = env
+            .storage()
+            .persistent()
+            .get(&collateral_id)
+            .ok_or(ContractError::CollateralNotFound)?;
+
+        // Update values
+        collateral.realized_value = new_value;
+        collateral.last_valuation_ts = env.ledger().timestamp();
+
+        // Store updated collateral
+        env.storage().persistent().set(&collateral_id, &collateral);
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("coll_val"),),
+            (collateral_id, new_value),
         );
 
         Ok(())
@@ -264,7 +330,27 @@ impl CollateralRegistry {
 
         env.storage()
             .instance()
-            .set(&symbol_short!("escrow_mgr"), &escrow_manager);
+            .set(&Symbol::new(&env, "escrow_mgr"), &escrow_manager);
+
+        Ok(())
+    }
+
+    /// Set valuation oracle address (admin only)
+    ///
+    /// # Arguments
+    /// * `valuation_oracle` - Address of the valuation oracle
+    pub fn set_valuation_oracle(env: Env, valuation_oracle: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .unwrap();
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&Symbol::new(&env, "val_oracle"), &valuation_oracle);
 
         Ok(())
     }
@@ -321,7 +407,43 @@ mod test {
             let collateral = CollateralRegistry::get_collateral(env.clone(), collateral_id).unwrap();
             assert_eq!(collateral.owner, owner);
             assert_eq!(collateral.face_value, 1000);
+            assert_eq!(collateral.realized_value, 1000);
             assert_eq!(collateral.locked, false);
+        });
+    }
+
+    #[test]
+    fn test_update_valuation_success() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let owner = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+
+        env.as_contract(&contract_id, || {
+            // Initialize
+            CollateralRegistry::initialize(env.clone(), admin.clone()).unwrap();
+            CollateralRegistry::set_valuation_oracle(env.clone(), oracle.clone()).unwrap();
+
+            // Register collateral
+            let future_ts = env.ledger().timestamp() + 86400;
+            let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let collateral_id = CollateralRegistry::register_collateral(
+                env.clone(),
+                owner,
+                1000,
+                future_ts,
+                metadata_hash,
+            ).unwrap();
+
+            // Update valuation
+            let update_result = CollateralRegistry::update_valuation(env.clone(), collateral_id, 1200);
+            assert!(update_result.is_ok());
+
+            // Verify updated value
+            let collateral = CollateralRegistry::get_collateral(env.clone(), collateral_id).unwrap();
+            assert_eq!(collateral.realized_value, 1200);
+            assert!(collateral.last_valuation_ts == env.ledger().timestamp());
         });
     }
 
