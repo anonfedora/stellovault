@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-
-// TODO: Inject EscrowService
+import { timingSafeEqual } from "crypto";
+import { env } from "../config/env";
+import escrowService from "../services/escrow.service";
 
 /**
  * POST /api/escrows
@@ -8,9 +9,8 @@ import { Request, Response, NextFunction } from "express";
  */
 export async function createEscrow(req: Request, res: Response, next: NextFunction) {
     try {
-        const { buyerId, sellerId, amount, assetCode, expiresAt } = req.body;
-        // const result = await escrowService.createEscrow(req.body);
-        res.status(201).json({ success: true, data: { escrowId: "TODO", xdr: "BASE64_XDR" } });
+        const result = await escrowService.createEscrow(req.body);
+        res.status(201).json({ success: true, data: result });
     } catch (err) { next(err); }
 }
 
@@ -20,7 +20,15 @@ export async function createEscrow(req: Request, res: Response, next: NextFuncti
  */
 export async function listEscrows(req: Request, res: Response, next: NextFunction) {
     try {
-        res.json({ success: true, data: [] });
+        const { buyerId, sellerId, status, page, limit } = req.query;
+        const result = await escrowService.listEscrows({
+            buyerId: typeof buyerId === "string" ? buyerId : undefined,
+            sellerId: typeof sellerId === "string" ? sellerId : undefined,
+            status: typeof status === "string" ? status : undefined,
+            page: typeof page === "string" ? page : undefined,
+            limit: typeof limit === "string" ? limit : undefined,
+        });
+        res.json({ success: true, data: result });
     } catch (err) { next(err); }
 }
 
@@ -29,8 +37,8 @@ export async function listEscrows(req: Request, res: Response, next: NextFunctio
  */
 export async function getEscrow(req: Request, res: Response, next: NextFunction) {
     try {
-        const { id } = req.params;
-        res.json({ success: true, data: null });
+        const escrow = await escrowService.getEscrow(req.params.id);
+        res.json({ success: true, data: escrow });
     } catch (err) { next(err); }
 }
 
@@ -40,14 +48,35 @@ export async function getEscrow(req: Request, res: Response, next: NextFunction)
  */
 export async function webhookEscrowUpdate(req: Request, res: Response, next: NextFunction) {
     try {
-        const secret = req.headers["x-webhook-secret"];
-        if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
-            return res.status(process.env.WEBHOOK_SECRET ? 401 : 503).json({
+        const secretHeader = req.headers["x-webhook-secret"];
+        const configuredSecret = env.webhookSecret;
+        if (!configuredSecret) {
+            return res.status(503).json({
                 success: false,
-                error: process.env.WEBHOOK_SECRET ? "Unauthorized" : "Webhook not configured",
+                error: "Webhook not configured",
             });
         }
-        // await escrowService.processEscrowEvent(req.body);
-        res.json({ success: true, data: null });
+
+        const incomingSecret = Array.isArray(secretHeader) ? secretHeader[0] : secretHeader;
+        if (typeof incomingSecret !== "string") {
+            return res.status(401).json({
+                success: false,
+                error: "Unauthorized",
+            });
+        }
+
+        const incomingBuffer = Buffer.from(incomingSecret);
+        const configuredBuffer = Buffer.from(configuredSecret);
+        if (
+            incomingBuffer.length !== configuredBuffer.length ||
+            !timingSafeEqual(incomingBuffer, configuredBuffer)
+        ) {
+            return res.status(401).json({
+                success: false,
+                error: "Unauthorized",
+            });
+        }
+        const updatedEscrow = await escrowService.processEscrowEvent(req.body);
+        res.json({ success: true, data: updatedEscrow });
     } catch (err) { next(err); }
 }
