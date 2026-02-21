@@ -150,6 +150,7 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
+
       <section className="pt-32 pb-20 px-6 text-center bg-gradient-to-br from-white via-white to-gray-50">
         <div className="max-w-4xl mx-auto">
           <span className="inline-block bg-blue-100 text-blue-900 px-4 py-1 rounded-full text-sm font-medium mb-6">
@@ -167,7 +168,6 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button
-              onClick={() => setIsWalletMenuOpen(true)}
               className="bg-blue-900 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 group"
             >
               Connect Wallet
@@ -565,7 +565,6 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <button
-              onClick={() => setIsWalletMenuOpen(true)}
               className="bg-blue-900 text-white px-10 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all"
             >
               Connect Wallet & Start Trading

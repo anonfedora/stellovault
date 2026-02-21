@@ -41,6 +41,7 @@ export function Navbar() {
           <Link href="/#features" className="hover:text-blue-900 transition">Features</Link>
           <Link href="/#innovation" className="hover:text-blue-900 transition">Innovation</Link>
           <Link href="/#impact" className="hover:text-blue-900 transition">Impact</Link>
+          <Link href="/about" className="hover:text-blue-900 transition">About</Link>
           <Link href="/contact" className="text-blue-900 font-semibold">Contact</Link>
         </div>
         
@@ -116,6 +117,7 @@ export function Navbar() {
           <Link href="/#features" className="block text-gray-600 hover:text-blue-900 py-2">Features</Link>
           <Link href="/#innovation" className="block text-gray-600 hover:text-blue-900 py-2">Innovation</Link>
           <Link href="/#impact" className="block text-gray-600 hover:text-blue-900 py-2">Impact</Link>
+          <Link href="/about" className="block text-gray-600 hover:text-blue-900 py-2">About</Link>
           <Link href="/contact" className="block text-blue-900 font-semibold py-2">Contact</Link>
         </div>
       )}

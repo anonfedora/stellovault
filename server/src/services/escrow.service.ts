@@ -112,7 +112,7 @@ export class EscrowService {
             throw new ValidationError("expiresAt must be in the future");
         }
 
-        const db: any = prisma;
+        const db = prisma;
         const users = await db.user.findMany({
             where: { id: { in: [buyerId, sellerId] } },
             select: { id: true },
@@ -152,7 +152,7 @@ export class EscrowService {
     }
 
     async getEscrow(id: string) {
-        const db: any = prisma;
+        const db = prisma;
         const escrow = await db.escrow.findUnique({
             where: { id },
             include: { buyer: true, seller: true },
@@ -165,7 +165,7 @@ export class EscrowService {
     }
 
     async listEscrows(query: EscrowListQuery) {
-        const db: any = prisma;
+        const db = prisma;
         const page = coercePage(query.page);
         const limit = coerceLimit(query.limit);
         const skip = (page - 1) * limit;
@@ -205,7 +205,7 @@ export class EscrowService {
         }
         const status = normalizeStatus(event.status, "status");
 
-        const db: any = prisma;
+        const db = prisma;
         const existing = await db.escrow.findUnique({ where: { id: escrowId } });
         if (!existing) {
             throw new NotFoundError("Escrow not found");
@@ -252,7 +252,7 @@ export class EscrowService {
 
         this.timeoutTimer = setInterval(async () => {
             try {
-                const db: any = prisma;
+                const db = prisma;
                 const overdueEscrows = await db.escrow.findMany({
                     where: {
                         status: "ACTIVE",

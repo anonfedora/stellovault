@@ -122,7 +122,7 @@ export class AuthService {
 
         const nonce = randomBytes(24).toString("hex");
         const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
-        const db: any = prisma;
+        const db = prisma;
 
         await db.walletChallenge.create({
             data: {
@@ -142,7 +142,7 @@ export class AuthService {
     }
 
     async getUserWallets(userId: string) {
-        const db: any = prisma;
+        const db = prisma;
         return db.wallet.findMany({
             where: { userId },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
@@ -295,7 +295,7 @@ export class AuthService {
     }
 
     async updateWalletLabel(userId: string, walletId: string, label?: string) {
-        const db: any = prisma;
+        const db = prisma;
         const wallet = await db.wallet.findFirst({ where: { id: walletId, userId } });
         if (!wallet) {
             throw new NotFoundError("Wallet not found");
