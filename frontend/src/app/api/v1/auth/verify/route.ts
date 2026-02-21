@@ -5,7 +5,7 @@ import { setAuthCookies, signToken } from '@/lib/auth';
 
 export async function POST(request: Request) {
     try {
-        const { publicKey, signedMessage } = await request.json();
+        const { publicKey, signedMessage, signerPublicKey } = await request.json();
         const cookieStore = await cookies();
         const storedNonceData = cookieStore.get('auth-nonce')?.value;
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
         const { nonce, publicKey: boundedPublicKey } = JSON.parse(storedNonceData);
 
-        if (publicKey !== boundedPublicKey) {
+        if (publicKey !== boundedPublicKey || (signerPublicKey && publicKey !== signerPublicKey)) {
             return NextResponse.json({ error: 'Public key mismatch' }, { status: 400 });
         }
 
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         }
 
         // Generate Tokens
-        const accessToken = await signToken({ sub: publicKey }, '1h');
+        const accessToken = await signToken({ sub: publicKey, type: 'access' }, '1h');
         const refreshToken = await signToken({ sub: publicKey, type: 'refresh' }, '7d');
 
         // Set Cookies

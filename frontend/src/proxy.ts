@@ -5,9 +5,6 @@ import { verifyToken, refreshAccessToken } from './lib/auth';
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // Simplify isPublicPath and remove /api/ if not needed (matcher already excludes it usually)
-    const isPublicPath = pathname === '/login' || pathname === '/';
-
     // Check for token
     const accessToken = request.cookies.get('accessToken')?.value;
     const refreshToken = request.cookies.get('refreshToken')?.value;

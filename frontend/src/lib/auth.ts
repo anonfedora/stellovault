@@ -64,7 +64,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
     return null;
   }
 
-  const newAccessToken = await signToken({ sub: payload.sub as string }, '1h');
+  const newAccessToken = await signToken({ sub: payload.sub as string, type: 'access' }, '1h');
   return { accessToken: newAccessToken };
 }
 

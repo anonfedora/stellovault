@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { isAllowed, setAllowed, getAddress, signMessage } from '@stellar/freighter-api';
+import { useRouter } from 'next/navigation';
 
 interface WalletAuth {
     isConnected: boolean;
@@ -16,6 +17,7 @@ export function useWalletAuth(): WalletAuth {
     const [isConnecting, setIsConnecting] = useState(false);
     const [publicKey, setPublicKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
 
     useEffect(() => {
         // Check if already allowed/connected on mount
@@ -82,19 +84,25 @@ export function useWalletAuth(): WalletAuth {
             const { nonce } = await challengeRes.json();
 
             // 2. Sign Message
-            const signedMessage = await signMessage(nonce);
+            const result = await signMessage(nonce);
+            if (result.error) throw new Error(result.error);
+
+            const signedMessageStr = typeof result.signedMessage === 'string'
+                ? result.signedMessage
+                : Buffer.from(result.signedMessage as any).toString('base64');
+            const signerPublicKey = result.signerAddress;
 
             // 3. Verify
             const verifyRes = await fetch('/api/v1/auth/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ publicKey: pk, signedMessage }),
+                body: JSON.stringify({ publicKey: pk, signedMessage: signedMessageStr, signerPublicKey }),
             });
 
             if (!verifyRes.ok) throw new Error('Verification failed');
 
-            // Success - redirect or whatever
-            window.location.href = '/dashboard';
+            // Success - redirect
+            router.push('/dashboard');
 
         } catch (err: any) {
             setError(err.message || 'Login failed');
@@ -105,12 +113,16 @@ export function useWalletAuth(): WalletAuth {
     };
 
     const logout = async () => {
-        // Call API to clear cookies if needed, or just clear local state
-        // Ideally call an endpoint to clear HTTP-only cookies
+        try {
+            // Call API to clear cookies first
+            await fetch('/api/v1/auth/logout', { method: 'POST' });
+        } catch (err) {
+            console.error('Logout API call failed:', err);
+        }
+
         setIsConnected(false);
         setPublicKey(null);
-        await fetch('/api/v1/auth/logout', { method: 'POST' }); // We might need this endpoint
-        window.location.href = '/login';
+        router.push('/login');
     };
 
     return {
