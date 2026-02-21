@@ -32,11 +32,13 @@ async function testAuthFlow() {
 
         // 2. Sign
         console.log('\n3. Signing Nonce...');
-        // Freighter signs the message (string)
-        // We sign the nonce (string)
+        // NOTE: This only tests server-side Ed25519 signature verification format.
+        // It does NOT emulate Freighter's signMessage() response/encoding.
+        // In a real browser session, Freighter would produce the signedMessage.
         const signature = keypair.sign(Buffer.from(nonce));
         const signedMessage = signature.toString('base64');
         console.log('   Signature:', signedMessage.slice(0, 20) + '...');
+
 
         // 3. Verify
         console.log('\n4. Verifying...');

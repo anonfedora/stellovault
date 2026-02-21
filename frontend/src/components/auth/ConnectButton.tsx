@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { WalletPickerModal } from './WalletPickerModal';
-import { Loader2, Wallet } from 'lucide-react';
+import { Loader2, Wallet, AlertCircle } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 export function ConnectButton() {
-    const { isConnected, isConnecting, publicKey, login, logout, connect } = useWalletAuth();
+    const { isConnected, isConnecting, publicKey, login, logout, connect, error } = useWalletAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleConnect = async () => {
-        // Obtain public key then perform challenge-response login
-
-
+        // Obtain public key via Freighter, then run challenge-response login
         const key = await connect();
         if (key) {
             await login(key);
@@ -19,8 +17,6 @@ export function ConnectButton() {
     };
 
     // Display truncated address if connected. Login is required for protected routes.
-
-
     if (isConnected && publicKey) {
         return (
             <div className="flex items-center gap-2">
@@ -52,6 +48,13 @@ export function ConnectButton() {
                 )}
                 <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
             </button>
+
+            {error && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-red-500">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                </div>
+            )}
 
             <WalletPickerModal
                 isOpen={isModalOpen}

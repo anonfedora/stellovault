@@ -83,8 +83,8 @@ export function useWalletAuth(): WalletAuth {
             if (!challengeRes.ok) throw new Error('Failed to get challenge');
             const { nonce } = await challengeRes.json();
 
-            // 2. Sign Message
-            const result = await signMessage(nonce);
+            // 2. Sign Message — pass address so Freighter uses the correct key
+            const result = await signMessage(nonce, { address: pk });
             if (result.error) throw new Error(result.error);
 
             const signedMessageStr = typeof result.signedMessage === 'string'
