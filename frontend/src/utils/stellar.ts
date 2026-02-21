@@ -65,7 +65,8 @@ export const getExplorerUrl = (txHash: string, network: 'testnet' | 'mainnet' = 
 };
 
 // Contract interaction helpers
-export const createContractInstance = (contractId: string) => {
+export const createContractInstance = (contractId: string, network: keyof typeof NETWORKS = 'testnet') => {
+  // serverUrl lookup removed as Contract doesn't require it directly.
   return new Contract(contractId);
 };
 

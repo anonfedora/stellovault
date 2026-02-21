@@ -20,12 +20,17 @@ export function useWalletAuth(): WalletAuth {
     useEffect(() => {
         // Check if already allowed/connected on mount
         async function checkConnection() {
-            if (await isAllowed()) {
-                const { address } = await getAddress();
-                if (address) {
-                    setIsConnected(true);
-                    setPublicKey(address);
+            try {
+                const result = await isAllowed();
+                if (result && result.isAllowed) {
+                    const { address, error: addressError } = await getAddress();
+                    if (address && !addressError) {
+                        setIsConnected(true);
+                        setPublicKey(address);
+                    }
                 }
+            } catch (err) {
+                console.error('Failed to check wallet connection:', err);
             }
         }
         checkConnection();
@@ -36,10 +41,10 @@ export function useWalletAuth(): WalletAuth {
         setError(null);
         let key: string | null = null;
         try {
-            const allowed = await setAllowed();
-            if (allowed) {
-                const { address } = await getAddress();
-                if (address) {
+            const result = await setAllowed();
+            if (result && result.isAllowed) {
+                const { address, error: addressError } = await getAddress();
+                if (address && !addressError) {
                     setIsConnected(true);
                     setPublicKey(address);
                     key = address;

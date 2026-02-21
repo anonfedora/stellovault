@@ -3,7 +3,7 @@ import { Keypair } from '@stellar/stellar-sdk';
 // usage: npx ts-node scripts/test-auth-flow.ts
 
 async function testAuthFlow() {
-    const BASE_URL = 'http://localhost:3000';
+    const BASE_URL = process.env.TEST_BASE_URL || process.env.BASE_URL || 'http://localhost:3000';
 
     console.log('1. Generating Keypair...');
     const keypair = Keypair.random();

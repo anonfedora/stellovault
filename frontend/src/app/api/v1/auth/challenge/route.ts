@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { StrKey } from '@stellar/stellar-sdk';
 
 export async function POST(request: Request) {
     try {
         const { publicKey } = await request.json();
 
-        if (!publicKey) {
-            return NextResponse.json({ error: 'Public key required' }, { status: 400 });
+        if (!publicKey || !StrKey.isValidEd25519PublicKey(publicKey)) {
+            return NextResponse.json({ error: 'Invalid public key' }, { status: 400 });
         }
 
         // Generate a random nonce
         const nonce = crypto.randomBytes(32).toString('hex');
 
-        // Store nonce in a temporary httpOnly cookie
+        // Store nonce and publicKey in a temporary httpOnly cookie to bind them
         const cookieStore = await cookies();
-        cookieStore.set('auth-nonce', nonce, {
+        const cookieValue = JSON.stringify({ nonce, publicKey });
+
+        cookieStore.set('auth-nonce', cookieValue, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',

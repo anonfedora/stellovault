@@ -9,13 +9,8 @@ export function ConnectButton() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleConnect = async () => {
-        // In this flow, we connect then immediately try to login (sign message)
-        // The modal's onConnect just triggers the login process which includes `connect` internally if needed
-        // But `useWalletAuth` separates `connect` (get key) and `login` (sign/verify)
-        // Let's assume the modal just initiates the connection/login flow found in useWalletAuth
+        // Obtain public key then perform challenge-response login
 
-        // Actually, `useWalletAuth` `connect` just gets the public key. `login` does the challenge.
-        // We should probably chain them effectively.
 
         const key = await connect();
         if (key) {
@@ -23,12 +18,8 @@ export function ConnectButton() {
         }
     };
 
-    // If we are already connected (have public key), we show that.
-    // But maybe we are not "logged in" (no JWT).
-    // For simplicity, we assume `isConnected` means we have the public key in state.
-    // The backend verification (login) is needed for protected routes.
-    // If `publicKey` is present but cookie is missing, requests will fail.
-    // We might want to auto-login if publicKey is present but we get 401.
+    // Display truncated address if connected. Login is required for protected routes.
+
 
     if (isConnected && publicKey) {
         return (

@@ -7,10 +7,16 @@ export async function POST(request: Request) {
     try {
         const { publicKey, signedMessage } = await request.json();
         const cookieStore = await cookies();
-        const nonce = cookieStore.get('auth-nonce')?.value;
+        const storedNonceData = cookieStore.get('auth-nonce')?.value;
 
-        if (!nonce) {
+        if (!storedNonceData) {
             return NextResponse.json({ error: 'No active challenge found' }, { status: 400 });
+        }
+
+        const { nonce, publicKey: boundedPublicKey } = JSON.parse(storedNonceData);
+
+        if (publicKey !== boundedPublicKey) {
+            return NextResponse.json({ error: 'Public key mismatch' }, { status: 400 });
         }
 
         if (!publicKey || !signedMessage) {
