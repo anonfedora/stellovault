@@ -2,11 +2,11 @@ import { ForbiddenError, NotFoundError, ValidationError } from "../config/errors
 import { contracts } from "../config/contracts";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
-import { Prisma } from "@prisma/client";
+import Decimal from "decimal.js";
 
-const MIN_COLLATERAL_RATIO = new Prisma.Decimal("1.5");
+const MIN_COLLATERAL_RATIO = new Decimal("1.5");
 const VALID_LOAN_STATUSES = new Set(["PENDING", "ACTIVE", "REPAID", "DEFAULTED"]);
-const ZERO = new Prisma.Decimal("0");
+const ZERO = new Decimal("0");
 
 type LoanStatus = "PENDING" | "ACTIVE" | "REPAID" | "DEFAULTED";
 
@@ -27,10 +27,10 @@ interface RecordRepaymentRequest {
     paidAt?: string | Date;
 }
 
-function parsePositiveDecimal(value: number | string | undefined, fieldName: string): Prisma.Decimal {
-    let parsed: Prisma.Decimal;
+function parsePositiveDecimal(value: number | string | undefined, fieldName: string): Decimal {
+    let parsed: Decimal;
     try {
-        parsed = new Prisma.Decimal(value as string | number);
+        parsed = new Decimal(value as string | number);
     } catch {
         throw new ValidationError(`${fieldName} must be a positive number`);
     }
@@ -194,11 +194,11 @@ export class LoanService {
             }
 
             const totalRepaid = loan.repayments.reduce(
-                (sum: Prisma.Decimal, repayment: { amount: string | number }) =>
-                    sum.plus(new Prisma.Decimal(repayment.amount.toString())),
+                (sum: Decimal, repayment: { amount: string | number }) =>
+                    sum.plus(new Decimal(repayment.amount.toString())),
                 ZERO
             );
-            const outstandingBefore = new Prisma.Decimal(loan.amount.toString()).minus(totalRepaid);
+            const outstandingBefore = new Decimal(loan.amount.toString()).minus(totalRepaid);
             if (outstandingBefore.lte(ZERO)) {
                 throw new ValidationError("Loan is already fully repaid");
             }

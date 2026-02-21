@@ -1,8 +1,8 @@
 import { Router } from "express";
-import * as userController from "../controllers/user.controller";
+import * as analyticsController from "../controllers/analytics.controller";
 
 const router = Router();
 
-router.get("/", userController.getAnalytics);
+router.get("/", analyticsController.getPlatformStats);
 
 export default router;
