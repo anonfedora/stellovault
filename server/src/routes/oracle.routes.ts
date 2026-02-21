@@ -6,6 +6,7 @@ const router = Router();
 router.post("/", oracleController.registerOracle);
 router.get("/", oracleController.listOracles);
 router.get("/metrics", oracleController.getOracleMetrics);
+router.post("/dispute", oracleController.flagDispute);
 router.get("/:address", oracleController.getOracle);
 router.post("/:address/deactivate", oracleController.deactivateOracle);
 

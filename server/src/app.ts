@@ -45,6 +45,7 @@ app.use(`${api}/escrows`, escrowRoutes);
 app.use(`${api}/collateral`, collateralRoutes);
 app.use(`${api}/loans`, loanRoutes);
 app.use(`${api}/oracles`, oracleRoutes);
+app.use(`${api}/oracle`, oracleRoutes);
 app.use(`${api}/confirmations`, confirmationRoutes);
 app.use(`${api}/governance`, governanceRoutes);
 app.use(`${api}/risk`, riskRoutes);

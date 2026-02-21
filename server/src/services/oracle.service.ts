@@ -1,0 +1,369 @@
+import { Keypair } from "@stellar/stellar-sdk";
+import {
+    ConflictError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+    TooManyRequestsError,
+} from "../config/errors";
+import { Prisma } from "@prisma/client";
+import { prisma } from "./database.service";
+
+const CONFIRMATION_RATE_LIMIT_MS = 60 * 1000;
+const MAX_CONFIRMATIONS_PER_MINUTE = 10;
+
+type CreateOracleInput = {
+    address: string;
+};
+
+type ConfirmEventInput = {
+    oracleAddress: string;
+    escrowId: string;
+    eventType: string;
+    signature: string;
+    payload: Record<string, unknown>;
+    nonce: string;
+};
+
+function toJsonValue(value: Record<string, unknown>): Prisma.InputJsonValue {
+    return value as Prisma.InputJsonValue;
+}
+
+type DisputeInput = {
+    escrowId: string;
+    reason: string;
+    disputerAddress: string;
+};
+
+type ListOraclesQuery = {
+    isActive?: boolean;
+    limit?: number;
+    offset?: number;
+};
+
+type ListConfirmationsQuery = {
+    escrowId: string;
+    limit?: number;
+    offset?: number;
+};
+
+export class OracleService {
+    private requireNonEmptyString(value: unknown, fieldName: string): string {
+        if (typeof value !== "string" || value.trim().length === 0) {
+            throw new ValidationError(`${fieldName} is required`);
+        }
+        return value.trim();
+    }
+
+    private normalizeAddress(address: unknown): string {
+        return this.requireNonEmptyString(address, "address").toUpperCase();
+    }
+
+    private assertValidStellarAddress(address: string): void {
+        try {
+            Keypair.fromPublicKey(address);
+        } catch {
+            throw new ValidationError("Invalid Stellar wallet address");
+        }
+    }
+
+    private decodeSignature(signature: unknown): Buffer {
+        const value = this.requireNonEmptyString(signature, "signature");
+
+        if (/^[0-9a-fA-F]+$/.test(value) && value.length % 2 === 0) {
+            const decoded = Buffer.from(value, "hex");
+            if (decoded.length === 64) {
+                return decoded;
+            }
+        }
+
+        if (/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+            const decoded = Buffer.from(value, "base64");
+            if (decoded.length === 64) {
+                return decoded;
+            }
+        }
+
+        throw new ValidationError("Signature must be a 64-byte hex or base64 value");
+    }
+
+    private async checkRateLimit(oracleId: string): Promise<void> {
+        const oneMinuteAgo = new Date(Date.now() - CONFIRMATION_RATE_LIMIT_MS);
+        const recentCount = await prisma.oracleConfirmation.count({
+            where: {
+                oracleId,
+                createdAt: { gte: oneMinuteAgo },
+            },
+        });
+
+        if (recentCount >= MAX_CONFIRMATIONS_PER_MINUTE) {
+            throw new TooManyRequestsError("Rate limit exceeded for oracle confirmations");
+        }
+    }
+
+    async registerOracle(input: CreateOracleInput) {
+        const address = this.normalizeAddress(input.address);
+        this.assertValidStellarAddress(address);
+
+        const existing = await prisma.oracle.findUnique({
+            where: { address },
+        });
+
+        if (existing) {
+            if (existing.isActive) {
+                throw new ConflictError("Oracle already registered and active");
+            }
+            return prisma.oracle.update({
+                where: { address },
+                data: { isActive: true, deactivatedAt: null },
+            });
+        }
+
+        return prisma.oracle.create({
+            data: { address },
+        });
+    }
+
+    async deactivateOracle(address: string) {
+        const normalizedAddress = this.normalizeAddress(address);
+        this.assertValidStellarAddress(normalizedAddress);
+
+        const oracle = await prisma.oracle.findUnique({
+            where: { address: normalizedAddress },
+        });
+
+        if (!oracle) {
+            throw new NotFoundError("Oracle not found");
+        }
+
+        if (!oracle.isActive) {
+            throw new ValidationError("Oracle is already deactivated");
+        }
+
+        return prisma.oracle.update({
+            where: { address: normalizedAddress },
+            data: { isActive: false, deactivatedAt: new Date() },
+        });
+    }
+
+    async confirmOracleEvent(input: ConfirmEventInput) {
+        const oracleAddress = this.normalizeAddress(input.oracleAddress);
+        const escrowId = this.requireNonEmptyString(input.escrowId, "escrowId");
+        const eventType = this.requireNonEmptyString(input.eventType, "eventType");
+        const nonce = this.requireNonEmptyString(input.nonce, "nonce");
+
+        this.assertValidStellarAddress(oracleAddress);
+
+        const oracle = await prisma.oracle.findUnique({
+            where: { address: oracleAddress },
+        });
+
+        if (!oracle) {
+            throw new UnauthorizedError("Unknown oracle address");
+        }
+
+        if (!oracle.isActive) {
+            throw new UnauthorizedError("Oracle is not active");
+        }
+
+        await this.checkRateLimit(oracle.id);
+
+        const escrow = await prisma.escrow.findUnique({
+            where: { id: escrowId },
+        });
+
+        if (!escrow) {
+            throw new NotFoundError("Escrow not found");
+        }
+
+        const existingConfirmation = await prisma.oracleConfirmation.findUnique({
+            where: {
+                oracleId_escrowId_eventType: {
+                    oracleId: oracle.id,
+                    escrowId,
+                    eventType,
+                },
+            },
+        });
+
+        if (existingConfirmation) {
+            throw new ConflictError("Duplicate confirmation for this event");
+        }
+
+        const message = Buffer.from(
+            JSON.stringify({
+                escrowId,
+                eventType,
+                nonce,
+                payload: input.payload,
+            })
+        );
+        const signatureBytes = this.decodeSignature(input.signature);
+        const isValid = Keypair.fromPublicKey(oracleAddress).verify(message, signatureBytes);
+
+        if (!isValid) {
+            throw new UnauthorizedError("Invalid oracle signature");
+        }
+
+        return prisma.oracleConfirmation.create({
+            data: {
+                oracleId: oracle.id,
+                escrowId,
+                eventType,
+                signature: input.signature,
+                payload: toJsonValue(input.payload),
+            },
+        });
+    }
+
+    async listOracles(query: ListOraclesQuery) {
+        const { isActive, limit = 50, offset = 0 } = query;
+
+        const where: Record<string, unknown> = {};
+        if (isActive !== undefined) {
+            where.isActive = isActive;
+        }
+
+        const [oracles, total] = await Promise.all([
+            prisma.oracle.findMany({
+                where,
+                orderBy: { registeredAt: "desc" },
+                take: limit,
+                skip: offset,
+            }),
+            prisma.oracle.count({ where }),
+        ]);
+
+        return { oracles, total, limit, offset };
+    }
+
+    async getOracle(address: string) {
+        const normalizedAddress = this.normalizeAddress(address);
+        this.assertValidStellarAddress(normalizedAddress);
+
+        const oracle = await prisma.oracle.findUnique({
+            where: { address: normalizedAddress },
+            include: {
+                _count: {
+                    select: { confirmations: true },
+                },
+            },
+        });
+
+        if (!oracle) {
+            throw new NotFoundError("Oracle not found");
+        }
+
+        return oracle;
+    }
+
+    async getConfirmations(query: ListConfirmationsQuery) {
+        const { escrowId, limit = 50, offset = 0 } = query;
+
+        const escrow = await prisma.escrow.findUnique({
+            where: { id: escrowId },
+        });
+
+        if (!escrow) {
+            throw new NotFoundError("Escrow not found");
+        }
+
+        const [confirmations, total] = await Promise.all([
+            prisma.oracleConfirmation.findMany({
+                where: { escrowId },
+                include: {
+                    oracle: {
+                        select: { address: true, isActive: true },
+                    },
+                },
+                orderBy: { createdAt: "desc" },
+                take: limit,
+                skip: offset,
+            }),
+            prisma.oracleConfirmation.count({ where: { escrowId } }),
+        ]);
+
+        return { confirmations, total, limit, offset };
+    }
+
+    async flagDispute(input: DisputeInput) {
+        const { escrowId, reason, disputerAddress } = input;
+
+        const normalizedDisputer = this.normalizeAddress(disputerAddress);
+        this.assertValidStellarAddress(normalizedDisputer);
+
+        const disputeReason = this.requireNonEmptyString(reason, "reason");
+
+        const escrow = await prisma.escrow.findUnique({
+            where: { id: escrowId },
+        });
+
+        if (!escrow) {
+            throw new NotFoundError("Escrow not found");
+        }
+
+        if (escrow.status === "DISPUTED") {
+            throw new ConflictError("Escrow is already disputed");
+        }
+
+        const updatedEscrow = await prisma.escrow.update({
+            where: { id: escrowId },
+            data: { status: "DISPUTED" },
+        });
+
+        return {
+            escrow: updatedEscrow,
+            dispute: {
+                escrowId,
+                reason: disputeReason,
+                disputerAddress: normalizedDisputer,
+                createdAt: new Date(),
+            },
+        };
+    }
+
+    async getOracleMetrics() {
+        const [activeOracles, totalOracles, totalConfirmations, escrowsByStatus] = await Promise.all([
+            prisma.oracle.count({ where: { isActive: true } }),
+            prisma.oracle.count(),
+            prisma.oracleConfirmation.count(),
+            prisma.escrow.groupBy({
+                by: ["status"],
+                _count: { id: true },
+            }),
+        ]);
+
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const recentConfirmations = await prisma.oracleConfirmation.count({
+            where: { createdAt: { gte: thirtyDaysAgo } },
+        });
+
+        const confirmationsPerOracle = await prisma.oracleConfirmation.groupBy({
+            by: ["oracleId"],
+            _count: { id: true },
+        });
+
+        const avgConfirmationsPerOracle =
+            confirmationsPerOracle.length > 0
+                ? confirmationsPerOracle.reduce((sum, o) => sum + o._count.id, 0) /
+                  confirmationsPerOracle.length
+                : 0;
+
+        const escrowCounts: Record<string, number> = {};
+        escrowsByStatus.forEach((item) => {
+            escrowCounts[item.status] = item._count.id;
+        });
+
+        return {
+            activeOracles,
+            totalOracles,
+            inactiveOracles: totalOracles - activeOracles,
+            totalConfirmations,
+            confirmationsLast30Days: recentConfirmations,
+            avgConfirmationsPerOracle: Math.round(avgConfirmationsPerOracle * 100) / 100,
+            escrowCounts,
+        };
+    }
+}
+
+export default new OracleService();

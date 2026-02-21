@@ -84,7 +84,61 @@ enum LoanStatus {
   DEFAULTED
 }
 
+enum EscrowStatus {
+  PENDING
+  FUNDED
+  RELEASED
+  REFUNDED
+  DISPUTED
+  CANCELLED
+}
+
 enum ChallengePurpose {
   LOGIN
   LINK_WALLET
+}
+
+model Oracle {
+  id           String   @id @default(uuid())
+  address      String   @unique
+  isActive     Boolean  @default(true)
+  registeredAt DateTime @default(now())
+  deactivatedAt DateTime?
+  updatedAt    DateTime @updatedAt
+  confirmations OracleConfirmation[]
+
+  @@index([address])
+  @@index([isActive])
+}
+
+model OracleConfirmation {
+  id           String   @id @default(uuid())
+  oracleId     String
+  oracle       Oracle   @relation(fields: [oracleId], references: [id], onDelete: Cascade)
+  escrowId     String
+  escrow       Escrow   @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  eventType    String
+  signature    String
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  @@unique([oracleId, escrowId, eventType])
+  @@index([escrowId])
+  @@index([oracleId])
+}
+
+model Escrow {
+  id           String   @id @default(uuid())
+  buyerId      String?
+  sellerId     String?
+  amount       Decimal
+  assetCode    String   @default("USDC")
+  status       EscrowStatus @default(PENDING)
+  escrowAddress String?
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  confirmations OracleConfirmation[]
+
+  @@index([status])
 }
