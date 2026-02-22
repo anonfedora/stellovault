@@ -5,7 +5,7 @@
 
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Val};
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -453,15 +453,31 @@ impl LoanManagement {
             return Err(ContractError::DeadlinePassed);
         }
 
-        // Calculate total repayment: amount + interest
-        // For simplicity, we assume interest is fixed and "amount" passed is total
-        // In a real scenario, we'd calculate interest: amount * (1 + rate/10000)
+        // Calculate total repayment: principal + interest
         let interest = (loan.amount * (loan.interest_rate as i128)) / 10000;
         let total_due = loan.amount + interest;
 
         if amount < total_due {
             return Err(ContractError::InsufficientAmount);
         }
+
+        // Calculate protocol fee if treasury is configured
+        let treasury_opt: Option<Address> =
+            env.storage().instance().get(&symbol_short!("treasury"));
+
+        let protocol_fee = if treasury_opt.is_some() {
+            // Query fee_bps from ProtocolTreasury
+            let treasury = treasury_opt.as_ref().unwrap();
+            let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
+            let fee_bps: u32 = env.invoke_contract(
+                treasury,
+                &Symbol::new(&env, "get_fee_bps"),
+                fee_bps_args,
+            );
+            (total_due * fee_bps as i128) / 10000
+        } else {
+            0i128
+        };
 
         loan.status = LoanStatus::Repaid;
         env.storage().persistent().set(&loan_id, &loan);
@@ -477,9 +493,9 @@ impl LoanManagement {
             .instance()
             .set(&symbol_short!("tot_bor"), &new_borrowed);
 
-        // Emit LoanRepaid event
+        // Emit LoanRepaid event including protocol fee
         env.events()
-            .publish((symbol_short!("loan_rep"),), (loan_id, amount));
+            .publish((symbol_short!("loan_rep"),), (loan_id, amount, protocol_fee));
 
         Ok(())
     }
@@ -592,6 +608,31 @@ impl LoanManagement {
     /// Get loan details
     pub fn get_loan(env: Env, loan_id: u64) -> Option<Loan> {
         env.storage().persistent().get(&loan_id)
+    }
+
+    /// Set the ProtocolTreasury address. Admin only.
+    pub fn set_treasury(env: Env, treasury: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("treasury"), &treasury);
+
+        env.events()
+            .publish((symbol_short!("trs_set"),), (treasury,));
+
+        Ok(())
+    }
+
+    /// Get the registered treasury address.
+    pub fn get_treasury(env: Env) -> Option<Address> {
+        env.storage().instance().get(&symbol_short!("treasury"))
     }
 
     /// Get loan ID for an escrow
