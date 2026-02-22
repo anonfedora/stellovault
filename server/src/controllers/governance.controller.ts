@@ -8,11 +8,49 @@ import { ProposalStatus } from "@prisma/client";
  */
 export async function getProposals(req: Request, res: Response, next: NextFunction) {
     try {
+        // Validate status enum
+        const validStatuses = Object.values(ProposalStatus);
+        const rawStatus = req.query.status as string;
+        let status: ProposalStatus | undefined;
+        if (rawStatus) {
+            if (!validStatuses.includes(rawStatus as ProposalStatus)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`
+                });
+            }
+            status = rawStatus as ProposalStatus;
+        }
+
+        // Validate limit and offset
+        let limit: number | undefined;
+        let offset: number | undefined;
+        
+        if (req.query.limit) {
+            limit = parseInt(req.query.limit as string, 10);
+            if (isNaN(limit) || limit < 1) {
+                return res.status(400).json({
+                    success: false,
+                    error: "limit must be a positive number"
+                });
+            }
+        }
+        
+        if (req.query.offset) {
+            offset = parseInt(req.query.offset as string, 10);
+            if (isNaN(offset) || offset < 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: "offset must be a non-negative number"
+                });
+            }
+        }
+
         const filters = {
-            status: req.query.status as ProposalStatus | undefined,
+            status,
             proposerId: req.query.proposerId as string | undefined,
-            limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
-            offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined
+            limit,
+            offset
         };
 
         const { proposals, total } = await governanceService.getProposals(filters);
@@ -47,12 +85,39 @@ export async function createProposal(req: Request, res: Response, next: NextFunc
             });
         }
 
+        // Validate quorum is a valid decimal
+        const quorumNum = parseFloat(quorum);
+        if (isNaN(quorumNum) || quorumNum <= 0) {
+            return res.status(400).json({
+                success: false,
+                error: "quorum must be a positive decimal number"
+            });
+        }
+
+        // Validate deadline if provided
+        let deadlineDate: Date | undefined;
+        if (deadline) {
+            deadlineDate = new Date(deadline);
+            if (isNaN(deadlineDate.getTime())) {
+                return res.status(400).json({
+                    success: false,
+                    error: "deadline must be a valid date string"
+                });
+            }
+            if (deadlineDate <= new Date()) {
+                return res.status(400).json({
+                    success: false,
+                    error: "deadline must be in the future"
+                });
+            }
+        }
+
         const { proposal, xdr } = await governanceService.createProposal({
             title,
             description,
             proposerId,
             quorum,
-            deadline: deadline ? new Date(deadline) : undefined,
+            deadline: deadlineDate,
             contractId
         });
 
@@ -100,11 +165,21 @@ export async function getProposal(req: Request, res: Response, next: NextFunctio
 export async function getProposalVotes(req: Request, res: Response, next: NextFunction) {
     try {
         const { id } = req.params;
-        const votes = await governanceService.getProposalVotes(id);
+        
+        // Parse pagination params
+        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
+        
+        const { votes, total, limit: appliedLimit, offset: appliedOffset } = await governanceService.getProposalVotes(id, { limit, offset });
 
         res.json({
             success: true,
-            data: votes
+            data: votes,
+            meta: {
+                total,
+                limit: appliedLimit,
+                offset: appliedOffset
+            }
         });
     } catch (err) {
         if ((err as Error).message === "Proposal not found") {
@@ -140,7 +215,7 @@ export async function submitVote(req: Request, res: Response, next: NextFunction
             weight
         });
 
-        res.json({
+        res.status(201).json({
             success: true,
             data: {
                 vote,

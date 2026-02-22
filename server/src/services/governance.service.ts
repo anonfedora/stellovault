@@ -147,8 +147,9 @@ export class GovernanceService {
 
     /**
      * Get all votes for a proposal with voter addresses and weights.
+     * Supports pagination to prevent unbounded results.
      */
-    async getProposalVotes(proposalId: string) {
+    async getProposalVotes(proposalId: string, options?: { limit?: number; offset?: number }) {
         const proposal = await prisma.proposal.findUnique({
             where: { id: proposalId }
         });
@@ -157,22 +158,31 @@ export class GovernanceService {
             throw new Error("Proposal not found");
         }
 
-        const votes = await prisma.vote.findMany({
-            where: { proposalId },
-            include: {
-                voter: {
-                    select: { id: true, stellarAddress: true, name: true }
-                }
-            },
-            orderBy: { createdAt: "desc" }
-        });
+        const limit = options?.limit ?? 100;
+        const offset = options?.offset ?? 0;
 
-        return votes;
+        const [votes, total] = await Promise.all([
+            prisma.vote.findMany({
+                where: { proposalId },
+                include: {
+                    voter: {
+                        select: { id: true, stellarAddress: true, name: true }
+                    }
+                },
+                orderBy: { createdAt: "desc" },
+                skip: offset,
+                take: limit
+            }),
+            prisma.vote.count({ where: { proposalId } })
+        ]);
+
+        return { votes, total, limit, offset };
     }
 
     /**
      * Submit a vote on a proposal.
      * Verifies voter has quorum weight, persists vote, builds contract call XDR.
+     * Uses transaction to prevent TOCTOU race condition on duplicate votes.
      */
     async submitVote(req: SubmitVoteRequest) {
         const proposal = await prisma.proposal.findUnique({
@@ -191,22 +201,6 @@ export class GovernanceService {
             throw new Error("Voting deadline has passed");
         }
 
-        // Check for existing vote (duplicate vote check)
-        const existingVote = await prisma.vote.findUnique({
-            where: {
-                proposalId_voterId: {
-                    proposalId: req.proposalId,
-                    voterId: req.voterId
-                }
-            }
-        });
-
-        if (existingVote) {
-            const error = new Error("Duplicate vote: User has already voted on this proposal");
-            (error as any).statusCode = 409;
-            throw error;
-        }
-
         // Verify voter has quorum weight
         const weightDecimal = new Prisma.Decimal(req.weight);
         if (weightDecimal.lessThanOrEqualTo(0)) {
@@ -223,60 +217,90 @@ export class GovernanceService {
             );
         }
 
-        // Persist vote
-        const vote = await prisma.vote.create({
-            data: {
+        // Use transaction to prevent TOCTOU race condition
+        try {
+            const vote = await prisma.$transaction(async (tx) => {
+                // Check for existing vote inside transaction
+                const existingVote = await tx.vote.findUnique({
+                    where: {
+                        proposalId_voterId: {
+                            proposalId: req.proposalId,
+                            voterId: req.voterId
+                        }
+                    }
+                });
+
+                if (existingVote) {
+                    const error = new Error("Duplicate vote: User has already voted on this proposal");
+                    (error as any).statusCode = 409;
+                    throw error;
+                }
+
+                // Persist vote
+                return tx.vote.create({
+                    data: {
+                        proposalId: req.proposalId,
+                        voterId: req.voterId,
+                        weight: weightDecimal,
+                        voteFor: req.voteFor,
+                        xdr
+                    },
+                    include: {
+                        voter: {
+                            select: { id: true, stellarAddress: true, name: true }
+                        },
+                        proposal: true
+                    }
+                });
+            }, {
+                isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+            });
+
+            // Log audit event
+            await this.logAuditEvent("VOTE_CAST", {
                 proposalId: req.proposalId,
                 voterId: req.voterId,
-                weight: weightDecimal,
-                voteFor: req.voteFor,
-                xdr
-            },
-            include: {
-                voter: {
-                    select: { id: true, stellarAddress: true, name: true }
-                },
-                proposal: true
+                details: `Vote ${req.voteFor ? "FOR" : "AGAINST"} proposal ${req.proposalId} with weight ${req.weight}`
+            });
+
+            return { vote, xdr };
+        } catch (err) {
+            // Handle unique constraint violation (P2002) as 409
+            const error = err as any;
+            if (error.code === "P2002" || error.statusCode === 409) {
+                const dupError = new Error("Duplicate vote: User has already voted on this proposal");
+                (dupError as any).statusCode = 409;
+                throw dupError;
             }
-        });
-
-        // Log audit event
-        await this.logAuditEvent("VOTE_CAST", {
-            proposalId: req.proposalId,
-            voterId: req.voterId,
-            details: `Vote ${req.voteFor ? "FOR" : "AGAINST"} proposal ${req.proposalId} with weight ${req.weight}`
-        });
-
-        return { vote, xdr };
+            throw err;
+        }
     }
 
     /**
      * Get protocol governance health metrics.
+     * Uses scalable queries with aggregation for performance.
      */
     async getMetrics() {
-        const [
-            totalProposals,
-            openProposals,
-            passedProposals,
-            rejectedProposals,
-            totalVotes,
-            uniqueVoters
-        ] = await Promise.all([
+        // Use raw query for efficient distinct count
+        const uniqueVotersResult = await prisma.$queryRaw<{ count: number }[]>`
+            SELECT COUNT(DISTINCT "voterId") as count FROM "Vote"
+        `;
+        const uniqueVoters = Number(uniqueVotersResult[0]?.count ?? 0);
+
+        // Use aggregate for efficient average calculation
+        const [totalProposals, openProposals, passedProposals, rejectedProposals, executedProposals, totalVotes, avgWeightResult] = await Promise.all([
             prisma.proposal.count(),
             prisma.proposal.count({ where: { status: ProposalStatus.OPEN } }),
             prisma.proposal.count({ where: { status: ProposalStatus.PASSED } }),
             prisma.proposal.count({ where: { status: ProposalStatus.REJECTED } }),
+            prisma.proposal.count({ where: { status: ProposalStatus.EXECUTED } }),
             prisma.vote.count(),
-            prisma.vote.groupBy({ by: ["voterId"] }).then(g => g.length)
+            prisma.vote.aggregate({
+                _avg: { weight: true }
+            })
         ]);
 
-        // Calculate average vote weight
-        const voteWeights = await prisma.vote.findMany({
-            select: { weight: true }
-        });
-        const avgWeight = voteWeights.length > 0
-            ? voteWeights.reduce((sum, v) => sum.plus(v.weight), new Prisma.Decimal(0)).div(voteWeights.length)
-            : new Prisma.Decimal(0);
+        const avgWeight = avgWeightResult._avg.weight ?? new Prisma.Decimal(0);
 
         // Calculate participation rate (votes per proposal)
         const participationRate = totalProposals > 0 ? totalVotes / totalProposals : 0;
@@ -287,7 +311,7 @@ export class GovernanceService {
                 open: openProposals,
                 passed: passedProposals,
                 rejected: rejectedProposals,
-                executed: await prisma.proposal.count({ where: { status: ProposalStatus.EXECUTED } })
+                executed: executedProposals
             },
             voting: {
                 totalVotes,
