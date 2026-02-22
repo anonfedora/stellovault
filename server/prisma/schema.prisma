@@ -8,16 +8,18 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  stellarAddress String    @unique
+  id             String            @id @default(uuid())
+  stellarAddress String            @unique
   name           String?
-  role           Role      @default(USER)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  role           Role              @default(USER)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   wallets        Wallet[]
   challenges     WalletChallenge[]
   loans          Loan[]
   investments    Investment[]
+  proposals      Proposal[]
+  votes          Vote[]
 }
 
 model Wallet {
@@ -87,4 +89,59 @@ enum LoanStatus {
 enum ChallengePurpose {
   LOGIN
   LINK_WALLET
+}
+
+enum ProposalStatus {
+  OPEN
+  PASSED
+  REJECTED
+  EXECUTED
+}
+
+model Proposal {
+  id          String          @id @default(uuid())
+  title       String
+  description String
+  proposerId  String
+  proposer    User            @relation(fields: [proposerId], references: [id])
+  status      ProposalStatus  @default(OPEN)
+  quorum      Decimal
+  deadline    DateTime?
+  xdr         String?
+  contractId  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  votes       Vote[]
+
+  @@index([proposerId])
+  @@index([status])
+}
+
+model Vote {
+  id          String    @id @default(uuid())
+  proposalId  String
+  proposal    Proposal  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  voterId     String
+  voter       User      @relation(fields: [voterId], references: [id])
+  weight      Decimal
+  voteFor     Boolean
+  xdr         String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([proposalId, voterId])
+  @@index([proposalId])
+  @@index([voterId])
+}
+
+model GovernanceAuditLog {
+  id          String    @id @default(uuid())
+  eventType   String
+  proposalId  String?
+  voterId     String?
+  details     String?
+  txHash      String?
+  createdAt   DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([createdAt])
 }
