@@ -215,8 +215,10 @@ pub struct Collateral {
     pub id: u64,
     pub owner: Address,
     pub face_value: i128,
+    pub realized_value: i128,
     pub expiry_ts: u64,
     pub registered_at: u64,
+    pub last_valuation_ts: u64,
     pub locked: bool,
 }
 
@@ -374,7 +376,7 @@ impl RiskAssessment {
 
         // Calculate health factor
         // HF = (Collateral Value * Liquidation Threshold) / Total Debt
-        let numerator = (collateral.face_value)
+        let numerator = (collateral.realized_value)
             .checked_mul(risk_params.liquidation_threshold as i128)
             .ok_or(ContractError::MathOverflow)?;
 
@@ -446,7 +448,7 @@ impl RiskAssessment {
         let health_factor = if total_debt == 0 {
             u32::MAX
         } else {
-            let numerator = (collateral.face_value)
+            let numerator = (collateral.realized_value)
                 .checked_mul(risk_params.liquidation_threshold as i128)
                 .ok_or(ContractError::MathOverflow)?;
             numerator
@@ -462,7 +464,7 @@ impl RiskAssessment {
             collateral_id: collateral.id,
             borrower: loan.borrower,
             lender: loan.lender,
-            collateral_value: collateral.face_value,
+            collateral_value: collateral.realized_value,
             debt_amount: total_debt,
             interest_rate: loan.interest_rate,
             deadline: loan.deadline,
@@ -1016,8 +1018,10 @@ mod test {
             id: position_id,
             owner: Address::generate(env),
             face_value,
+            realized_value: face_value,
             expiry_ts: env.ledger().timestamp() + 86400 * 30,
             registered_at: env.ledger().timestamp(),
+            last_valuation_ts: env.ledger().timestamp(),
             locked: true,
         }
     }
@@ -1152,6 +1156,48 @@ mod test {
 
             let risk = RiskAssessment::get_position_risk(env.clone(), position_id).unwrap();
             assert_eq!(risk, PositionRisk::Healthy);
+        });
+    }
+
+    #[test]
+    fn test_calculate_health_factor_dynamic_valuation() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(),
+                admin.clone(),
+                governance.clone(),
+                coll_reg.clone(),
+                loan_mgr.clone(),
+                vault.clone(),
+            ).unwrap();
+
+            let position_id = 1u64;
+            // Face value: $10,000, but Realized value: $6,000
+            // Debt: $5,000 (with 5% interest = $5,250)
+            // HF (using realized value) = (6000 * 8000) / 5250 = 9142 (liquidatable)
+            let loan = create_test_loan(&env, position_id, 5000, 500);
+            let mut collateral = create_test_collateral(&env, position_id, 10000);
+            collateral.realized_value = 6000;
+            let escrow = create_test_escrow(&env, 5000);
+
+            RiskAssessment::set_test_position(
+                env.clone(),
+                position_id,
+                loan,
+                collateral,
+                escrow,
+            );
+
+            let health_factor = RiskAssessment::calculate_health_factor(env.clone(), position_id).unwrap();
+            assert!(health_factor < 10000); // Should be liquidatable due to low realized value
+
+            let risk = RiskAssessment::get_position_risk(env.clone(), position_id).unwrap();
+            assert_eq!(risk, PositionRisk::Liquidatable);
         });
     }
 
