@@ -14,14 +14,72 @@ model User {
   role           Role      @default(USER)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  loans          Loan[]
+  loans          Loan[]    @relation("BorrowerLoans")
+  lentLoans      Loan[]    @relation("LenderLoans")
+  wallets        Wallet[]
+  challenges     WalletChallenge[]
+  boughtEscrows  Escrow[]  @relation("BuyerEscrows")
+  soldEscrows    Escrow[]  @relation("SellerEscrows")
   investments    Investment[]
+}
+
+model Wallet {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address    String   @unique
+  isPrimary  Boolean  @default(false)
+  label      String?
+  verifiedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model WalletChallenge {
+  id            String           @id @default(uuid())
+  userId        String?
+  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletAddress String
+  nonce         String
+  purpose       ChallengePurpose
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@unique([walletAddress, nonce, purpose])
+  @@index([walletAddress, purpose])
+  @@index([userId, purpose])
+}
+
+model Escrow {
+  id            String       @id @default(uuid())
+  buyerId       String
+  buyer         User         @relation("BuyerEscrows", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User         @relation("SellerEscrows", fields: [sellerId], references: [id])
+  collaterals   Collateral[]
+  amount        Decimal
+  assetCode     String       @default("USDC")
+  status        EscrowStatus @default(PENDING)
+  stellarTxHash String?
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model Loan {
   id             String    @id @default(uuid())
   borrowerId     String
-  borrower       User      @relation(fields: [borrowerId], references: [id])
+  borrower       User      @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+  lenderId       String?
+  lender         User?     @relation("LenderLoans", fields: [lenderId], references: [id])
   amount         Decimal
   assetCode      String    @default("USDC")
   status         LoanStatus @default(PENDING)
@@ -29,6 +87,11 @@ model Loan {
   escrowAddress  String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  repayments     Repayment[]
+
+  @@index([borrowerId])
+  @@index([lenderId])
+  @@index([status])
 }
 
 model Investment {
@@ -37,6 +100,17 @@ model Investment {
   investor       User      @relation(fields: [investorId], references: [id])
   amount         Decimal
   createdAt      DateTime  @default(now())
+}
+
+model Repayment {
+  id             String    @id @default(uuid())
+  loanId         String
+  loan           Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount         Decimal
+  paidAt         DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([loanId])
 }
 
 enum Role {
@@ -50,4 +124,37 @@ enum LoanStatus {
   ACTIVE
   REPAID
   DEFAULTED
+}
+
+enum ChallengePurpose {
+  LOGIN
+  LINK_WALLET
+}
+
+enum EscrowStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  EXPIRED
+}
+
+enum CollateralStatus {
+  PENDING
+  DEPOSITED
+}
+
+model Collateral {
+  id           String           @id @default(uuid())
+  escrowId     String
+  escrow       Escrow           @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  assetCode    String
+  amount       Decimal
+  metadataHash String           @unique
+  status       CollateralStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([escrowId])
+  @@index([status])
 }

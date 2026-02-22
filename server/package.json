@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "TypeScript backend for StelloVault",
   "main": "dist/app.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
