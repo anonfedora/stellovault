@@ -1,15 +1,17 @@
 // Stellar/Soroban utility functions for StelloVault
 
-import { Address, Contract, networks, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Address, Contract, Networks, scValToNative, xdr } from '@stellar/stellar-sdk';
 
 // Network configurations
 export const NETWORKS = {
   testnet: {
-    ...networks.testnet,
+    networkPassphrase: Networks.TESTNET,
+    horizonUrl: 'https://horizon-testnet.stellar.org',
     soroban: 'https://soroban-testnet.stellar.org',
   },
   mainnet: {
-    ...networks.public,
+    networkPassphrase: Networks.PUBLIC,
+    horizonUrl: 'https://horizon.stellar.org',
     soroban: 'https://soroban.stellar.org',
   },
 };
@@ -63,21 +65,21 @@ export const getExplorerUrl = (txHash: string, network: 'testnet' | 'mainnet' = 
 };
 
 // Contract interaction helpers
-export const createContractInstance = (contractId: string, network: 'testnet' | 'mainnet' = 'testnet') => {
-  const serverUrl = NETWORKS[network].soroban;
+export const createContractInstance = (contractId: string, network: keyof typeof NETWORKS = 'testnet') => {
+  // serverUrl lookup removed as Contract doesn't require it directly.
   return new Contract(contractId);
 };
 
 // Error handling for Soroban transactions
-export const handleContractError = (error: any): string => {
-  if (error?.message?.includes('insufficient balance')) {
+export const handleContractError = (error: Error | { message?: string } | null | undefined): string => {
+  if (error && 'message' in error && error.message?.includes('insufficient balance')) {
     return 'Insufficient balance for this transaction';
   }
-  if (error?.message?.includes('unauthorized')) {
+  if (error && 'message' in error && error.message?.includes('unauthorized')) {
     return 'You are not authorized to perform this action';
   }
-  if (error?.message?.includes('invalid amount')) {
+  if (error && 'message' in error && error.message?.includes('invalid amount')) {
     return 'Invalid amount specified';
   }
-  return error?.message || 'An unexpected error occurred';
+  return (error && 'message' in error && error.message) || 'An unexpected error occurred';
 };
