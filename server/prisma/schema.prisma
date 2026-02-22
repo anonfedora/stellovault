@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────
+// User & Auth
+// ─────────────────────────────────────────────
+
 model User {
   id             String    @id @default(uuid())
   stellarAddress String    @unique
@@ -14,22 +18,29 @@ model User {
   role           Role      @default(USER)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  loans          Loan[]    @relation("BorrowerLoans")
+  lentLoans      Loan[]    @relation("LenderLoans")
   wallets        Wallet[]
   challenges     WalletChallenge[]
-  loans          Loan[]
+  boughtEscrows  Escrow[]  @relation("BuyerEscrows")
+  soldEscrows    Escrow[]  @relation("SellerEscrows")
   investments    Investment[]
+
+  sessions           Session[]
+  borrowedLoans      Loan[]              @relation("BorrowerLoans")
+  governanceProposals GovernanceProposal[] @relation("ProposerProposals")
 }
 
 model Wallet {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  address    String   @unique
-  isPrimary  Boolean  @default(false)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address    String    @unique
+  isPrimary  Boolean   @default(false)
   label      String?
-  verifiedAt DateTime @default(now())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId])
 }
@@ -50,31 +61,217 @@ model WalletChallenge {
   @@index([userId, purpose])
 }
 
-model Loan {
-  id             String    @id @default(uuid())
-  borrowerId     String
-  borrower       User      @relation(fields: [borrowerId], references: [id])
-  amount         Decimal
-  assetCode      String    @default("USDC")
-  status         LoanStatus @default(PENDING)
-  collateralAmt  Decimal
-  escrowAddress  String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+model Session {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jti       String    @unique   // JWT ID — used to revoke specific tokens
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
-model Investment {
-  id             String    @id @default(uuid())
-  investorId     String
-  investor       User      @relation(fields: [investorId], references: [id])
-  amount         Decimal
-  createdAt      DateTime  @default(now())
+// ─────────────────────────────────────────────
+// Escrow & Collateral
+// ─────────────────────────────────────────────
+
+model Escrow {
+  id            String       @id @default(uuid())
+  buyerId       String
+  buyer         User         @relation("BuyerEscrows", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User         @relation("SellerEscrows", fields: [sellerId], references: [id])
+<<<<<<< HEAD
+  collaterals   Collateral[]
+  amount        Decimal
+=======
+  amount        Decimal      @db.Decimal(20, 7)
+>>>>>>> 4ab8eb5 (feat: Re-initialize database schema, add Docker Compose for local development, and enhance setup documentation with a new README and Prisma seed script.)
+  assetCode     String       @default("USDC")
+  status        EscrowStatus @default(PENDING)
+  stellarTxHash String?
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  collaterals  Collateral[]
+  oracleEvents OracleEvent[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([expiresAt])
 }
+
+model Collateral {
+  id           String           @id @default(uuid())
+  escrowId     String
+  escrow       Escrow           @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  assetCode    String
+  amount       Decimal          @db.Decimal(20, 7)
+  metadataHash String?
+  status       CollateralStatus @default(LOCKED)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  loans Loan[]
+
+  @@index([escrowId])
+  @@index([metadataHash])
+}
+
+// ─────────────────────────────────────────────
+// Loan & Repayment
+// ─────────────────────────────────────────────
+
+model Loan {
+  id           String     @id @default(uuid())
+  borrowerId   String
+  borrower     User       @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+  lenderId     String?
+  lender       User?      @relation("LenderLoans", fields: [lenderId], references: [id])
+  amount       Decimal    @db.Decimal(20, 7)
+  assetCode    String     @default("USDC")
+  interestRate Decimal    @db.Decimal(5, 4)   // e.g. 0.0500 = 5%
+  status       LoanStatus @default(PENDING)
+  dueDate      DateTime?
+  collateralId String?
+  collateral   Collateral? @relation(fields: [collateralId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  repayments Repayment[]
+
+  @@index([borrowerId])
+  @@index([lenderId])
+  @@index([status])
+  @@index([collateralId])
+}
+
+model Repayment {
+  id        String   @id @default(uuid())
+  loanId    String
+  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(20, 7)
+  paidAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([loanId])
+}
+
+// ─────────────────────────────────────────────
+// Oracle
+// ─────────────────────────────────────────────
+
+model OracleEvent {
+  id               String   @id @default(uuid())
+  escrowId         String
+  escrow           Escrow   @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  oracleAddress    String
+  confirmationType String
+  signature        String
+  confirmedAt      DateTime @default(now())
+
+  @@index([escrowId])
+  @@index([oracleAddress])
+}
+
+// ─────────────────────────────────────────────
+// Governance
+// ─────────────────────────────────────────────
+
+model GovernanceProposal {
+  id          String           @id @default(uuid())
+  title       String
+  description String
+  proposerId  String
+  proposer    User             @relation("ProposerProposals", fields: [proposerId], references: [id])
+  status      GovernanceStatus @default(OPEN)
+  endsAt      DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  votes GovernanceVote[]
+
+  @@index([proposerId])
+  @@index([status])
+}
+
+model GovernanceVote {
+  id         String             @id @default(uuid())
+  proposalId String
+  proposal   GovernanceProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  voterAddress String
+  vote       String             // e.g. "YES" | "NO" | "ABSTAIN"
+  weight     Decimal            @db.Decimal(20, 7)
+  createdAt  DateTime           @default(now())
+
+  @@unique([proposalId, voterAddress])
+  @@index([proposalId])
+}
+
+// ─────────────────────────────────────────────
+// Risk Scoring
+// ─────────────────────────────────────────────
+
+model RiskScore {
+  id            String   @id @default(uuid())
+  walletAddress String
+  score         Int      // 0–1000
+  components    Json     // { transactionHistory, repaymentRecord, collateralCoverage, disputeHistory }
+  recordedAt    DateTime @default(now())
+
+  @@index([walletAddress])
+  @@index([recordedAt])
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
 
 enum Role {
   USER
   MERCHANT
   ADMIN
+}
+
+enum ChallengePurpose {
+  LOGIN
+  LINK_WALLET
+}
+
+enum EscrowStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  EXPIRED
+}
+
+enum CollateralStatus {
+<<<<<<< HEAD
+  PENDING
+  DEPOSITED
+}
+
+model Collateral {
+  id           String           @id @default(uuid())
+  escrowId     String
+  escrow       Escrow           @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  assetCode    String
+  amount       Decimal
+  metadataHash String           @unique
+  status       CollateralStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([escrowId])
+  @@index([status])
+=======
+  LOCKED
+  RELEASED
+  LIQUIDATED
 }
 
 enum LoanStatus {
@@ -84,7 +281,10 @@ enum LoanStatus {
   DEFAULTED
 }
 
-enum ChallengePurpose {
-  LOGIN
-  LINK_WALLET
+enum GovernanceStatus {
+  OPEN
+  PASSED
+  REJECTED
+  EXECUTED
+>>>>>>> 4ab8eb5 (feat: Re-initialize database schema, add Docker Compose for local development, and enhance setup documentation with a new README and Prisma seed script.)
 }
