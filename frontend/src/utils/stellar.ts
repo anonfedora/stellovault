@@ -1,15 +1,17 @@
 // Stellar/Soroban utility functions for StelloVault
 
-import { Address, Contract, Networks } from '@stellar/stellar-sdk';
+import { Address, Contract, Networks, scValToNative, xdr } from '@stellar/stellar-sdk';
 
 // Network configurations
 export const NETWORKS = {
   testnet: {
     networkPassphrase: Networks.TESTNET,
+    horizonUrl: 'https://horizon-testnet.stellar.org',
     soroban: 'https://soroban-testnet.stellar.org',
   },
   mainnet: {
     networkPassphrase: Networks.PUBLIC,
+    horizonUrl: 'https://horizon.stellar.org',
     soroban: 'https://soroban.stellar.org',
   },
 };
@@ -63,7 +65,8 @@ export const getExplorerUrl = (txHash: string, network: 'testnet' | 'mainnet' = 
 };
 
 // Contract interaction helpers
-export const createContractInstance = (contractId: string) => {
+export const createContractInstance = (contractId: string, network: keyof typeof NETWORKS = 'testnet') => {
+  // serverUrl lookup removed as Contract doesn't require it directly.
   return new Contract(contractId);
 };
 

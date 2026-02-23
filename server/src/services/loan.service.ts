@@ -2,6 +2,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from "../config/errors
 import { contracts } from "../config/contracts";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
+import websocketService from "./websocket.service";
+import { Prisma } from "@prisma/client";
 import Decimal from "decimal.js";
 
 const MIN_COLLATERAL_RATIO = new Decimal("1.5");
@@ -71,7 +73,7 @@ export class LoanService {
             );
         }
 
-        const db: any = prisma;
+        const db = prisma;
         const users = await db.user.findMany({
             where: { id: { in: [borrowerId, lenderId] } },
             select: { id: true },
@@ -109,6 +111,8 @@ export class LoanService {
             },
         });
 
+        websocketService.broadcastLoanUpdated(loan.id, loan.status);
+
         return {
             loanId: loan.id,
             xdr,
@@ -117,7 +121,7 @@ export class LoanService {
     }
 
     async getLoan(id: string) {
-        const db: any = prisma;
+        const db = prisma;
         const loan = await db.loan.findUnique({
             where: { id },
             include: {
@@ -135,7 +139,7 @@ export class LoanService {
     }
 
     async listLoans(borrowerId?: string, lenderId?: string, status?: string) {
-        const db: any = prisma;
+        const db = prisma;
         const normalizedStatus = status?.trim().toUpperCase();
         if (normalizedStatus && !VALID_LOAN_STATUSES.has(normalizedStatus)) {
             throw new ValidationError("Invalid status. Use PENDING, ACTIVE, REPAID, or DEFAULTED");
@@ -177,7 +181,7 @@ export class LoanService {
             }
         }
 
-        const db: any = prisma;
+        const db = prisma;
         return db.$transaction(async (tx: any) => {
             const loan = await tx.loan.findUnique({
                 where: { id: loanId },
@@ -227,6 +231,8 @@ export class LoanService {
                     where: { id: loanId },
                     data: { status: nextStatus },
                 });
+                
+                websocketService.broadcastLoanUpdated(loanId, nextStatus);
             }
 
             const updatedLoan = await tx.loan.findUnique({
