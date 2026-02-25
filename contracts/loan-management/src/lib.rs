@@ -532,7 +532,7 @@ impl LoanManagement {
         let treasury_opt: Option<Address> =
             env.storage().instance().get(&symbol_short!("treasury"));
 
-        let protocol_fee = if treasury_opt.is_some() {
+        let protocol_fee = if treasury_opt.is_some() && principal_payment > 0 {
             // Query fee_bps from ProtocolTreasury
             let treasury = treasury_opt.as_ref().unwrap();
             let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
@@ -541,7 +541,26 @@ impl LoanManagement {
                 &Symbol::new(&env, "get_fee_bps"),
                 fee_bps_args,
             );
-            (total_due * fee_bps as i128) / 10000
+            // Calculate fee on the principal payment only (not interest)
+            let fee_amount = (principal_payment * fee_bps as i128) / 10000;
+            
+            // Record the fee deposit in treasury
+            // Note: In a full implementation, the actual token transfer would happen
+            // before this call, either by the borrower or automatically
+            let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
+                &env,
+                [
+                    loan.lender.into_val(&env), // Asset address (simplified - using lender as proxy)
+                    fee_amount.into_val(&env),
+                ],
+            );
+            env.invoke_contract(
+                &treasury,
+                &Symbol::new(&env, "deposit_fee"),
+                deposit_args,
+            );
+            
+            fee_amount
         } else {
             0i128
         };
