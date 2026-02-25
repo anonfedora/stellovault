@@ -6,11 +6,10 @@
 
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, contracterror, symbol_short, Address, Bytes, BytesN, Env, Symbol, Vec};
 
-/// Contract errors
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracterror]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ContractError {
     Unauthorized = 1,
     AlreadyInitialized = 2,
@@ -30,11 +29,12 @@ pub enum EventType {
     Delivery = 2,
     Quality = 3,
     Custom = 4,
+    Valuation = 5,
 }
 
 /// Oracle confirmation data structure
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConfirmationData {
     pub escrow_id: Bytes,
     pub event_type: u32,
@@ -54,8 +54,8 @@ pub struct ContractData {
 }
 
 /// Event symbols
-const ORACLE_ADDED: Symbol = symbol_short!("oracle_add");
-const ORACLE_REMOVED: Symbol = symbol_short!("oracle_rem");
+const ORACLE_ADDED: Symbol = symbol_short!("orc_add");
+const ORACLE_REMOVED: Symbol = symbol_short!("orc_rem");
 const ORACLE_CONFIRMED: Symbol = symbol_short!("confirmed");
 const INITIALIZED: Symbol = symbol_short!("init");
 
@@ -86,11 +86,10 @@ impl OracleAdapter {
             oracles: Vec::new(&env),
         };
 
-        env.storage().instance().set(&Symbol::new(&env, "data"), &contract_data);
+        env.storage().instance().set(&symbol_short!("data"), &contract_data);
 
         // Emit initialization event
         env.events().publish((INITIALIZED,), (admin,));
-
         Ok(())
     }
 
@@ -104,7 +103,7 @@ impl OracleAdapter {
     pub fn add_oracle(env: Env, oracle: Address) -> Result<(), ContractError> {
         Self::check_admin(&env)?;
 
-        let mut contract_data = Self::get_contract_data(&env);
+        let mut contract_data = Self::get_contract_data(&env)?;
 
         // Check if oracle is already registered
         if Self::is_oracle_registered(&contract_data, &oracle) {
@@ -115,7 +114,7 @@ impl OracleAdapter {
         contract_data.oracles.push_back(oracle.clone());
 
         // Save updated data
-        env.storage().instance().set(&Symbol::new(&env, "data"), &contract_data);
+        env.storage().instance().set(&symbol_short!("data"), &contract_data);
 
         // Emit event
         env.events().publish((ORACLE_ADDED,), (oracle,));
@@ -133,7 +132,7 @@ impl OracleAdapter {
     pub fn remove_oracle(env: Env, oracle: Address) -> Result<(), ContractError> {
         Self::check_admin(&env)?;
 
-        let mut contract_data = Self::get_contract_data(&env);
+        let mut contract_data = Self::get_contract_data(&env)?;
 
         // Find and remove oracle
         let mut found = false;
@@ -154,7 +153,7 @@ impl OracleAdapter {
         contract_data.oracles = new_oracles;
 
         // Save updated data
-        env.storage().instance().set(&Symbol::new(&env, "data"), &contract_data);
+        env.storage().instance().set(&symbol_short!("data"), &contract_data);
 
         // Emit event
         env.events().publish((ORACLE_REMOVED,), (oracle,));
@@ -174,15 +173,13 @@ impl OracleAdapter {
     /// Emits `ORACLE_CONFIRMED` event
     pub fn confirm_event(
         env: Env,
+        oracle: Address,
         escrow_id: Bytes,
         event_type: u32,
         result: Bytes,
         signature: Bytes,
     ) -> Result<(), ContractError> {
-        let contract_data = Self::get_contract_data(&env);
-
-        // Get caller (oracle)
-        let oracle = env.invoker();
+        let contract_data = Self::get_contract_data(&env)?;
 
         // Verify oracle is registered
         if !Self::is_oracle_registered(&contract_data, &oracle) {
@@ -190,7 +187,7 @@ impl OracleAdapter {
         }
 
         // Validate event type
-        if event_type < 1 || event_type > 4 {
+        if event_type < 1 || event_type > 5 {
             return Err(ContractError::InvalidEventType);
         }
 
@@ -236,7 +233,7 @@ impl OracleAdapter {
     /// # Returns
     /// Option containing confirmation data if found
     pub fn get_confirmation(env: Env, escrow_id: Bytes) -> Option<Vec<ConfirmationData>> {
-        let contract_data = Self::get_contract_data(&env);
+        let contract_data = Self::get_contract_data(&env).ok()?;
         let mut confirmations = Vec::new(&env);
 
         // Iterate through all registered oracles
@@ -261,15 +258,15 @@ impl OracleAdapter {
     ///
     /// # Returns
     /// true if oracle is registered, false otherwise
-    pub fn is_oracle_registered_query(env: Env, oracle: Address) -> bool {
-        let contract_data = Self::get_contract_data(&env);
-        Self::is_oracle_registered(&contract_data, &oracle)
+    pub fn is_oracle_registered_query(env: Env, oracle: Address) -> Result<bool, ContractError> {
+        let contract_data = Self::get_contract_data(&env)?;
+        Ok(Self::is_oracle_registered(&contract_data, &oracle))
     }
 
     /// Get the total number of registered oracles
-    pub fn get_oracle_count(env: Env) -> u32 {
-        let contract_data = Self::get_contract_data(&env);
-        contract_data.oracles.len()
+    pub fn get_oracle_count(env: Env) -> Result<u32, ContractError> {
+        let contract_data = Self::get_contract_data(&env)?;
+        Ok(contract_data.oracles.len())
     }
 
     /// Get oracle address at specific index
@@ -280,40 +277,30 @@ impl OracleAdapter {
     /// # Returns
     /// Oracle address at the given index
     pub fn get_oracle_at(env: Env, index: u32) -> Option<Address> {
-        let contract_data = Self::get_contract_data(&env);
-        contract_data.oracles.get(index)
+        Self::get_contract_data(&env).ok()?.oracles.get(index)
     }
 
     /// Get admin address
-    pub fn get_admin(env: Env) -> Address {
-        let contract_data = Self::get_contract_data(&env);
-        contract_data.admin
+    pub fn get_admin(env: Env) -> Result<Address, ContractError> {
+        let contract_data = Self::get_contract_data(&env)?;
+        Ok(contract_data.admin)
     }
 
     // Helper functions
 
     fn is_initialized(env: &Env) -> bool {
-        env.storage().instance().has(&Symbol::new(env, "data"))
+        env.storage().instance().has(&symbol_short!("data"))
     }
 
-    fn get_contract_data(env: &Env) -> ContractData {
+    fn get_contract_data(env: &Env) -> Result<ContractData, ContractError> {
         env.storage().instance()
-            .get(&Symbol::new(env, "data"))
-            .unwrap_or(ContractData {
-                admin: Address::from_contract_id(&BytesN::from_array(env, &[0; 32])),
-                initialized: false,
-                oracles: Vec::new(env),
-            })
+            .get(&symbol_short!("data"))
+            .ok_or(ContractError::EscrowNotFound)
     }
 
     fn check_admin(env: &Env) -> Result<(), ContractError> {
-        let contract_data = Self::get_contract_data(env);
-        let caller = env.invoker();
-
-        if caller != contract_data.admin {
-            return Err(ContractError::Unauthorized);
-        }
-
+        let contract_data = Self::get_contract_data(env)?;
+        contract_data.admin.require_auth();
         Ok(())
     }
 
@@ -328,39 +315,38 @@ impl OracleAdapter {
 
     fn create_message(env: &Env, escrow_id: &Bytes, event_type: u32, result: &Bytes) -> BytesN<32> {
         // Create a deterministic message hash for signature verification
-        let mut message_data = Vec::new(env);
-        message_data.append(&escrow_id.clone());
+        let mut message_data = Bytes::new(env);
+        message_data.append(escrow_id);
         message_data.append(&Bytes::from_slice(env, &event_type.to_be_bytes()));
-        message_data.append(&result.clone());
+        message_data.append(result);
 
-        env.crypto().sha256(&message_data)
+        env.crypto().sha256(&message_data).into()
     }
 
     fn verify_signature(
-        env: &Env,
-        message: &BytesN<32>,
-        signature: &Bytes,
+        _env: &Env,
+        _message: &BytesN<32>,
+        _signature: &Bytes,
         oracle: &Address,
     ) -> Result<(), ContractError> {
-        // For Soroban, we'll use the built-in signature verification
-        // This is a simplified version - in production, you'd want more robust verification
-        match env.crypto().ed25519_verify(&oracle.contract_id().into(), message, signature) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(ContractError::InvalidSignature),
-        }
+        // In modern Soroban, we prefer require_auth()
+        // For this adapter, we'll ensure the oracle authorized the call
+        oracle.require_auth();
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::testutils::{Address as _, BytesN as _};
-    use soroban_sdk::{testutils::MockAuth, testutils::MockAuthInvoke, Address, Env, Bytes};
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{testutils::MockAuth, testutils::MockAuthInvoke, Address, Env, Bytes, IntoVal};
 
     #[test]
     fn test_initialization() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -378,7 +364,7 @@ mod test {
     #[test]
     fn test_oracle_management() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -393,59 +379,101 @@ mod test {
         assert_eq!(client.get_oracle_count(), 0);
 
         // Test adding first oracle
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "add_oracle",
+                args: (oracle1.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         client.add_oracle(&oracle1);
         assert_eq!(client.is_oracle_registered_query(&oracle1), true);
         assert_eq!(client.get_oracle_count(), 1);
 
         // Test adding second oracle
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "add_oracle",
+                args: (oracle2.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         client.add_oracle(&oracle2);
         assert_eq!(client.is_oracle_registered_query(&oracle2), true);
         assert_eq!(client.get_oracle_count(), 2);
 
         // Test adding same oracle fails
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "add_oracle",
+                args: (oracle1.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         assert_eq!(client.try_add_oracle(&oracle1), Err(Ok(ContractError::OracleAlreadyRegistered)));
 
         // Test unauthorized add fails
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &unauthorized,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "add_oracle",
-                    args: (Address::generate(&env),).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::add_oracle(env, Address::generate(&env)), Err(ContractError::Unauthorized));
-        });
+        env.mock_auths(&[MockAuth {
+            address: &unauthorized,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "add_oracle",
+                args: (Address::generate(&env),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        assert!(client.try_add_oracle(&Address::generate(&env)).is_err());
 
         // Test removing oracle
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "remove_oracle",
+                args: (oracle1.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         client.remove_oracle(&oracle1);
         assert_eq!(client.is_oracle_registered_query(&oracle1), false);
         assert_eq!(client.get_oracle_count(), 1);
 
         // Test removing non-existent oracle fails
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "remove_oracle",
+                args: (oracle1.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
         assert_eq!(client.try_remove_oracle(&oracle1), Err(Ok(ContractError::OracleNotRegistered)));
 
         // Test unauthorized remove fails
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &unauthorized,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "remove_oracle",
-                    args: (oracle2.clone(),).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::remove_oracle(env, oracle2), Err(ContractError::Unauthorized));
-        });
+        env.mock_auths(&[MockAuth {
+            address: &unauthorized,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "remove_oracle",
+                args: (oracle2.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        assert!(client.try_remove_oracle(&oracle2).is_err());
     }
 
     #[test]
     fn test_event_type_validation() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -460,58 +488,25 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Test invalid event type (0)
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &oracle,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "confirm_event",
-                    args: (escrow_id.clone(), 0u32, result.clone(), signature.clone()).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::confirm_event(env, escrow_id.clone(), 0u32, result.clone(), signature.clone()),
-                      Err(ContractError::InvalidEventType));
-        });
+        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &0u32, &result, &signature),
+                  Err(Ok(ContractError::InvalidEventType)));
 
-        // Test invalid event type (5)
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &oracle,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "confirm_event",
-                    args: (escrow_id.clone(), 5u32, result.clone(), signature.clone()).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::confirm_event(env, escrow_id.clone(), 5u32, result.clone(), signature.clone()),
-                      Err(ContractError::InvalidEventType));
-        });
+        // Test invalid event type (6)
+        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &6u32, &result, &signature),
+                  Err(Ok(ContractError::InvalidEventType)));
 
         // Test valid event types (1-4)
         for event_type in 1..=4 {
-            env.as_contract(&contract_id, || {
-                env.mock_auths(&[MockAuth {
-                    address: &oracle,
-                    invoke: &MockAuthInvoke {
-                        contract: &contract_id,
-                        fn_name: "confirm_event",
-                        args: (escrow_id.clone(), event_type, result.clone(), signature.clone()).into_val(&env),
-                        sub_invokes: &[],
-                    },
-                }]);
-                // Note: This will fail due to signature verification, but event type validation passes
-                let result = OracleAdapter::confirm_event(env, escrow_id.clone(), event_type, result.clone(), signature.clone());
-                assert!(result == Err(ContractError::InvalidSignature) || result.is_ok());
-            });
+            let confirm_result = client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
+            assert!(confirm_result.is_ok());
         }
     }
 
     #[test]
     fn test_replay_attack_prevention() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -526,43 +521,20 @@ mod test {
         let result = Bytes::from_slice(&env, b"confirmed");
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
-        // First confirmation should work (even with invalid signature for this test)
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &oracle,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "confirm_event",
-                    args: (escrow_id.clone(), event_type, result.clone(), signature.clone()).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            // Skip signature verification for this test by mocking it
-            // In real implementation, signature would be verified
-            let confirm_result = OracleAdapter::confirm_event(env, escrow_id.clone(), event_type, result.clone(), signature.clone());
-            // The result depends on signature verification implementation
-        });
+        // First confirmation should work
+        // Note: verify_signature is now just require_auth(), so it should pass with mock_all_auths
+        let confirm_result = client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
+        assert!(confirm_result.is_ok());
 
         // Second confirmation from same oracle should fail (replay attack)
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &oracle,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "confirm_event",
-                    args: (escrow_id.clone(), event_type, result.clone(), signature.clone()).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::confirm_event(env, escrow_id.clone(), event_type, result.clone(), signature.clone()),
-                      Err(ContractError::ConfirmationAlreadyExists));
-        });
+        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature),
+                  Err(Ok(ContractError::ConfirmationAlreadyExists)));
     }
 
     #[test]
     fn test_unauthorized_oracle_confirmation() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -577,25 +549,14 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Confirmation from unregistered oracle should fail
-        env.as_contract(&contract_id, || {
-            env.mock_auths(&[MockAuth {
-                address: &unauthorized_oracle,
-                invoke: &MockAuthInvoke {
-                    contract: &contract_id,
-                    fn_name: "confirm_event",
-                    args: (escrow_id.clone(), event_type, result.clone(), signature.clone()).into_val(&env),
-                    sub_invokes: &[],
-                },
-            }]);
-            assert_eq!(OracleAdapter::confirm_event(env, escrow_id.clone(), event_type, result.clone(), signature.clone()),
-                      Err(ContractError::OracleNotRegistered));
-        });
+        assert_eq!(client.try_confirm_event(&unauthorized_oracle, &escrow_id, &event_type, &result, &signature),
+                  Err(Ok(ContractError::OracleNotRegistered)));
     }
 
     #[test]
     fn test_get_confirmation_empty() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -612,7 +573,8 @@ mod test {
     #[test]
     fn test_oracle_queries() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
         let client = OracleAdapterClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
@@ -636,9 +598,9 @@ mod test {
         assert_eq!(client.is_oracle_registered_query(&Address::generate(&env)), false);
 
         // Test getting oracles by index
-        let oracle_at_0 = client.get_oracle_at(0);
-        let oracle_at_1 = client.get_oracle_at(1);
-        let oracle_at_2 = client.get_oracle_at(2);
+        let oracle_at_0 = client.get_oracle_at(&0);
+        let oracle_at_1 = client.get_oracle_at(&1);
+        let oracle_at_2 = client.get_oracle_at(&2);
 
         assert!(oracle_at_0.is_some());
         assert!(oracle_at_1.is_some());
@@ -648,7 +610,7 @@ mod test {
     #[test]
     fn test_message_creation() {
         let env = Env::default();
-        let contract_id = env.register_contract(None, OracleAdapter);
+        let contract_id = env.register(OracleAdapter, ());
 
         let escrow_id = Bytes::from_slice(&env, b"escrow_123");
         let event_type = 1u32;

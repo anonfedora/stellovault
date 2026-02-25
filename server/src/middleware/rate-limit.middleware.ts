@@ -1,29 +1,14 @@
-import { Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_REQUESTS = 100;
-
-const requestCounts = new Map<string, { count: number; resetAt: number }>();
-
-/**
- * Simple in-process rate limiter: 100 requests/min per IP.
- * Replace with `express-rate-limit` + Redis in production.
- */
-export function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
-    const ip = req.ip || "unknown";
-    const now = Date.now();
-    const entry = requestCounts.get(ip);
-
-    if (!entry || now > entry.resetAt) {
-        requestCounts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-        return next();
-    }
-
-    entry.count++;
-    if (entry.count > MAX_REQUESTS) {
-        res.setHeader("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
-        return res.status(429).json({ success: false, error: "Too many requests" });
-    }
-
-    next();
-}
+export const rateLimitMiddleware = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 1 minute)
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (_req, res, _next, _options) => {
+    res.status(429).json({
+      success: false,
+      error: "Too many requests",
+    });
+  },
+});

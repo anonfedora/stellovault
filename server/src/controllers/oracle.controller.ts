@@ -1,5 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import oracleService from "../services/oracle.service";
+import { ValidationError } from "../config/errors";
+
+function validateRequiredFields(fields: Record<string, unknown>, names: string[]): void {
+    for (const name of names) {
+        if (fields[name] === undefined || fields[name] === null || fields[name] === "") {
+            throw new ValidationError(`Missing required field: ${name}`);
+        }
+    }
+}
 
 export async function registerOracle(req: Request, res: Response, next: NextFunction) {
     try {
@@ -54,6 +63,10 @@ export async function deactivateOracle(req: Request, res: Response, next: NextFu
 export async function submitConfirmation(req: Request, res: Response, next: NextFunction) {
     try {
         const { oracleAddress, escrowId, eventType, signature, payload, nonce } = req.body;
+        validateRequiredFields(
+            { oracleAddress, escrowId, eventType, signature, payload, nonce },
+            ["oracleAddress", "escrowId", "eventType", "signature", "payload", "nonce"]
+        );
         const confirmation = await oracleService.confirmOracleEvent({
             oracleAddress,
             escrowId,
@@ -93,6 +106,10 @@ export async function getOracleMetrics(req: Request, res: Response, next: NextFu
 export async function flagDispute(req: Request, res: Response, next: NextFunction) {
     try {
         const { escrowId, reason, disputerAddress } = req.body;
+        validateRequiredFields(
+            { escrowId, reason, disputerAddress },
+            ["escrowId", "reason", "disputerAddress"]
+        );
         const result = await oracleService.flagDispute({
             escrowId,
             reason,

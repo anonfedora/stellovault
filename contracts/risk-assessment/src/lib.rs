@@ -59,6 +59,14 @@ pub enum ContractError {
 
     // Loan status errors
     LoanNotActive = 24,
+
+    // Auction errors
+    AuctionAlreadyActive = 25,
+    AuctionNotFound = 26,
+    AuctionExpired = 27,
+    AuctionNotActive = 28,
+    BidBelowDebtFloor = 29,
+    AuctionNotExpired = 30,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -190,6 +198,59 @@ pub struct PendingUpdate {
     pub execute_after: u64,
 }
 
+/// Dutch Auction configuration (governance-controlled)
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct AuctionConfig {
+    /// Auction duration in seconds (default: 6 hours)
+    pub duration: u64,
+    /// Decay rate in basis points per second (default: ~2 bps/s → full decay over 6h)
+    /// price = collateral_value * (1 - decay_rate_bps * elapsed / 1_000_000)
+    pub decay_rate_bps_per_sec: u64,
+    /// Auction fee charged on surplus, in basis points (default: 50 = 0.5%)
+    pub auction_fee_bps: u32,
+}
+
+impl AuctionConfig {
+    pub fn default() -> Self {
+        Self {
+            duration: 21_600,             // 6 hours
+            decay_rate_bps_per_sec: 46,   // ~46 bps/s → 100% decay in ~6h at 10 000 bps scale
+            auction_fee_bps: 50,          // 0.5%
+        }
+    }
+}
+
+/// Auction lifecycle status
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuctionStatus {
+    Active = 0,
+    Settled = 1,
+    Expired = 2,
+}
+
+/// State of a Dutch Auction for one defaulted loan
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct AuctionState {
+    pub loan_id: u64,
+    pub collateral_value: i128,
+    pub debt_floor: i128,
+    pub started_at: u64,
+    pub ends_at: u64,
+    pub status: AuctionStatus,
+    /// Address of the winning bidder (zero-value until settled)
+    pub winner: Option<Address>,
+    pub winning_bid: i128,
+    /// Amount paid to lender
+    pub debt_covered: i128,
+    /// Surplus returned to borrower (after auction fee)
+    pub borrower_surplus: i128,
+    /// Auction fee collected by protocol
+    pub auction_fee: i128,
+}
+
 // ============================================================================
 // External Contract Data Structures (for cross-contract calls)
 // ============================================================================
@@ -215,8 +276,10 @@ pub struct Collateral {
     pub id: u64,
     pub owner: Address,
     pub face_value: i128,
+    pub realized_value: i128,
     pub expiry_ts: u64,
     pub registered_at: u64,
+    pub last_valuation_ts: u64,
     pub locked: bool,
 }
 
@@ -250,6 +313,10 @@ const EVT_PARAM_UPD: Symbol = symbol_short!("prm_upd");
 const EVT_PARAM_CANCEL: Symbol = symbol_short!("prm_cncl");
 const EVT_PAUSED: Symbol = symbol_short!("liq_pause");
 const EVT_UNPAUSED: Symbol = symbol_short!("liq_unpse");
+const EVT_AUC_START: Symbol = symbol_short!("auc_start");
+const EVT_AUC_BID: Symbol = symbol_short!("auc_bid");
+const EVT_AUC_SETL: Symbol = symbol_short!("auc_setl");
+const EVT_AUC_EXP: Symbol = symbol_short!("auc_exp");
 
 // ============================================================================
 // Contract Definition
@@ -301,6 +368,10 @@ impl RiskAssessment {
 
         // Set default timelock duration (24 hours)
         env.storage().instance().set(&symbol_short!("timelock"), &86400u64);
+
+        // Set default auction config
+        let default_auction_cfg = AuctionConfig::default();
+        env.storage().instance().set(&symbol_short!("auc_cfg"), &default_auction_cfg);
 
         // Emit initialization event
         env.events().publish(
@@ -374,7 +445,7 @@ impl RiskAssessment {
 
         // Calculate health factor
         // HF = (Collateral Value * Liquidation Threshold) / Total Debt
-        let numerator = (collateral.face_value)
+        let numerator = (collateral.realized_value)
             .checked_mul(risk_params.liquidation_threshold as i128)
             .ok_or(ContractError::MathOverflow)?;
 
@@ -446,7 +517,7 @@ impl RiskAssessment {
         let health_factor = if total_debt == 0 {
             u32::MAX
         } else {
-            let numerator = (collateral.face_value)
+            let numerator = (collateral.realized_value)
                 .checked_mul(risk_params.liquidation_threshold as i128)
                 .ok_or(ContractError::MathOverflow)?;
             numerator
@@ -462,7 +533,7 @@ impl RiskAssessment {
             collateral_id: collateral.id,
             borrower: loan.borrower,
             lender: loan.lender,
-            collateral_value: collateral.face_value,
+            collateral_value: collateral.realized_value,
             debt_amount: total_debt,
             interest_rate: loan.interest_rate,
             deadline: loan.deadline,
@@ -976,6 +1047,287 @@ impl RiskAssessment {
         env.storage().persistent().set(&coll_key, &collateral);
         env.storage().persistent().set(&escrow_key, &escrow);
     }
+
+    // ========================================================================
+    // Dutch Auction — Governance Config
+    // ========================================================================
+
+    /// Get current auction configuration
+    pub fn get_auction_config(env: Env) -> AuctionConfig {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("auc_cfg"))
+            .unwrap_or(AuctionConfig::default())
+    }
+
+    /// Update auction configuration (governance only, with timelock)
+    pub fn set_auction_config(
+        env: Env,
+        config: AuctionConfig,
+    ) -> Result<(), ContractError> {
+        let governance: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("gov"))
+            .ok_or(ContractError::Unauthorized)?;
+        governance.require_auth();
+
+        env.storage().instance().set(&symbol_short!("auc_cfg"), &config);
+        Ok(())
+    }
+
+    // ========================================================================
+    // Dutch Auction — Core Functions
+    // ========================================================================
+
+    /// Start a Dutch Auction for a defaulted / undercollateralised loan.
+    ///
+    /// Anyone may trigger this once the loan is liquidatable. The starting price
+    /// equals the full collateral value and decays linearly toward the debt floor
+    /// over the configured auction duration.
+    pub fn start_auction(
+        env: Env,
+        loan_id: u64,
+    ) -> Result<AuctionState, ContractError> {
+        // Guard: liquidations not paused
+        let paused: bool = env.storage()
+            .instance()
+            .get(&symbol_short!("paused"))
+            .unwrap_or(false);
+        if paused {
+            return Err(ContractError::LiquidationsPaused);
+        }
+
+        // Guard: no active auction already running
+        let auc_key = (symbol_short!("auction"), loan_id);
+        if let Some(existing) = env.storage().persistent().get::<_, AuctionState>(&auc_key) {
+            if existing.status == AuctionStatus::Active {
+                return Err(ContractError::AuctionAlreadyActive);
+            }
+        }
+
+        // Position must be liquidatable
+        let health_factor = Self::calculate_health_factor(env.clone(), loan_id)?;
+        let risk_params = Self::get_risk_parameters(env.clone());
+        if health_factor >= risk_params.min_health_factor {
+            return Err(ContractError::PositionNotLiquidatable);
+        }
+
+        // Fetch position data
+        let (loan, collateral, _escrow) = Self::fetch_position_data(&env, loan_id)?;
+        if loan.status != LoanStatus::Active {
+            return Err(ContractError::LoanNotActive);
+        }
+
+        // Compute debt floor (principal + interest)
+        let interest = loan.amount
+            .checked_mul(loan.interest_rate as i128)
+            .ok_or(ContractError::MathOverflow)?
+            / 10_000;
+        let debt_floor = loan.amount
+            .checked_add(interest)
+            .ok_or(ContractError::MathOverflow)?;
+
+        let cfg = Self::get_auction_config(env.clone());
+        let now = env.ledger().timestamp();
+        let ends_at = now.checked_add(cfg.duration).ok_or(ContractError::MathOverflow)?;
+
+        let state = AuctionState {
+            loan_id,
+            collateral_value: collateral.realized_value,
+            debt_floor,
+            started_at: now,
+            ends_at,
+            status: AuctionStatus::Active,
+            winner: None,
+            winning_bid: 0,
+            debt_covered: 0,
+            borrower_surplus: 0,
+            auction_fee: 0,
+        };
+
+        env.storage().persistent().set(&auc_key, &state);
+
+        env.events().publish(
+            (EVT_AUC_START,),
+            (loan_id, collateral.realized_value, debt_floor, ends_at),
+        );
+
+        Ok(state)
+    }
+
+    /// Compute the current Dutch-Auction price for a loan.
+    ///
+    /// `price = collateral_value * (1 - decay_rate_bps_per_sec * elapsed / 1_000_000)`
+    /// Clamped at `debt_floor` so the lender is always fully repaid.
+    pub fn get_auction_price(env: Env, loan_id: u64) -> Result<i128, ContractError> {
+        let auc_key = (symbol_short!("auction"), loan_id);
+        let state: AuctionState = env.storage()
+            .persistent()
+            .get(&auc_key)
+            .ok_or(ContractError::AuctionNotFound)?;
+
+        if state.status != AuctionStatus::Active {
+            return Err(ContractError::AuctionNotActive);
+        }
+
+        let now = env.ledger().timestamp();
+        if now >= state.ends_at {
+            // Auction has timed out — price floors at debt_floor
+            return Ok(state.debt_floor);
+        }
+
+        let cfg = Self::get_auction_config(env.clone());
+        let elapsed = now.saturating_sub(state.started_at);
+
+        // decay_factor_bps = decay_rate_bps_per_sec * elapsed  (capped at 1_000_000)
+        let decay_factor = (cfg.decay_rate_bps_per_sec as u128)
+            .saturating_mul(elapsed as u128)
+            .min(1_000_000);
+
+        // price = collateral_value * (1_000_000 - decay_factor) / 1_000_000
+        let price = (state.collateral_value as u128)
+            .saturating_mul(1_000_000u128.saturating_sub(decay_factor))
+            / 1_000_000;
+
+        let price = price as i128;
+        // Floor at debt_floor
+        Ok(if price < state.debt_floor { state.debt_floor } else { price })
+    }
+
+    /// Place a bid on an active Dutch Auction.
+    ///
+    /// The first bidder whose `payment_amount >= current_auction_price` wins
+    /// immediately and triggers settlement:
+    ///  - `debt_floor` goes to the lender.
+    ///  - surplus above `debt_floor` minus auction fee goes to borrower.
+    pub fn bid_auction(
+        env: Env,
+        loan_id: u64,
+        bidder: Address,
+        payment_amount: i128,
+    ) -> Result<AuctionState, ContractError> {
+        bidder.require_auth();
+
+        // Guard: liquidations not paused
+        let paused: bool = env.storage()
+            .instance()
+            .get(&symbol_short!("paused"))
+            .unwrap_or(false);
+        if paused {
+            return Err(ContractError::LiquidationsPaused);
+        }
+
+        let auc_key = (symbol_short!("auction"), loan_id);
+        let mut state: AuctionState = env.storage()
+            .persistent()
+            .get(&auc_key)
+            .ok_or(ContractError::AuctionNotFound)?;
+
+        if state.status != AuctionStatus::Active {
+            return Err(ContractError::AuctionNotActive);
+        }
+
+        let now = env.ledger().timestamp();
+        if now >= state.ends_at {
+            // Mark expired and bail so settle_expired_auction can be called
+            state.status = AuctionStatus::Expired;
+            env.storage().persistent().set(&auc_key, &state);
+            env.events().publish((EVT_AUC_EXP,), (loan_id,));
+            return Err(ContractError::AuctionExpired);
+        }
+
+        // Bid must be at least the debt floor
+        if payment_amount < state.debt_floor {
+            return Err(ContractError::BidBelowDebtFloor);
+        }
+
+        // Fetch escrow asset for token transfers
+        let (_loan, _collateral, escrow) = Self::fetch_position_data(&env, loan_id)?;
+        let (loan, _collateral2, _escrow2) = Self::fetch_position_data(&env, loan_id)?;
+
+        // Verify bid is >= current auction price
+        let current_price = Self::get_auction_price(env.clone(), loan_id)?;
+        // Accept any bid >= current price (first-bid-wins Dutch auction)
+        if payment_amount < current_price {
+            return Err(ContractError::BidBelowDebtFloor);
+        }
+
+        let cfg = Self::get_auction_config(env.clone());
+
+        // Compute distribution
+        let debt_covered = state.debt_floor; // lender gets exactly the debt
+        let gross_surplus = payment_amount
+            .checked_sub(debt_covered)
+            .unwrap_or(0);
+        let auction_fee = (gross_surplus as i128)
+            .checked_mul(cfg.auction_fee_bps as i128)
+            .ok_or(ContractError::MathOverflow)?
+            / 10_000;
+        let borrower_surplus = gross_surplus
+            .checked_sub(auction_fee)
+            .unwrap_or(0);
+
+        // Transfer: bidder → lender (debt covered)
+        let token_client = token::Client::new(&env, &escrow.asset);
+        token_client.transfer(&bidder, &loan.lender, &debt_covered);
+
+        // Transfer: bidder → borrower (surplus after fee)
+        if borrower_surplus > 0 {
+            token_client.transfer(&bidder, &loan.borrower, &borrower_surplus);
+        }
+
+        // Update state to Settled
+        state.status = AuctionStatus::Settled;
+        state.winner = Some(bidder.clone());
+        state.winning_bid = payment_amount;
+        state.debt_covered = debt_covered;
+        state.borrower_surplus = borrower_surplus;
+        state.auction_fee = auction_fee;
+
+        env.storage().persistent().set(&auc_key, &state);
+
+        env.events().publish(
+            (EVT_AUC_BID,),
+            (loan_id, bidder.clone(), payment_amount),
+        );
+        env.events().publish(
+            (EVT_AUC_SETL,),
+            (loan_id, debt_covered, borrower_surplus, auction_fee),
+        );
+
+        Ok(state)
+    }
+
+    /// Mark an expired auction as Expired so a new one can be started.
+    pub fn expire_auction(env: Env, loan_id: u64) -> Result<(), ContractError> {
+        let auc_key = (symbol_short!("auction"), loan_id);
+        let mut state: AuctionState = env.storage()
+            .persistent()
+            .get(&auc_key)
+            .ok_or(ContractError::AuctionNotFound)?;
+
+        if state.status != AuctionStatus::Active {
+            return Err(ContractError::AuctionNotActive);
+        }
+
+        let now = env.ledger().timestamp();
+        if now < state.ends_at {
+            return Err(ContractError::AuctionNotExpired);
+        }
+
+        state.status = AuctionStatus::Expired;
+        env.storage().persistent().set(&auc_key, &state);
+        env.events().publish((EVT_AUC_EXP,), (loan_id,));
+
+        Ok(())
+    }
+
+    /// Retrieve the current auction state for a loan.
+    pub fn get_auction(env: Env, loan_id: u64) -> Option<AuctionState> {
+        env.storage()
+            .persistent()
+            .get(&(symbol_short!("auction"), loan_id))
+    }
 }
 
 // ============================================================================
@@ -1016,8 +1368,10 @@ mod test {
             id: position_id,
             owner: Address::generate(env),
             face_value,
+            realized_value: face_value,
             expiry_ts: env.ledger().timestamp() + 86400 * 30,
             registered_at: env.ledger().timestamp(),
+            last_valuation_ts: env.ledger().timestamp(),
             locked: true,
         }
     }
@@ -1152,6 +1506,48 @@ mod test {
 
             let risk = RiskAssessment::get_position_risk(env.clone(), position_id).unwrap();
             assert_eq!(risk, PositionRisk::Healthy);
+        });
+    }
+
+    #[test]
+    fn test_calculate_health_factor_dynamic_valuation() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(),
+                admin.clone(),
+                governance.clone(),
+                coll_reg.clone(),
+                loan_mgr.clone(),
+                vault.clone(),
+            ).unwrap();
+
+            let position_id = 1u64;
+            // Face value: $10,000, but Realized value: $6,000
+            // Debt: $5,000 (with 5% interest = $5,250)
+            // HF (using realized value) = (6000 * 8000) / 5250 = 9142 (liquidatable)
+            let loan = create_test_loan(&env, position_id, 5000, 500);
+            let mut collateral = create_test_collateral(&env, position_id, 10000);
+            collateral.realized_value = 6000;
+            let escrow = create_test_escrow(&env, 5000);
+
+            RiskAssessment::set_test_position(
+                env.clone(),
+                position_id,
+                loan,
+                collateral,
+                escrow,
+            );
+
+            let health_factor = RiskAssessment::calculate_health_factor(env.clone(), position_id).unwrap();
+            assert!(health_factor < 10000); // Should be liquidatable due to low realized value
+
+            let risk = RiskAssessment::get_position_risk(env.clone(), position_id).unwrap();
+            assert_eq!(risk, PositionRisk::Liquidatable);
         });
     }
 
@@ -1773,6 +2169,195 @@ mod test {
             // Try to cancel without pending update
             let result = RiskAssessment::cancel_parameter_update(env.clone());
             assert_eq!(result, Err(ContractError::NoPendingUpdate));
+        });
+    }
+    // ========================================================================
+    // Dutch Auction Tests
+    // ========================================================================
+
+    #[test]
+    fn test_start_auction_success() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            // Undercollateralised position
+            let loan_id = 42u64;
+            let loan = create_test_loan(&env, loan_id, 8_500, 500);
+            let collateral = create_test_collateral(&env, loan_id, 10_000);
+            let escrow = create_test_escrow(&env, 8_500);
+            RiskAssessment::set_test_position(env.clone(), loan_id, loan, collateral, escrow);
+
+            let state = RiskAssessment::start_auction(env.clone(), loan_id).unwrap();
+            assert_eq!(state.status, AuctionStatus::Active);
+            assert_eq!(state.collateral_value, 10_000);
+            assert!(state.debt_floor > 0);
+        });
+    }
+
+    #[test]
+    fn test_start_auction_healthy_position_fails() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let loan_id = 1u64;
+            let loan = create_test_loan(&env, loan_id, 5_000, 500);
+            let collateral = create_test_collateral(&env, loan_id, 10_000);
+            let escrow = create_test_escrow(&env, 5_000);
+            RiskAssessment::set_test_position(env.clone(), loan_id, loan, collateral, escrow);
+
+            let result = RiskAssessment::start_auction(env.clone(), loan_id);
+            assert_eq!(result, Err(ContractError::PositionNotLiquidatable));
+        });
+    }
+
+    #[test]
+    fn test_start_auction_duplicate_fails() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let loan_id = 42u64;
+            let loan = create_test_loan(&env, loan_id, 8_500, 500);
+            let collateral = create_test_collateral(&env, loan_id, 10_000);
+            let escrow = create_test_escrow(&env, 8_500);
+            RiskAssessment::set_test_position(env.clone(), loan_id, loan, collateral, escrow);
+
+            RiskAssessment::start_auction(env.clone(), loan_id).unwrap();
+            let result = RiskAssessment::start_auction(env.clone(), loan_id);
+            assert_eq!(result, Err(ContractError::AuctionAlreadyActive));
+        });
+    }
+
+    #[test]
+    fn test_get_auction_price_decays() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let loan_id = 42u64;
+            let loan = create_test_loan(&env, loan_id, 8_500, 500);
+            let collateral = create_test_collateral(&env, loan_id, 10_000);
+            let escrow = create_test_escrow(&env, 8_500);
+            RiskAssessment::set_test_position(env.clone(), loan_id, loan, collateral, escrow);
+
+            RiskAssessment::start_auction(env.clone(), loan_id).unwrap();
+
+            // Price at t=0 should equal collateral_value
+            let price_start = RiskAssessment::get_auction_price(env.clone(), loan_id).unwrap();
+            assert_eq!(price_start, 10_000);
+
+            // Advance 3 hours → price should be lower
+            env.ledger().set_timestamp(env.ledger().timestamp() + 10_800);
+            let price_mid = RiskAssessment::get_auction_price(env.clone(), loan_id).unwrap();
+            assert!(price_mid < price_start);
+
+            // Advance past auction end → price == debt_floor
+            env.ledger().set_timestamp(env.ledger().timestamp() + 100_000);
+            let price_end = RiskAssessment::get_auction_price(env.clone(), loan_id).unwrap();
+            let state = RiskAssessment::get_auction(env.clone(), loan_id).unwrap();
+            assert_eq!(price_end, state.debt_floor);
+        });
+    }
+
+    #[test]
+    fn test_get_auction_config_default() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let cfg = RiskAssessment::get_auction_config(env.clone());
+            assert_eq!(cfg.duration, 21_600);
+            assert_eq!(cfg.auction_fee_bps, 50);
+        });
+    }
+
+    #[test]
+    fn test_set_auction_config_governance() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let new_cfg = AuctionConfig {
+                duration: 43_200,
+                decay_rate_bps_per_sec: 23,
+                auction_fee_bps: 100,
+            };
+            RiskAssessment::set_auction_config(env.clone(), new_cfg).unwrap();
+
+            let cfg = RiskAssessment::get_auction_config(env.clone());
+            assert_eq!(cfg.duration, 43_200);
+            assert_eq!(cfg.auction_fee_bps, 100);
+        });
+    }
+
+    #[test]
+    fn test_expire_auction() {
+        let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
+        let contract_id = env.register(RiskAssessment, ());
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            RiskAssessment::initialize(
+                env.clone(), admin.clone(), governance.clone(),
+                coll_reg.clone(), loan_mgr.clone(), vault.clone(),
+            ).unwrap();
+
+            let loan_id = 42u64;
+            let loan = create_test_loan(&env, loan_id, 8_500, 500);
+            let collateral = create_test_collateral(&env, loan_id, 10_000);
+            let escrow = create_test_escrow(&env, 8_500);
+            RiskAssessment::set_test_position(env.clone(), loan_id, loan, collateral, escrow);
+
+            RiskAssessment::start_auction(env.clone(), loan_id).unwrap();
+
+            // Expire before end → error
+            let err = RiskAssessment::expire_auction(env.clone(), loan_id);
+            assert_eq!(err, Err(ContractError::AuctionNotExpired));
+
+            // Advance past end
+            env.ledger().set_timestamp(env.ledger().timestamp() + 100_000);
+            RiskAssessment::expire_auction(env.clone(), loan_id).unwrap();
+
+            let state = RiskAssessment::get_auction(env.clone(), loan_id).unwrap();
+            assert_eq!(state.status, AuctionStatus::Expired);
         });
     }
 }

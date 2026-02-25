@@ -370,28 +370,32 @@ export class OracleService {
             throw new ConflictError("Escrow is already disputed");
         }
 
-        const updateResult = await prisma.escrow.updateMany({
-            where: {
-                id: escrowId,
-                status: { not: "DISPUTED" },
-            },
-            data: { status: "DISPUTED" },
-        });
+        const { updatedEscrow, dispute } = await prisma.$transaction(async (tx) => {
+            const updateResult = await tx.escrow.updateMany({
+                where: {
+                    id: escrowId,
+                    status: { not: "DISPUTED" },
+                },
+                data: { status: "DISPUTED" },
+            });
 
-        if (updateResult.count === 0) {
-            throw new ConflictError("Escrow is already disputed");
-        }
+            if (updateResult.count === 0) {
+                throw new ConflictError("Escrow is already disputed");
+            }
 
-        const dispute = await prisma.dispute.create({
-            data: {
-                escrowId,
-                reporterAddress: normalizedDisputer,
-                reason: disputeReason,
-            },
-        });
+            const newDispute = await tx.dispute.create({
+                data: {
+                    escrowId,
+                    reporterAddress: normalizedDisputer,
+                    reason: disputeReason,
+                },
+            });
 
-        const updatedEscrow = await prisma.escrow.findUnique({
-            where: { id: escrowId },
+            const fetchedEscrow = await tx.escrow.findUnique({
+                where: { id: escrowId },
+            });
+
+            return { updatedEscrow: fetchedEscrow, dispute: newDispute };
         });
 
         const disputeEvent = {

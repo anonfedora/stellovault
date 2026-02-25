@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stellovault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stella
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: stellovault
+    ports:
+      - "5432:5432"
+    volumes:
+      - stellovault_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stella -d stellovault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  stellovault_db_data:

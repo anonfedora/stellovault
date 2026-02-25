@@ -5,6 +5,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 const router = Router();
 
 router.post("/", authMiddleware, oracleController.registerOracle);
+router.post("/dispute", authMiddleware, oracleController.flagDispute);
 router.get("/", oracleController.listOracles);
 router.get("/metrics", oracleController.getOracleMetrics);
 router.get("/:address", oracleController.getOracle);
