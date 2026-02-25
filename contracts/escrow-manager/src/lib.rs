@@ -124,6 +124,7 @@ impl EscrowManager {
         collateral_registry: Address,
         oracle_adapter: Address,
         loan_management: Address,
+        treasury: Address,
     ) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("admin")) {
             return Err(ContractError::AlreadyInitialized);
@@ -143,11 +144,39 @@ impl EscrowManager {
             .set(&symbol_short!("loan_mgr"), &loan_management);
         env.storage()
             .instance()
+            .set(&symbol_short!("treasury"), &treasury);
+        env.storage()
+            .instance()
             .set(&symbol_short!("next_id"), &1u64);
 
         env.events().publish((symbol_short!("esc_init"),), (admin,));
 
         Ok(())
+    }
+
+    /// Set the treasury address (admin only).
+    pub fn set_treasury(env: Env, treasury: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("treasury"), &treasury);
+
+        env.events()
+            .publish((symbol_short!("trs_set"),), (treasury,));
+
+        Ok(())
+    }
+
+    /// Get the current treasury address.
+    pub fn get_treasury(env: Env) -> Option<Address> {
+        env.storage().instance().get(&symbol_short!("treasury"))
     }
 
     /// Create a new escrow.
@@ -346,6 +375,51 @@ impl EscrowManager {
             );
         }
 
+        // Calculate and collect protocol fee if treasury is configured
+        let treasury_opt: Option<Address> = env.storage().instance().get(&symbol_short!("treasury"));
+        let protocol_fee = if treasury_opt.is_some() {
+            let treasury = treasury_opt.as_ref().unwrap();
+            
+            // Query fee_bps from ProtocolTreasury
+            let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
+            let fee_bps: u32 = env.invoke_contract(
+                &treasury,
+                &Symbol::new(&env, "get_fee_bps"),
+                fee_bps_args,
+            );
+            
+            // Calculate fee on the escrow amount
+            let fee_amount = (escrow.amount * fee_bps as i128) / 10000;
+            
+            if fee_amount > 0 {
+                // Record the fee deposit in treasury
+                // Note: In a full implementation, the actual token transfer would happen
+                // before this call, either deducted from the payment or transferred separately
+                let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
+                    &env,
+                    [
+                        escrow.asset.into_val(&env), // Asset address
+                        fee_amount.into_val(&env),
+                    ],
+                );
+                env.invoke_contract(
+                    &treasury,
+                    &Symbol::new(&env, "deposit_fee"),
+                    deposit_args,
+                );
+                
+                // Emit fee collection event
+                env.events().publish(
+                    (symbol_short!("fee_col"),),
+                    (escrow_id, fee_amount, escrow.asset),
+                );
+            }
+            
+            fee_amount
+        } else {
+            0i128
+        };
+
         // Unlock collateral via CollateralRegistry
         let coll_reg: Address = env
             .storage()
@@ -518,6 +592,7 @@ mod test {
         coll_reg_addr: Address,
         oracle_client: MockOracleAdapterClient<'a>,
         token_addr: Address,
+        treasury_addr: Address,
         buyer: Address,
         seller: Address,
         lender: Address,
@@ -541,6 +616,7 @@ mod test {
         let oracle_client = MockOracleAdapterClient::new(&env, &oracle_addr);
 
         let loan_mgr_addr = Address::generate(&env); // placeholder
+        let treasury_addr = Address::generate(&env); // placeholder treasury
 
         // Create a Stellar asset token
         let token_admin = Address::generate(&env);
@@ -550,7 +626,7 @@ mod test {
         token_admin_client.mint(&lender, &1_000_000);
 
         // Initialize escrow manager
-        escrow_client.initialize(&admin, &coll_reg_addr, &oracle_addr, &loan_mgr_addr);
+        escrow_client.initialize(&admin, &coll_reg_addr, &oracle_addr, &loan_mgr_addr, &treasury_addr);
 
         // Leak lifetimes for test convenience
         let escrow_client = unsafe {
@@ -571,6 +647,7 @@ mod test {
             coll_reg_addr,
             oracle_client,
             token_addr,
+            treasury_addr,
             buyer,
             seller,
             lender,
