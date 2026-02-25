@@ -6,7 +6,10 @@
 
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, contracterror, symbol_short, Address, Bytes, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env,
+    Symbol, Vec,
+};
 
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,6 +23,7 @@ pub enum ContractError {
     EscrowNotFound = 7,
     InvalidEventType = 8,
     ConsensusNotMet = 9,
+    InvalidThreshold = 10,
 }
 
 /// Event types for oracle confirmations
@@ -88,7 +92,9 @@ impl OracleAdapter {
             oracles: Vec::new(&env),
         };
 
-        env.storage().instance().set(&symbol_short!("data"), &contract_data);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("data"), &contract_data);
 
         // Emit initialization event
         env.events().publish((INITIALIZED,), (admin,));
@@ -116,7 +122,9 @@ impl OracleAdapter {
         contract_data.oracles.push_back(oracle.clone());
 
         // Save updated data
-        env.storage().instance().set(&symbol_short!("data"), &contract_data);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("data"), &contract_data);
 
         // Emit event
         env.events().publish((ORACLE_ADDED,), (oracle,));
@@ -155,7 +163,13 @@ impl OracleAdapter {
         contract_data.oracles = new_oracles;
 
         // Save updated data
-        env.storage().instance().set(&symbol_short!("data"), &contract_data);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("data"), &contract_data);
+
+        // Note: Stale confirmations from removed oracles are automatically filtered
+        // by check_consensus which validates against current registration state.
+        // This prevents removed oracles from ever contributing to consensus.
 
         // Emit event
         env.events().publish((ORACLE_REMOVED,), (oracle,));
@@ -224,18 +238,20 @@ impl OracleAdapter {
         };
 
         // Store confirmation
-        env.storage().persistent().set(&confirmation_key, &confirmation);
+        env.storage()
+            .persistent()
+            .set(&confirmation_key, &confirmation);
 
         // Track confirming oracles for this escrow
         confirming_oracles.push_back(oracle.clone());
         let confirming_key = (CONFIRMING_ORACLES, escrow_id.clone());
-        env.storage().persistent().set(&confirming_key, &confirming_oracles);
+        env.storage()
+            .persistent()
+            .set(&confirming_key, &confirming_oracles);
 
         // Emit event
-        env.events().publish(
-            (ORACLE_CONFIRMED,),
-            (escrow_id, event_type, result, oracle),
-        );
+        env.events()
+            .publish((ORACLE_CONFIRMED,), (escrow_id, event_type, result, oracle));
 
         Ok(())
     }
@@ -250,7 +266,11 @@ impl OracleAdapter {
     pub fn get_confirmation(env: Env, escrow_id: Bytes) -> Option<Vec<ConfirmationData>> {
         let confirmations = Self::get_confirmations_for_escrow(&env, escrow_id).ok()?;
 
-        if confirmations.is_empty() { None } else { Some(confirmations) }
+        if confirmations.is_empty() {
+            None
+        } else {
+            Some(confirmations)
+        }
     }
 
     /// Check if an oracle is registered
@@ -306,6 +326,11 @@ impl OracleAdapter {
         threshold: u32,
         oracle_set: Vec<Address>,
     ) -> Result<bool, ContractError> {
+        // Reject zero threshold
+        if threshold == 0 {
+            return Err(ContractError::InvalidThreshold);
+        }
+
         let contract_data = Self::get_contract_data(&env)?;
 
         // Count unique oracle confirmations for this escrow
@@ -314,19 +339,24 @@ impl OracleAdapter {
 
         for confirmation in confirmations.iter() {
             // Verify confirmed oracle is in the authorized set (or set is empty)
+            // Also validate against current registration state
             let is_authorized = if oracle_set.is_empty() {
                 // If oracle_set is empty, check against all registered oracles
                 Self::is_oracle_registered(&contract_data, &confirmation.oracle)
             } else {
                 // Check if oracle is in the specified oracle_set
-                let mut found = false;
-                for authorized_oracle in oracle_set.iter() {
-                    if authorized_oracle == confirmation.oracle {
-                        found = true;
-                        break;
+                // Additionally validate against current registration
+                let is_in_set = {
+                    let mut found = false;
+                    for authorized_oracle in oracle_set.iter() {
+                        if authorized_oracle == confirmation.oracle {
+                            found = true;
+                            break;
+                        }
                     }
-                }
-                found
+                    found
+                };
+                is_in_set && Self::is_oracle_registered(&contract_data, &confirmation.oracle)
             };
 
             if is_authorized && confirmation.verified {
@@ -344,12 +374,16 @@ impl OracleAdapter {
     }
 
     fn get_contract_data(env: &Env) -> Result<ContractData, ContractError> {
-        env.storage().instance()
+        env.storage()
+            .instance()
             .get(&symbol_short!("data"))
             .ok_or(ContractError::EscrowNotFound)
     }
 
-    fn get_confirmations_for_escrow(env: &Env, escrow_id: Bytes) -> Result<Vec<ConfirmationData>, ContractError> {
+    fn get_confirmations_for_escrow(
+        env: &Env,
+        escrow_id: Bytes,
+    ) -> Result<Vec<ConfirmationData>, ContractError> {
         let contract_data = Self::get_contract_data(env)?;
         let mut confirmations = Vec::new(env);
 
@@ -427,7 +461,9 @@ impl OracleAdapter {
 mod test {
     use super::*;
     use soroban_sdk::testutils::Address as _;
-    use soroban_sdk::{testutils::MockAuth, testutils::MockAuthInvoke, Address, Env, Bytes, IntoVal};
+    use soroban_sdk::{
+        testutils::MockAuth, testutils::MockAuthInvoke, Address, Bytes, Env, IntoVal,
+    };
 
     #[test]
     fn test_initialization() {
@@ -442,7 +478,10 @@ mod test {
         assert_eq!(client.initialize(&admin), ());
 
         // Test double initialization fails
-        assert_eq!(client.try_initialize(&admin), Err(Ok(ContractError::AlreadyInitialized)));
+        assert_eq!(
+            client.try_initialize(&admin),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
 
         // Test admin getter
         assert_eq!(client.get_admin(), admin);
@@ -503,7 +542,10 @@ mod test {
                 sub_invokes: &[],
             },
         }]);
-        assert_eq!(client.try_add_oracle(&oracle1), Err(Ok(ContractError::OracleAlreadyRegistered)));
+        assert_eq!(
+            client.try_add_oracle(&oracle1),
+            Err(Ok(ContractError::OracleAlreadyRegistered))
+        );
 
         // Test unauthorized add fails
         env.mock_auths(&[MockAuth {
@@ -541,7 +583,10 @@ mod test {
                 sub_invokes: &[],
             },
         }]);
-        assert_eq!(client.try_remove_oracle(&oracle1), Err(Ok(ContractError::OracleNotRegistered)));
+        assert_eq!(
+            client.try_remove_oracle(&oracle1),
+            Err(Ok(ContractError::OracleNotRegistered))
+        );
 
         // Test unauthorized remove fails
         env.mock_auths(&[MockAuth {
@@ -575,19 +620,30 @@ mod test {
 
         // Test invalid event type (0)
         let escrow_id = Bytes::from_slice(&env, b"escrow_0");
-        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &0u32, &result, &signature),
-                  Err(Ok(ContractError::InvalidEventType)));
+        assert_eq!(
+            client.try_confirm_event(&oracle, &escrow_id, &0u32, &result, &signature),
+            Err(Ok(ContractError::InvalidEventType))
+        );
 
         // Test invalid event type (6)
         let escrow_id = Bytes::from_slice(&env, b"escrow_6");
-        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &6u32, &result, &signature),
-                  Err(Ok(ContractError::InvalidEventType)));
+        assert_eq!(
+            client.try_confirm_event(&oracle, &escrow_id, &6u32, &result, &signature),
+            Err(Ok(ContractError::InvalidEventType))
+        );
 
         // Test valid event types (1-5)
-        let escrow_ids = [b"escrow_1", b"escrow_2", b"escrow_3", b"escrow_4", b"escrow_5"];
+        let escrow_ids = [
+            b"escrow_1",
+            b"escrow_2",
+            b"escrow_3",
+            b"escrow_4",
+            b"escrow_5",
+        ];
         for (i, event_type) in (1..=5).enumerate() {
             let escrow_id = Bytes::from_slice(&env, escrow_ids[i]);
-            let confirm_result = client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
+            let confirm_result =
+                client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
             assert!(confirm_result.is_ok());
         }
     }
@@ -613,12 +669,15 @@ mod test {
 
         // First confirmation should work
         // Note: verify_signature is now just require_auth(), so it should pass with mock_all_auths
-        let confirm_result = client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
+        let confirm_result =
+            client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature);
         assert!(confirm_result.is_ok());
 
         // Second confirmation from same oracle should fail (replay attack)
-        assert_eq!(client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature),
-                  Err(Ok(ContractError::ConfirmationAlreadyExists)));
+        assert_eq!(
+            client.try_confirm_event(&oracle, &escrow_id, &event_type, &result, &signature),
+            Err(Ok(ContractError::ConfirmationAlreadyExists))
+        );
     }
 
     #[test]
@@ -639,8 +698,16 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Confirmation from unregistered oracle should fail
-        assert_eq!(client.try_confirm_event(&unauthorized_oracle, &escrow_id, &event_type, &result, &signature),
-                  Err(Ok(ContractError::OracleNotRegistered)));
+        assert_eq!(
+            client.try_confirm_event(
+                &unauthorized_oracle,
+                &escrow_id,
+                &event_type,
+                &result,
+                &signature
+            ),
+            Err(Ok(ContractError::OracleNotRegistered))
+        );
     }
 
     #[test]
@@ -685,7 +752,10 @@ mod test {
         // Test oracle registration queries
         assert_eq!(client.is_oracle_registered_query(&oracle1), true);
         assert_eq!(client.is_oracle_registered_query(&oracle2), true);
-        assert_eq!(client.is_oracle_registered_query(&Address::generate(&env)), false);
+        assert_eq!(
+            client.is_oracle_registered_query(&Address::generate(&env)),
+            false
+        );
 
         // Test getting oracles by index
         let oracle_at_0 = client.get_oracle_at(&0);
@@ -737,10 +807,14 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // First oracle confirms
-        assert!(client.try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Second oracle confirms
-        assert!(client.try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Create oracle set with all 3 oracles
         let oracle_set = Vec::from_array(&env, [oracle1.clone(), oracle2.clone(), oracle3.clone()]);
@@ -778,21 +852,37 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Oracle 1 and 2 confirm
-        assert!(client.try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature).is_ok());
-        assert!(client.try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
+        assert!(client
+            .try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Unauthorized oracle also confirms
-        assert!(client.try_confirm_event(&unauthorized_oracle, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(
+                &unauthorized_oracle,
+                &escrow_id,
+                &event_type,
+                &result,
+                &signature
+            )
+            .is_ok());
 
         // Create restricted oracle set (only oracle1, oracle2, oracle3)
-        let restricted_oracle_set = Vec::from_array(&env, [oracle1.clone(), oracle2.clone(), oracle3.clone()]);
+        let restricted_oracle_set =
+            Vec::from_array(&env, [oracle1.clone(), oracle2.clone(), oracle3.clone()]);
 
         // Check consensus with restricted set - should only count oracle1 and oracle2 (2 confirmations)
         // unauthorized_oracle is not in the set, so it shouldn't count
         assert!(client.check_consensus(&escrow_id, &2u32, &restricted_oracle_set));
 
         // Create full oracle set including unauthorized
-        let full_oracle_set = Vec::from_array(&env, [oracle1, oracle2.clone(), oracle3, unauthorized_oracle]);
+        let full_oracle_set = Vec::from_array(
+            &env,
+            [oracle1, oracle2.clone(), oracle3, unauthorized_oracle],
+        );
 
         // With all oracles in set, should have 3 confirmations
         assert!(client.check_consensus(&escrow_id, &3u32, &full_oracle_set));
@@ -819,7 +909,9 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Oracle 1 confirms
-        assert!(client.try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Only oracle1 is in the authorized set
         let restricted_set = Vec::from_array(&env, [oracle1.clone()]);
@@ -832,7 +924,9 @@ mod test {
         assert!(!client.check_consensus(&escrow_id, &2u32, &both_set));
 
         // Oracle 2 confirms
-        assert!(client.try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Now both oracles have confirmed
         assert!(client.check_consensus(&escrow_id, &2u32, &both_set));
@@ -859,8 +953,12 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Both oracles confirm
-        assert!(client.try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature).is_ok());
-        assert!(client.try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
+        assert!(client
+            .try_confirm_event(&oracle2, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Empty oracle set means any registered oracle can confirm
         let empty_set = Vec::new(&env);
@@ -888,7 +986,9 @@ mod test {
         let signature = Bytes::from_slice(&env, b"mock_signature");
 
         // Confirm from oracle1
-        assert!(client.try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature).is_ok());
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
 
         // Get the confirmation to verify it's marked as verified
         let confirmations = client.get_confirmation(&escrow_id).unwrap();
@@ -900,4 +1000,40 @@ mod test {
         // Check consensus - should count the verified confirmation
         assert!(client.check_consensus(&escrow_id, &1u32, &oracle_set));
     }
+
+    #[test]
+    fn test_consensus_rejects_zero_threshold() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
+        let client = OracleAdapterClient::new(&env, &contract_id);
+
+        let admin = Address::generate(&env);
+        let oracle1 = Address::generate(&env);
+
+        client.initialize(&admin);
+        client.add_oracle(&oracle1);
+
+        let escrow_id = Bytes::from_slice(&env, b"escrow_zero_threshold");
+        let event_type = 2u32;
+        let result = Bytes::from_slice(&env, b"confirmed");
+        let signature = Bytes::from_slice(&env, b"mock_signature");
+
+        // Confirm from oracle1
+        assert!(client
+            .try_confirm_event(&oracle1, &escrow_id, &event_type, &result, &signature)
+            .is_ok());
+
+        let oracle_set = Vec::from_array(&env, [oracle1]);
+
+        // Check consensus with threshold 0 should fail
+        assert_eq!(
+            client.try_check_consensus(&escrow_id, &0u32, &oracle_set),
+            Err(Ok(ContractError::InvalidThreshold))
+        );
+
+        // Threshold 1 should succeed
+        assert!(client.check_consensus(&escrow_id, &1u32, &oracle_set));
+    }
 }
+

@@ -35,6 +35,8 @@ pub enum ContractError {
     EscrowNotExpired = 7,
     PathPaymentFailed = 8,
     SlippageExceeded = 9,
+    InvalidOracleSet = 10,
+    InvalidThreshold = 11,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -47,6 +49,24 @@ impl From<&ContractError> for soroban_sdk::Error {
     fn from(err: &ContractError) -> Self {
         soroban_sdk::Error::from_contract_error(*err as u32)
     }
+}
+
+/// Escrow configuration for creation
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct EscrowConfig {
+    pub buyer: Address,
+    pub seller: Address,
+    pub lender: Address,
+    pub collateral_id: u64,
+    pub amount: i128,
+    pub asset: Address,
+    pub required_confirmation: u32,
+    pub expiry_ts: u64,
+    pub destination_asset: Address,
+    pub min_destination_amount: i128,
+    pub required_confirmations: u32,
+    pub oracle_set: Vec<Address>,
 }
 
 /// Escrow data structure linking buyer, seller, lender, collateral and oracle.
@@ -69,6 +89,10 @@ pub struct Escrow {
     pub destination_asset: Address,
     /// Minimum amount to receive in destination asset (slippage protection)
     pub min_destination_amount: i128,
+    /// Number of oracle confirmations required for multi-oracle consensus (0 for single oracle)
+    pub required_confirmations: u32,
+    /// Set of authorized oracles for consensus (empty means any registered oracle can confirm)
+    pub oracle_set: Vec<Address>,
 }
 
 /// Local mirror of OracleAdapter's ConfirmationData for cross-contract deserialization.
@@ -142,22 +166,15 @@ impl EscrowManager {
     /// * `expiry_ts` - Timestamp after which the escrow can be refunded
     /// * `destination_asset` - Asset to pay seller (for path payments)
     /// * `min_destination_amount` - Minimum amount seller must receive (slippage protection)
+    /// * `required_confirmations` - Number of oracle confirmations required (0 for single oracle)
+    /// * `oracle_set` - Set of authorized oracles (empty means any registered oracle)
     pub fn create_escrow(
         env: Env,
-        buyer: Address,
-        seller: Address,
-        lender: Address,
-        collateral_id: u64,
-        amount: i128,
-        asset: Address,
-        required_confirmation: u32,
-        expiry_ts: u64,
-        destination_asset: Address,
-        min_destination_amount: i128,
+        config: EscrowConfig,
     ) -> Result<u64, ContractError> {
-        lender.require_auth();
+        config.lender.require_auth();
 
-        if amount <= 0 || min_destination_amount <= 0 {
+        if config.amount <= 0 || config.min_destination_amount <= 0 {
             return Err(ContractError::InvalidAmount);
         }
 
@@ -168,12 +185,12 @@ impl EscrowManager {
             .get(&symbol_short!("coll_reg"))
             .ok_or(ContractError::Unauthorized)?;
 
-        let lock_args: Vec<Val> = Vec::from_array(&env, [collateral_id.into_val(&env)]);
+        let lock_args: Vec<Val> = Vec::from_array(&env, [config.collateral_id.into_val(&env)]);
         env.invoke_contract::<Val>(&coll_reg, &Symbol::new(&env, "lock_collateral"), lock_args);
 
         // Transfer funds from lender to this contract
-        let token_client = token::Client::new(&env, &asset);
-        token_client.transfer(&lender, &env.current_contract_address(), &amount);
+        let token_client = token::Client::new(&env, &config.asset);
+        token_client.transfer(&config.lender, &env.current_contract_address(), &config.amount);
 
         let escrow_id: u64 = env
             .storage()
@@ -183,18 +200,20 @@ impl EscrowManager {
 
         let escrow = Escrow {
             id: escrow_id,
-            buyer: buyer.clone(),
-            seller: seller.clone(),
-            lender: lender.clone(),
-            collateral_id,
-            amount,
-            asset,
-            required_confirmation,
+            buyer: config.buyer.clone(),
+            seller: config.seller.clone(),
+            lender: config.lender.clone(),
+            collateral_id: config.collateral_id,
+            amount: config.amount,
+            asset: config.asset,
+            required_confirmation: config.required_confirmation,
             status: EscrowStatus::Active,
-            expiry_ts,
+            expiry_ts: config.expiry_ts,
             created_at: env.ledger().timestamp(),
-            destination_asset,
-            min_destination_amount,
+            destination_asset: config.destination_asset,
+            min_destination_amount: config.min_destination_amount,
+            required_confirmations: config.required_confirmations,
+            oracle_set: config.oracle_set,
         };
 
         env.storage().persistent().set(&escrow_id, &escrow);
@@ -204,7 +223,7 @@ impl EscrowManager {
 
         env.events().publish(
             (symbol_short!("esc_crtd"),),
-            (escrow_id, buyer, seller, lender, amount),
+            (escrow_id, config.buyer, config.seller, config.lender, config.amount),
         );
 
         Ok(escrow_id)
@@ -560,18 +579,20 @@ mod test {
 
     fn create_test_escrow(t: &TestEnv) -> u64 {
         let expiry = t.env.ledger().timestamp() + 3600;
-        t.escrow_client.create_escrow(
-            &t.buyer,
-            &t.seller,
-            &t.lender,
-            &1u64,     // collateral_id
-            &5000i128, // amount
-            &t.token_addr,
-            &2u32, // required_confirmation = Delivery
-            &expiry,
-            &t.token_addr, // destination_asset (same as source for basic tests)
-            &5000i128,     // min_destination_amount
-        )
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32, // Delivery
+            expiry_ts: expiry,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        })
     }
 
     fn set_oracle_confirmation(t: &TestEnv, escrow_id: u64, event_type: u32, verified: bool) {
@@ -671,18 +692,20 @@ mod test {
     fn test_create_escrow_invalid_amount() {
         let t = setup();
         let expiry = t.env.ledger().timestamp() + 3600;
-        t.escrow_client.create_escrow(
-            &t.buyer,
-            &t.seller,
-            &t.lender,
-            &1u64,
-            &0i128, // invalid
-            &t.token_addr,
-            &2u32,
-            &expiry,
-            &t.token_addr,
-            &5000i128,
-        );
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 0i128, // invalid
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
     }
 
     #[test]
@@ -887,18 +910,20 @@ mod test {
 
         // Create escrow with different destination asset
         let expiry = t.env.ledger().timestamp() + 3600;
-        let escrow_id = t.escrow_client.create_escrow(
-            &t.buyer,
-            &t.seller,
-            &t.lender,
-            &1u64,
-            &5000i128,
-            &t.token_addr,
-            &2u32,
-            &expiry,
-            &dest_token_addr,
-            &4500i128, // min_destination_amount (allowing 10% slippage)
-        );
+        let escrow_id = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: dest_token_addr.clone(),
+            min_destination_amount: 4500i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
 
         // Set exchange rate: 0.95 (5% loss in conversion)
         t.escrow_client.set_test_exchange_rate(&950_000i128);
@@ -927,18 +952,20 @@ mod test {
 
         // Create escrow with different destination asset
         let expiry = t.env.ledger().timestamp() + 3600;
-        let escrow_id = t.escrow_client.create_escrow(
-            &t.buyer,
-            &t.seller,
-            &t.lender,
-            &1u64,
-            &5000i128,
-            &t.token_addr,
-            &2u32,
-            &expiry,
-            &dest_token_addr,
-            &4800i128, // min_destination_amount (only 4% slippage allowed)
-        );
+        let escrow_id = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: dest_token_addr.clone(),
+            min_destination_amount: 4800i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
 
         // Set exchange rate: 0.90 (10% loss in conversion)
         t.escrow_client.set_test_exchange_rate(&900_000i128);
@@ -960,18 +987,20 @@ mod test {
         let dest_token_addr = dest_token_contract.address();
 
         let expiry = t.env.ledger().timestamp() + 3600;
-        let escrow_id = t.escrow_client.create_escrow(
-            &t.buyer,
-            &t.seller,
-            &t.lender,
-            &1u64,
-            &5000i128,
-            &t.token_addr,
-            &2u32,
-            &expiry,
-            &dest_token_addr,
-            &4500i128,
-        );
+        let escrow_id = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: dest_token_addr.clone(),
+            min_destination_amount: 4500i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.destination_asset, dest_token_addr);
