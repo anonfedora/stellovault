@@ -2,8 +2,8 @@ import { prisma } from "../services/database.service";
 
 type PlatformStats = {
     totalEscrows: number;
-    activeEscrows: number;
-    completedEscrows: number;
+    fundedEscrows: number;
+    releasedEscrows: number;
     disputedEscrows: number;
     totalLoans: number;
     activeLoans: number;
@@ -28,8 +28,8 @@ class AnalyticsService {
         try {
             const [
                 totalEscrows,
-                activeEscrows,
-                completedEscrows,
+                fundedEscrows,
+                releasedEscrows,
                 disputedEscrows,
                 totalLoans,
                 activeLoans,
@@ -40,8 +40,8 @@ class AnalyticsService {
                 activeWallets,
             ] = await Promise.all([
                 prisma.escrow.count(),
-                prisma.escrow.count({ where: { status: "ACTIVE" } }),
-                prisma.escrow.count({ where: { status: "COMPLETED" } }),
+                prisma.escrow.count({ where: { status: "FUNDED" } }),
+                prisma.escrow.count({ where: { status: "RELEASED" } }),
                 prisma.escrow.count({ where: { status: "DISPUTED" } }),
                 prisma.loan.count(),
                 prisma.loan.count({ where: { status: "ACTIVE" } }),
@@ -73,8 +73,8 @@ class AnalyticsService {
 
             const data: PlatformStats = {
                 totalEscrows,
-                activeEscrows,
-                completedEscrows,
+                fundedEscrows,
+                releasedEscrows,
                 disputedEscrows,
                 totalLoans,
                 activeLoans,

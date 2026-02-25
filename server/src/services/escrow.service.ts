@@ -4,20 +4,21 @@ import contractService from "./contract.service";
 import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
 
-const ESCROW_STATUSES = new Set(["PENDING", "ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]);
+const ESCROW_STATUSES = new Set(["PENDING", "FUNDED", "RELEASED", "REFUNDED", "DISPUTED", "CANCELLED"]);
 const ESCROW_ALLOWED_TRANSITIONS: Record<EscrowStatus, ReadonlySet<EscrowStatus>> = {
-    PENDING: new Set(["PENDING", "ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]),
-    ACTIVE: new Set(["ACTIVE", "COMPLETED", "DISPUTED", "EXPIRED"]),
-    COMPLETED: new Set(["COMPLETED"]),
-    DISPUTED: new Set(["DISPUTED", "ACTIVE", "COMPLETED", "EXPIRED"]),
-    EXPIRED: new Set(["EXPIRED"]),
+    PENDING: new Set(["PENDING", "FUNDED", "RELEASED", "REFUNDED", "DISPUTED", "CANCELLED"]),
+    FUNDED: new Set(["FUNDED", "RELEASED", "REFUNDED", "DISPUTED", "CANCELLED"]),
+    RELEASED: new Set(["RELEASED"]),
+    REFUNDED: new Set(["REFUNDED"]),
+    DISPUTED: new Set(["DISPUTED", "FUNDED", "RELEASED", "CANCELLED"]),
+    CANCELLED: new Set(["CANCELLED"]),
 };
 const MIN_PAGE = 1;
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-type EscrowStatus = "PENDING" | "ACTIVE" | "COMPLETED" | "DISPUTED" | "EXPIRED";
+type EscrowStatus = "PENDING" | "FUNDED" | "RELEASED" | "REFUNDED" | "DISPUTED" | "CANCELLED";
 
 interface CreateEscrowRequest {
     buyerId?: string;
@@ -65,7 +66,7 @@ function normalizeStatus(value: string | undefined, fieldName: string): EscrowSt
     const status = value?.trim().toUpperCase();
     if (!status || !ESCROW_STATUSES.has(status)) {
         throw new ValidationError(
-            `${fieldName} must be one of: PENDING, ACTIVE, COMPLETED, DISPUTED, EXPIRED`
+            `${fieldName} must be one of: PENDING, FUNDED, RELEASED, REFUNDED, DISPUTED, CANCELLED`
         );
     }
     return status as EscrowStatus;
@@ -255,7 +256,7 @@ export class EscrowService {
                 const db = prisma;
                 const overdueEscrows = await db.escrow.findMany({
                     where: {
-                        status: "ACTIVE",
+                        status: "FUNDED",
                         expiresAt: { lt: new Date() },
                     },
                     select: { id: true },
@@ -267,22 +268,22 @@ export class EscrowService {
 
                 await db.escrow.updateMany({
                     where: {
-                        status: "ACTIVE",
+                        status: "FUNDED",
                         id: { in: overdueEscrows.map((item: { id: string }) => item.id) },
                     },
-                    data: { status: "EXPIRED" },
+                    data: { status: "CANCELLED" },
                 });
 
                 const expiredEscrows = await db.escrow.findMany({
                     where: {
                         id: { in: overdueEscrows.map((item: { id: string }) => item.id) },
-                        status: "EXPIRED",
+                        status: "CANCELLED",
                     },
                     select: { id: true },
                 });
 
                 for (const escrow of expiredEscrows) {
-                    websocketService.broadcastEscrowUpdated(escrow.id, "EXPIRED");
+                    websocketService.broadcastEscrowUpdated(escrow.id, "CANCELLED");
                 }
             } catch (error) {
                 console.error("Escrow timeout detector failed:", error);
