@@ -1,14 +1,29 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../config/prisma";
 
-const prisma = new PrismaClient();
 
 export class DatabaseService {
-    async createUser(stellarAddress: string) {
-        return prisma.user.create({
-            data: { stellarAddress },
+    async createUser(stellarAddress: string, options?: { label?: string; isPrimary?: boolean }) {
+        // Create the user
+       return prisma.$transaction(async (tx: any) => {
+       const user = await tx.user.create({           data: {
+                name: null,
+                role: "USER",
+            },
         });
-    }
 
+        const wallet = await tx.wallet.create({
+            data: {
+                userId: user.id,
+                stellarAddress,
+                isPrimary: options?.isPrimary ?? true,
+                label: options?.label ?? null,
+                status: "ACTIVE",
+            },
+        });
+
+        return { user, wallet };
+    });
+  }
     async getLoanById(id: string) {
         return prisma.loan.findUnique({
             where: { id },

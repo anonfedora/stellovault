@@ -1,10 +1,9 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
-
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -12,6 +11,35 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model User {
+<<<<<<< HEAD
+  id        String   @id @default(uuid())
+  name      String?
+  role      Role     @default(USER)
+  wallets   Wallet[]
+  loans     Loan[]
+  investments Investment[]
+  sessions  Session[]
+  challenges Challenge[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Wallet {
+  id             String       @id @default(uuid())
+  userId         String
+  stellarAddress String       @unique // Renamed to stellarAddress to be specific
+  isPrimary      Boolean      @default(false)
+  label          String?      // "Ledger", "Freighter", etc.
+  status         WalletStatus @default(ACTIVE)
+  
+  // Relations
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions       Session[]
+  challenges     Challenge[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+=======
   id                  String                @id @default(uuid())
   stellarAddress      String                @unique
   name                String?
@@ -40,25 +68,11 @@ model Wallet {
   verifiedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+>>>>>>> upstream/master
 
   @@index([userId])
 }
 
-model WalletChallenge {
-  id            String           @id @default(uuid())
-  userId        String?
-  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  walletAddress String
-  nonce         String
-  purpose       ChallengePurpose
-  expiresAt     DateTime
-  usedAt        DateTime?
-  createdAt     DateTime         @default(now())
-
-  @@unique([walletAddress, nonce, purpose])
-  @@index([walletAddress, purpose])
-  @@index([userId, purpose])
-}
 
 model Session {
   id        String    @id @default(uuid())
@@ -98,6 +112,57 @@ model Escrow {
   @@index([expiresAt])
 }
 
+<<<<<<< HEAD
+model Challenge {
+  id         String           @id @default(uuid())
+  userId     String
+  walletId   String?          // Made optional: Login might not have a wallet yet
+  walletAddress String?       // From the first dev's version
+  nonce      String           @unique
+  purpose    ChallengePurpose @default(LOGIN)
+  expiresAt  DateTime
+  consumed   Boolean          @default(false)
+  
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet     Wallet?          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([walletId])
+  @@index([nonce])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  walletId  String
+  jti       String   @unique
+
+  ipAddress String?
+  userAgent String?
+  revoked   Boolean  @default(false)
+  revokedAt DateTime?
+  expiresAt DateTime
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+enum WalletStatus {
+  ACTIVE
+  UNLINKED
+  SUSPENDED
+}
+
+ 
+=======
 model Collateral {
   id           String           @id @default(uuid())
   escrowId     String
@@ -224,6 +289,7 @@ model RiskScore {
 // Enums
 // ─────────────────────────────────────────────
 
+>>>>>>> upstream/master
 enum Role {
   USER
   MERCHANT

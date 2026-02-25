@@ -1,7 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-
-// TODO: Inject AuthService
-// import authService from "../services/auth.service";
+import { authService } from "../services/auth.service";
 
 /**
  * POST /api/auth/challenge
@@ -10,8 +8,13 @@ import { Request, Response, NextFunction } from "express";
 export async function requestChallenge(req: Request, res: Response, next: NextFunction) {
     try {
         const { walletAddress } = req.body;
-        // const challenge = await authService.generateChallenge(walletAddress);
-        res.json({ success: true, data: { nonce: "TODO", expiresAt: new Date() } });
+
+        if (!walletAddress) {
+            return res.status(400).json({ success: false, error: "walletAddress is required" });
+        }
+
+        const challenge = await authService.generateChallenge(walletAddress);
+        res.status(200).json({ success: true, data: challenge });
     } catch (err) {
         next(err);
     }
@@ -24,8 +27,23 @@ export async function requestChallenge(req: Request, res: Response, next: NextFu
 export async function verifySignature(req: Request, res: Response, next: NextFunction) {
     try {
         const { walletAddress, nonce, signature } = req.body;
-        // const tokens = await authService.verifySignature(walletAddress, nonce, signature, req.ip);
-        res.json({ success: true, data: { accessToken: "TODO", refreshToken: "TODO" } });
+
+        if (!walletAddress || !nonce || !signature) {
+            return res.status(400).json({
+                success: false,
+                error: "walletAddress, nonce, and signature are required",
+            });
+        }
+
+        const tokens = await authService.verifySignature(
+            walletAddress,
+            nonce,
+            signature,
+            req.ip,
+            req.get("user-agent")
+        );
+
+        res.status(200).json({ success: true, data: tokens });
     } catch (err) {
         next(err);
     }
@@ -38,8 +56,13 @@ export async function verifySignature(req: Request, res: Response, next: NextFun
 export async function refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
         const { refreshToken } = req.body;
-        // const tokens = await authService.refreshTokens(refreshToken);
-        res.json({ success: true, data: { accessToken: "TODO", refreshToken: "TODO" } });
+
+        if (!refreshToken) {
+            return res.status(400).json({ success: false, error: "refreshToken is required" });
+        }
+
+        const tokens = await authService.refreshTokens(refreshToken);
+        res.status(200).json({ success: true, data: tokens });
     } catch (err) {
         next(err);
     }
@@ -51,7 +74,12 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
  */
 export async function logout(req: Request, res: Response, next: NextFunction) {
     try {
-        // await authService.revokeSession(req.user!.jti);
+        const jti = req.user?.jti;
+        if (!jti) {
+            return res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+
+        await authService.revokeSession(jti);
         res.status(204).send();
     } catch (err) {
         next(err);
@@ -64,8 +92,13 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
  */
 export async function logoutAll(req: Request, res: Response, next: NextFunction) {
     try {
-        // const count = await authService.revokeAllSessions(req.user!.userId);
-        res.json({ success: true, data: { revokedSessions: 0 } });
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+
+        const revokedCount = await authService.revokeAllSessions(userId);
+        res.status(200).json({ success: true, data: { revokedSessions: revokedCount } });
     } catch (err) {
         next(err);
     }
@@ -77,8 +110,13 @@ export async function logoutAll(req: Request, res: Response, next: NextFunction)
  */
 export async function getMe(req: Request, res: Response, next: NextFunction) {
     try {
-        // const user = await authService.getUserById(req.user!.userId);
-        res.json({ success: true, data: null });
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+
+        const user = await authService.getUserById(userId);
+        res.status(200).json({ success: true, data: user });
     } catch (err) {
         next(err);
     }

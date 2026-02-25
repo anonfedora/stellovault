@@ -1,13 +1,12 @@
-import { defineConfig } from "prisma/config";
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config"; // Import 'env' helper
 
-// DATABASE_URL must be set in the environment (e.g. from .env).
-// From server dir you can run: node -r dotenv/config node_modules/.bin/prisma migrate dev
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
+
   datasource: {
-    url: process.env.DATABASE_URL ?? "",
+    // Use the env() helper for better type safety in v7
+    url: env("DATABASE_URL"), 
   },
 });
+

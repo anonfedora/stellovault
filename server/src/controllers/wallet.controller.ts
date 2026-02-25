@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { UnauthorizedError, ValidationError } from "../config/errors";
-import authService from "../services/auth.service";
+import {authService} from "../services/auth.service";
 
 function getUserId(req: Request): string {
     const userId = req.user?.userId;
