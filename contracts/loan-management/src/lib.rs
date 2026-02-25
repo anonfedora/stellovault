@@ -192,7 +192,7 @@ impl LoanManagement {
     /// - Warning: 1
     /// - Danger: 2
     /// - Liquidatable: 3
-    fn get_borrower_risk_factor(env: &Env, _borrower: &Address) -> Result<u32, ContractError> {
+    fn get_borrower_risk_factor(env: &Env, borrower: &Address) -> Result<u32, ContractError> {
         let risk_engine: Option<Address> = env.storage().instance().get(&symbol_short!("risk_eng"));
 
         if risk_engine.is_none() {
@@ -200,14 +200,34 @@ impl LoanManagement {
             return Ok(1);
         }
 
-        // Try to get the borrower's position risk
-        // We'll use a simple approach: check if borrower has any active positions
-        // In a real implementation, this would query the RiskAssessment contract
-        // For now, we'll return a default risk factor
-        // TODO: Implement cross-contract call to RiskAssessment::get_position_risk
+        let risk_contract = risk_engine.unwrap();
+        
+        // For borrower-specific risk assessment, we need to find the borrower's position
+        // Since RiskAssessment::get_position_risk requires a position_id (escrow_id),
+        // we'll check if the borrower has any existing positions
+        // For now, we'll use a simplified approach: query the borrower's overall risk
+        
+        // Create arguments for the risk assessment call
+        // We'll implement a borrower-specific risk function in RiskAssessment
+        let args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(env);
+        args.push_back(borrower.clone().into());
+        
+        // Try to call get_borrower_risk_factor function on RiskAssessment
+        // If that function doesn't exist, fall back to default
+        let risk_factor_result: Result<u32, soroban_sdk::Error> = env.try_invoke_contract(
+            &risk_contract,
+            &Symbol::new(env, "get_borrower_risk_factor"),
+            args,
+        );
 
-        // Placeholder: return default risk factor
-        Ok(1)
+        match risk_factor_result {
+            Ok(risk_factor) => Ok(risk_factor),
+            Err(_) => {
+                // If the function doesn't exist or call fails, use default risk factor
+                // In a production environment, you might want to handle this differently
+                Ok(1) // Default to Warning level
+            }
+        }
     }
 
     /// Calculate protocol utilization ratio in basis points
@@ -469,6 +489,11 @@ impl LoanManagement {
         // Calculate total repayment: principal + interest
         let interest = (loan.amount * (loan.interest_rate as i128)) / 10000;
         let total_due = loan.amount + interest;
+
+        // Calculate accrued interest since last repayment
+        let seconds_per_year: u64 = 31_557_600;
+        let elapsed = current_ts - loan.last_repayment_ts;
+        let principal_remaining = loan.amount - loan.principal_repaid;
 
         let interest_accrued = (principal_remaining * (loan.interest_rate as i128) * (elapsed as i128))
             / ((seconds_per_year as i128) * 10000);

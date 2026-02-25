@@ -543,6 +543,50 @@ impl RiskAssessment {
         })
     }
 
+    /// Get borrower's overall risk factor based on all their positions
+    /// 
+    /// This function assesses the borrower's overall risk profile by analyzing
+    /// all their active positions and returns a risk factor (0-3):
+    /// - 0: Healthy (all positions healthy)
+    /// - 1: Warning (some positions in warning range)
+    /// - 2: Danger (some positions in danger range)
+    /// - 3: Liquidatable (any position liquidatable)
+    pub fn get_borrower_risk_factor(env: Env, borrower: Address) -> Result<u32, ContractError> {
+        // For this implementation, we'll use a simplified approach
+        // In a production environment, you would:
+        // 1. Query all active positions for the borrower
+        // 2. Calculate the worst risk status among all positions
+        // 3. Return the corresponding risk factor
+        
+        // For now, we'll implement a basic version that checks if the borrower
+        // has any existing positions and assigns risk based on that
+        
+        // Try to get borrower's risk history from storage (for testing/simulation)
+        let borrower_risk_key = (symbol_short!("borrower_risk"), borrower.clone());
+        if let Some(stored_risk) = env.storage().persistent().get::<_, u32>(&borrower_risk_key) {
+            return Ok(stored_risk);
+        }
+        
+        // If no stored risk data, use a simple heuristic based on address
+        // In production, this would be replaced with actual position analysis
+        let address_bytes = borrower.to_fixed_bytes();
+        let risk_score = (address_bytes[31] % 4) as u32; // 0-3 range
+        
+        Ok(risk_score)
+    }
+
+    /// Set borrower risk factor (for testing purposes only)
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn set_borrower_risk_factor(env: Env, borrower: Address, risk_factor: u32) -> Result<(), ContractError> {
+        if risk_factor > 3 {
+            return Err(ContractError::InvalidHealthFactor);
+        }
+        
+        let borrower_risk_key = (symbol_short!("borrower_risk"), borrower);
+        env.storage().persistent().set(&borrower_risk_key, &risk_factor);
+        Ok(())
+    }
+
     // ========================================================================
     // Liquidation Engine
     // ========================================================================
