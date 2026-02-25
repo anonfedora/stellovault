@@ -38,10 +38,10 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "bytes": "657363726f775f313233"
+                  "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                 },
                 {
-                  "u32": 1
+                  "u32": 2
                 },
                 {
                   "bytes": "636f6e6669726d6564"
@@ -56,6 +56,7 @@
         }
       ]
     ],
+    [],
     []
   ],
   "ledger": {
@@ -75,7 +76,7 @@
             "key": {
               "vec": [
                 {
-                  "bytes": "657363726f775f313233"
+                  "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -95,7 +96,7 @@
                 "key": {
                   "vec": [
                     {
-                      "bytes": "657363726f775f313233"
+                      "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -110,7 +111,7 @@
                         "symbol": "escrow_id"
                       },
                       "val": {
-                        "bytes": "657363726f775f313233"
+                        "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                       }
                     },
                     {
@@ -118,7 +119,7 @@
                         "symbol": "event_type"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 2
                       }
                     },
                     {
@@ -172,7 +173,7 @@
                   "symbol": "conf_orc"
                 },
                 {
-                  "bytes": "657363726f775f313233"
+                  "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                 }
               ]
             },
@@ -192,7 +193,7 @@
                       "symbol": "conf_orc"
                     },
                     {
-                      "bytes": "657363726f775f313233"
+                      "bytes": "657363726f775f7a65726f5f7468726573686f6c64"
                     }
                   ]
                 },
