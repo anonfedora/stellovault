@@ -37,6 +37,7 @@ pub enum ContractError {
     SlippageExceeded = 9,
     InvalidOracleSet = 10,
     InvalidThreshold = 11,
+    ConsensusNotMet = 12,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -304,6 +305,7 @@ impl EscrowManager {
                 &env,
                 [
                     escrow_id_bytes.into_val(&env),
+                    escrow.required_confirmation.into_val(&env), // Add event type filtering
                     escrow.required_confirmations.into_val(&env),
                     escrow.oracle_set.into_val(&env),
                 ],
@@ -621,6 +623,7 @@ mod test {
         escrow_id_addr: Address,
         coll_reg_addr: Address,
         oracle_client: MockOracleAdapterClient<'a>,
+        oracle_addr: Option<Address>, // Add field for multi-oracle tests
         token_addr: Address,
         buyer: Address,
         seller: Address,
@@ -674,6 +677,7 @@ mod test {
             escrow_id_addr,
             coll_reg_addr,
             oracle_client,
+            oracle_addr: None, // Initialize as None for single oracle setup
             token_addr,
             buyer,
             seller,
@@ -1119,15 +1123,16 @@ mod test {
         
         // Replace with multi-oracle consensus adapter
         let oracle_addr = t.env.register(MockOracleAdapterWithConsensus, ());
-        t.oracle_client = unsafe {
-            core::mem::transmute::<MockOracleAdapterWithConsensusClient<'_>, MockOracleAdapterWithConsensusClient<'static>>(
-                MockOracleAdapterWithConsensusClient::new(&t.env, &oracle_addr),
-            )
-        };
-
-        // Re-initialize escrow manager with new oracle
-        let admin = Address::generate(&t.env);
-        t.escrow_client.initialize(&admin, &t.coll_reg_addr, &oracle_addr, &Address::generate(&t.env));
+        
+        // Store oracle address in TestEnv for test helpers
+        t.oracle_addr = Some(oracle_addr.clone());
+        
+        // Update oracle address in storage directly (avoid re-initialization)
+        t.env.as_contract(&t.escrow_client.address, || {
+            t.env.storage()
+                .instance()
+                .set(&symbol_short!("oracle"), &oracle_addr);
+        });
 
         t
     }
@@ -1172,11 +1177,8 @@ mod test {
             confirmations.push_back(conf);
         }
 
-        let oracle_client = unsafe {
-            core::mem::transmute::<EscrowManagerClient<'_>, MockOracleAdapterWithConsensusClient<'_>>(
-                t.escrow_client.clone()
-            )
-        };
+        let oracle_addr = t.oracle_addr.expect("Oracle address must be set in multi-oracle tests");
+        let oracle_client = MockOracleAdapterWithConsensusClient::new(&t.env, &oracle_addr);
         oracle_client.set_confirmation(&escrow_id_bytes, &confirmations);
     }
 
@@ -1213,7 +1215,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #9)")]
+    #[should_panic(expected = "HostError: Error(Contract, #12)")]
     fn test_multi_oracle_consensus_insufficient_confirmations() {
         let t = setup_multi_oracle();
 
