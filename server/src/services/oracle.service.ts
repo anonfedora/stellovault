@@ -7,11 +7,13 @@ import {
     ValidationError,
     TooManyRequestsError,
 } from "../config/errors";
-import { Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "./database.service";
 
 const CONFIRMATION_RATE_LIMIT_MS = 60 * 1000;
 const MAX_CONFIRMATIONS_PER_MINUTE = 10;
+
+type TransactionClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
 type CreateOracleInput = {
     address: string;
@@ -127,18 +129,53 @@ export class OracleService {
         throw new ValidationError("Signature must be a 64-byte hex or base64 value");
     }
 
-    private async checkRateLimit(oracleId: string): Promise<void> {
-        const oneMinuteAgo = new Date(Date.now() - CONFIRMATION_RATE_LIMIT_MS);
-        const recentCount = await prisma.oracleConfirmation.count({
+    private getMinuteWindow(): Date {
+        const now = new Date();
+        return new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+            now.getHours(),
+            now.getMinutes()
+        );
+    }
+
+    private async checkRateLimitAtomic(oracleId: string, tx: TransactionClient): Promise<void> {
+        const minuteWindow = this.getMinuteWindow();
+
+        const existing = await tx.oracleRateLimit.findUnique({
             where: {
-                oracleId,
-                createdAt: { gte: oneMinuteAgo },
+                oracleId_minuteWindow: {
+                    oracleId,
+                    minuteWindow,
+                },
             },
         });
 
-        if (recentCount >= MAX_CONFIRMATIONS_PER_MINUTE) {
+        if (existing && existing.count >= MAX_CONFIRMATIONS_PER_MINUTE) {
             throw new TooManyRequestsError("Rate limit exceeded for oracle confirmations");
         }
+    }
+
+    private async incrementRateLimit(oracleId: string, tx: TransactionClient): Promise<void> {
+        const minuteWindow = this.getMinuteWindow();
+
+        await tx.oracleRateLimit.upsert({
+            where: {
+                oracleId_minuteWindow: {
+                    oracleId,
+                    minuteWindow,
+                },
+            },
+            update: {
+                count: { increment: 1 },
+            },
+            create: {
+                oracleId,
+                minuteWindow,
+                count: 1,
+            },
+        });
     }
 
     async registerOracle(input: CreateOracleInput) {
@@ -218,8 +255,6 @@ export class OracleService {
             throw new UnauthorizedError("Oracle is not active");
         }
 
-        await this.checkRateLimit(oracle.id);
-
         const escrow = await prisma.escrow.findUnique({
             where: { id: escrowId },
         });
@@ -257,8 +292,11 @@ export class OracleService {
             throw new UnauthorizedError("Invalid oracle signature");
         }
 
-        try {
-            return await prisma.oracleConfirmation.create({
+        return prisma.$transaction(async (tx) => {
+            await this.checkRateLimitAtomic(oracle.id, tx);
+            await this.incrementRateLimit(oracle.id, tx);
+
+            return tx.oracleConfirmation.create({
                 data: {
                     oracleId: oracle.id,
                     escrowId,
@@ -267,17 +305,7 @@ export class OracleService {
                     payload: toJsonValue(input.payload),
                 },
             });
-        } catch (error) {
-            if (
-                typeof error === "object" &&
-                error !== null &&
-                "code" in error &&
-                (error as { code?: string }).code === "P2002"
-            ) {
-                throw new ConflictError("Duplicate confirmation for this event");
-            }
-            throw error;
-        }
+        });
     }
 
     async listOracles(query: ListOraclesQuery) {

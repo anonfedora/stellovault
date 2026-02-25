@@ -194,8 +194,21 @@ model Oracle {
   deactivatedAt DateTime?
   updatedAt     DateTime            @updatedAt
   confirmations OracleConfirmation[]
+  rateLimits    OracleRateLimit[]
 
   @@index([isActive])
+}
+
+model OracleRateLimit {
+  id           String   @id @default(uuid())
+  oracleId     String
+  oracle       Oracle   @relation(fields: [oracleId], references: [id], onDelete: Cascade)
+  minuteWindow DateTime
+  count        Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  @@unique([oracleId, minuteWindow])
+  @@index([oracleId])
 }
 
 model OracleConfirmation {
