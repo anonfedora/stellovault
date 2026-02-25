@@ -178,6 +178,31 @@ impl EscrowManager {
             return Err(ContractError::InvalidAmount);
         }
 
+        // Validate multi-oracle consensus parameters
+        if config.required_confirmations > 0 {
+            // Multi-oracle consensus mode requires oracle_set
+            if config.oracle_set.is_empty() {
+                return Err(ContractError::InvalidOracleSet);
+            }
+
+            // Threshold cannot exceed oracle set size
+            if config.required_confirmations > config.oracle_set.len() {
+                return Err(ContractError::InvalidThreshold);
+            }
+
+            // Prevent duplicate oracles in the set
+            let mut unique_oracles = Vec::new(&env);
+            for oracle in config.oracle_set.iter() {
+                // Check for duplicates
+                for existing in unique_oracles.iter() {
+                    if existing == oracle {
+                        return Err(ContractError::InvalidOracleSet);
+                    }
+                }
+                unique_oracles.push_back(oracle);
+            }
+        }
+
         // Lock collateral via CollateralRegistry
         let coll_reg: Address = env
             .storage()
@@ -231,8 +256,11 @@ impl EscrowManager {
 
     /// Release escrowed funds to the seller after oracle confirmation.
     ///
-    /// Queries OracleAdapter::get_confirmation for the required event type.
-    /// If a verified confirmation matching the required type is found:
+    /// For multi-oracle consensus: Queries OracleAdapter::check_consensus to verify
+    /// that the required number of unique oracle confirmations have been received.
+    /// For single oracle (backward compatibility): Falls back to get_confirmation check.
+    ///
+    /// If consensus is met:
     /// - Executes path payment from source asset to destination asset (if different)
     /// - Uses Stellar's built-in DEX for currency conversion
     /// - Enforces slippage protection via min_destination_amount
@@ -249,7 +277,7 @@ impl EscrowManager {
             return Err(ContractError::EscrowNotActive);
         }
 
-        // Query OracleAdapter for confirmations
+        // Query OracleAdapter for consensus
         let oracle: Address = env
             .storage()
             .instance()
@@ -257,28 +285,64 @@ impl EscrowManager {
             .ok_or(ContractError::Unauthorized)?;
 
         let escrow_id_bytes = Bytes::from_slice(&env, &escrow_id.to_be_bytes());
-        let conf_args: Vec<Val> = Vec::from_array(&env, [escrow_id_bytes.into_val(&env)]);
 
-        let confirmations: Option<Vec<ConfirmationData>> =
-            env.invoke_contract(&oracle, &Symbol::new(&env, "get_confirmation"), conf_args);
-
-        // Check if a verified confirmation matching the required event type exists
-        let confirmed = match confirmations {
-            Some(confs) => {
-                let mut found = false;
-                for conf in confs.iter() {
-                    if conf.event_type == escrow.required_confirmation && conf.verified {
-                        found = true;
-                        break;
-                    }
-                }
-                found
+        // Check if multi-oracle consensus is configured (required_confirmations > 0)
+        if escrow.required_confirmations > 0 {
+            // Multi-oracle consensus mode
+            // Validate oracle_set is not empty when required_confirmations > 0
+            if escrow.oracle_set.is_empty() {
+                return Err(ContractError::InvalidOracleSet);
             }
-            None => false,
-        };
 
-        if !confirmed {
-            return Err(ContractError::ConfirmationNotMet);
+            // Validate threshold doesn't exceed oracle set size
+            if escrow.required_confirmations > escrow.oracle_set.len() {
+                return Err(ContractError::InvalidThreshold);
+            }
+
+            // Call OracleAdapter::check_consensus
+            let consensus_args: Vec<Val> = Vec::from_array(
+                &env,
+                [
+                    escrow_id_bytes.into_val(&env),
+                    escrow.required_confirmations.into_val(&env),
+                    escrow.oracle_set.into_val(&env),
+                ],
+            );
+
+            let consensus_met: bool = env.invoke_contract(
+                &oracle,
+                &Symbol::new(&env, "check_consensus"),
+                consensus_args,
+            );
+
+            if !consensus_met {
+                return Err(ContractError::ConsensusNotMet);
+            }
+        } else {
+            // Single oracle mode (backward compatibility)
+            let conf_args: Vec<Val> = Vec::from_array(&env, [escrow_id_bytes.into_val(&env)]);
+
+            let confirmations: Option<Vec<ConfirmationData>> =
+                env.invoke_contract(&oracle, &Symbol::new(&env, "get_confirmation"), conf_args);
+
+            // Check if a verified confirmation matching the required event type exists
+            let confirmed = match confirmations {
+                Some(confs) => {
+                    let mut found = false;
+                    for conf in confs.iter() {
+                        if conf.event_type == escrow.required_confirmation && conf.verified {
+                            found = true;
+                            break;
+                        }
+                    }
+                    found
+                }
+                None => false,
+            };
+
+            if !confirmed {
+                return Err(ContractError::ConfirmationNotMet);
+            }
         }
 
         // Execute payment: path payment if assets differ, direct transfer otherwise
@@ -491,13 +555,13 @@ mod test {
         }
     }
 
-    // -- Mock OracleAdapter -----------------------------------------------
+    // -- Mock OracleAdapter with Multi-Oracle Support --------------------------
 
     #[contract]
-    pub struct MockOracleAdapter;
+    pub struct MockOracleAdapterWithConsensus;
 
     #[contractimpl]
-    impl MockOracleAdapter {
+    impl MockOracleAdapterWithConsensus {
         /// Returns confirmations stored under the escrow_id key.
         pub fn get_confirmation(env: Env, escrow_id: Bytes) -> Option<Vec<ConfirmationData>> {
             env.storage().persistent().get(&escrow_id)
@@ -506,6 +570,46 @@ mod test {
         /// Test helper: store confirmation data for a given escrow_id.
         pub fn set_confirmation(env: Env, escrow_id: Bytes, confirmations: Vec<ConfirmationData>) {
             env.storage().persistent().set(&escrow_id, &confirmations);
+        }
+
+        /// Mock implementation of check_consensus for testing
+        pub fn check_consensus(
+            env: Env,
+            escrow_id: Bytes,
+            threshold: u32,
+            oracle_set: Vec<Address>,
+        ) -> bool {
+            if let Some(confirmations) = Self::get_confirmation(env, escrow_id.clone()) {
+                let mut unique_oracle_count = 0u32;
+                
+                // Count unique oracle confirmations from authorized set
+                for conf in confirmations.iter() {
+                    if !conf.verified {
+                        continue;
+                    }
+                    
+                    // Check if oracle is in the authorized set
+                    let is_authorized = if oracle_set.is_empty() {
+                        true // Any oracle is authorized if set is empty
+                    } else {
+                        let mut found = false;
+                        for authorized in oracle_set.iter() {
+                            if authorized == conf.oracle {
+                                found = true;
+                                break;
+                            }
+                        }
+                        found
+                    };
+                    
+                    if is_authorized {
+                        unique_oracle_count += 1;
+                    }
+                }
+                
+                return unique_oracle_count >= threshold;
+            }
+            false
         }
     }
 
@@ -962,18 +1066,18 @@ mod test {
             required_confirmation: 2u32,
             expiry_ts: expiry,
             destination_asset: dest_token_addr.clone(),
-            min_destination_amount: 4800i128,
+            min_destination_amount: 5000i128, // Same as source amount (no slippage tolerance)
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
         });
 
-        // Set exchange rate: 0.90 (10% loss in conversion)
-        t.escrow_client.set_test_exchange_rate(&900_000i128);
+        // Set exchange rate: 0.95 (5% loss in conversion)
+        t.escrow_client.set_test_exchange_rate(&950_000i128);
 
         // Set oracle confirmation
         set_oracle_confirmation(&t, escrow_id, 2, true);
 
-        // This should fail due to slippage
+        // Release should fail due to slippage
         t.escrow_client.release_funds_on_confirmation(&escrow_id);
     }
 
@@ -1006,5 +1110,278 @@ mod test {
         assert_eq!(escrow.destination_asset, dest_token_addr);
         assert_eq!(escrow.min_destination_amount, 4500);
         assert_eq!(escrow.status, EscrowStatus::Active);
+    }
+
+    // -- Multi-Oracle Consensus Tests -------------------------------------
+
+    fn setup_multi_oracle() -> TestEnv<'static> {
+        let mut t = setup();
+        
+        // Replace with multi-oracle consensus adapter
+        let oracle_addr = t.env.register(MockOracleAdapterWithConsensus, ());
+        t.oracle_client = unsafe {
+            core::mem::transmute::<MockOracleAdapterWithConsensusClient<'_>, MockOracleAdapterWithConsensusClient<'static>>(
+                MockOracleAdapterWithConsensusClient::new(&t.env, &oracle_addr),
+            )
+        };
+
+        // Re-initialize escrow manager with new oracle
+        let admin = Address::generate(&t.env);
+        t.escrow_client.initialize(&admin, &t.coll_reg_addr, &oracle_addr, &Address::generate(&t.env));
+
+        t
+    }
+
+    fn create_multi_oracle_escrow(t: &TestEnv, threshold: u32, oracle_set: Vec<Address>) -> u64 {
+        let expiry = t.env.ledger().timestamp() + 3600;
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32, // Delivery
+            expiry_ts: expiry,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: threshold,
+            oracle_set,
+        })
+    }
+
+    fn set_multi_oracle_confirmations(
+        t: &TestEnv,
+        escrow_id: u64,
+        oracles: Vec<Address>,
+        event_type: u32,
+        verified: bool,
+    ) {
+        let escrow_id_bytes = Bytes::from_slice(&t.env, &escrow_id.to_be_bytes());
+        let mut confirmations = Vec::new(&t.env);
+
+        for oracle in oracles.iter() {
+            let conf = ConfirmationData {
+                escrow_id: escrow_id_bytes.clone(),
+                event_type,
+                result: Bytes::from_slice(&t.env, b"confirmed"),
+                oracle: oracle.clone(),
+                timestamp: t.env.ledger().timestamp(),
+                verified,
+            };
+            confirmations.push_back(conf);
+        }
+
+        let oracle_client = unsafe {
+            core::mem::transmute::<EscrowManagerClient<'_>, MockOracleAdapterWithConsensusClient<'_>>(
+                t.escrow_client.clone()
+            )
+        };
+        oracle_client.set_confirmation(&escrow_id_bytes, &confirmations);
+    }
+
+    #[test]
+    fn test_multi_oracle_consensus_success() {
+        let t = setup_multi_oracle();
+
+        let oracle1 = Address::generate(&t.env);
+        let oracle2 = Address::generate(&t.env);
+        let oracle3 = Address::generate(&t.env);
+        let oracle_set = Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone(), oracle3.clone()]);
+
+        // Create escrow requiring 2 out of 3 oracles
+        let escrow_id = create_multi_oracle_escrow(&t, 2u32, oracle_set.clone());
+
+        // Set confirmations from 2 different oracles
+        set_multi_oracle_confirmations(
+            &t,
+            escrow_id,
+            Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone()]),
+            2, // Delivery event
+            true,
+        );
+
+        // Release should succeed
+        t.escrow_client.release_funds_on_confirmation(&escrow_id);
+
+        let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Released);
+
+        // Verify funds sent to seller
+        let token = token::Client::new(&t.env, &t.token_addr);
+        assert_eq!(token.balance(&t.seller), 5000);
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #9)")]
+    fn test_multi_oracle_consensus_insufficient_confirmations() {
+        let t = setup_multi_oracle();
+
+        let oracle1 = Address::generate(&t.env);
+        let oracle2 = Address::generate(&t.env);
+        let oracle3 = Address::generate(&t.env);
+        let oracle_set = Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone(), oracle3.clone()]);
+
+        // Create escrow requiring 3 out of 3 oracles
+        let escrow_id = create_multi_oracle_escrow(&t, 3u32, oracle_set.clone());
+
+        // Only provide 2 confirmations
+        set_multi_oracle_confirmations(
+            &t,
+            escrow_id,
+            Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone()]),
+            2, // Delivery event
+            true,
+        );
+
+        // Release should fail - consensus not met
+        t.escrow_client.release_funds_on_confirmation(&escrow_id);
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #10)")]
+    fn test_multi_oracle_create_escrow_empty_oracle_set() {
+        let t = setup_multi_oracle();
+
+        // Try to create escrow with required_confirmations > 0 but empty oracle_set
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: t.env.ledger().timestamp() + 3600,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 2u32, // > 0 requires oracle_set
+            oracle_set: Vec::new(&t.env), // Empty - should fail
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #11)")]
+    fn test_multi_oracle_create_escrow_threshold_exceeds_set_size() {
+        let t = setup_multi_oracle();
+
+        let oracle1 = Address::generate(&t.env);
+        let oracle2 = Address::generate(&t.env);
+        let oracle_set = Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone()]);
+
+        // Try to create escrow with threshold 3 but only 2 oracles in set
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: t.env.ledger().timestamp() + 3600,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 3u32, // > oracle_set.len()
+            oracle_set,
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #10)")]
+    fn test_multi_oracle_create_escrow_duplicate_oracles() {
+        let t = setup_multi_oracle();
+
+        let oracle1 = Address::generate(&t.env);
+        // Include the same oracle twice
+        let oracle_set = Vec::from_array(&t.env, [oracle1.clone(), oracle1.clone()]);
+
+        t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: t.env.ledger().timestamp() + 3600,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 2u32,
+            oracle_set, // Contains duplicate
+        });
+    }
+
+    #[test]
+    fn test_multi_oracle_consensus_ignores_unauthorized_oracles() {
+        let t = setup_multi_oracle();
+
+        let oracle1 = Address::generate(&t.env);
+        let oracle2 = Address::generate(&t.env);
+        let unauthorized_oracle = Address::generate(&t.env);
+        let oracle_set = Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone()]);
+
+        // Create escrow requiring 2 oracles from the authorized set
+        let escrow_id = create_multi_oracle_escrow(&t, 2u32, oracle_set.clone());
+
+        // Set confirmations: 1 authorized + 1 unauthorized
+        set_multi_oracle_confirmations(
+            &t,
+            escrow_id,
+            Vec::from_array(&t.env, [oracle1.clone(), unauthorized_oracle]),
+            2, // Delivery event
+            true,
+        );
+
+        // Release should fail - only 1 authorized confirmation
+        assert_eq!(
+            t.escrow_client
+                .try_release_funds_on_confirmation(&escrow_id),
+            Err(Ok(ContractError::ConsensusNotMet))
+        );
+
+        // Add the second authorized confirmation
+        set_multi_oracle_confirmations(
+            &t,
+            escrow_id,
+            Vec::from_array(&t.env, [oracle1.clone(), oracle2.clone()]),
+            2, // Delivery event
+            true,
+        );
+
+        // Now release should succeed
+        t.escrow_client.release_funds_on_confirmation(&escrow_id);
+
+        let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Released);
+    }
+
+    #[test]
+    fn test_multi_oracle_backward_compatibility_single_oracle() {
+        let t = setup_multi_oracle();
+
+        // Create escrow with required_confirmations = 0 (single oracle mode)
+        let escrow_id = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: t.env.ledger().timestamp() + 3600,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 0u32, // Single oracle mode
+            oracle_set: Vec::new(&t.env), // Ignored in single oracle mode
+        });
+
+        // Set single oracle confirmation using the old method
+        set_oracle_confirmation(&t, escrow_id, 2, true);
+
+        // Release should succeed using backward compatibility
+        t.escrow_client.release_funds_on_confirmation(&escrow_id);
+
+        let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Released);
     }
 }
