@@ -10,7 +10,7 @@
 
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contract, contractclient, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
 
 // ============================================================================
 // Error Types
@@ -99,6 +99,17 @@ pub struct Vote {
     pub timestamp: u64,
 }
 
+/// Proposal lifecycle status
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProposalStatus {
+    Active = 0,    // Voting is ongoing
+    Succeeded = 1, // Voting ended, quorum + majority reached
+    Failed = 2,    // Voting ended, quorum or majority not reached
+    Executed = 3,  // Proposal executed on-chain
+    Cancelled = 4, // Cancelled by admin emergency
+}
+
 /// Governance configuration
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -110,8 +121,8 @@ pub struct GovernanceConfig {
     pub min_voting_power: i128, // Minimum tokens to create proposal
 }
 
-impl GovernanceConfig {
-    pub fn default() -> Self {
+impl Default for GovernanceConfig {
+    fn default() -> Self {
         Self {
             voting_period: 604800,  // 7 days
             timelock_period: 86400, // 24 hours
@@ -120,6 +131,29 @@ impl GovernanceConfig {
             min_voting_power: 1000, // 1000 tokens minimum
         }
     }
+}
+
+// ============================================================================
+// RiskAssessment Cross-Contract Interface
+// ============================================================================
+
+/// Mirror of RiskAssessment's RiskParameters (XDR-compatible)
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct RiskParameters {
+    pub liquidation_threshold: u32,
+    pub liquidation_penalty: u32,
+    pub min_health_factor: u32,
+    pub max_liquidation_ratio: u32,
+    pub grace_period: u64,
+    pub liquidator_bonus: u32,
+}
+
+/// Client interface for calling RiskAssessment contract
+#[contractclient(name = "RiskAssessmentClient")]
+pub trait IRiskAssessment {
+    fn get_risk_parameters(env: Env) -> RiskParameters;
+    fn update_risk_parameters(env: Env, new_params: RiskParameters);
 }
 
 // ============================================================================
@@ -205,7 +239,7 @@ impl Governance {
         env.storage()
             .instance()
             .get(&symbol_short!("config"))
-            .unwrap_or(GovernanceConfig::default())
+            .unwrap_or_default()
     }
 
     // ========================================================================
@@ -582,7 +616,7 @@ impl Governance {
     }
 
     /// Set voting power for testing
-    #[cfg(any(test, feature = "testutils"))]
+    #[cfg(test)]
     pub fn set_voting_power(env: Env, voter: Address, power: i128) {
         let key = (symbol_short!("vp"), voter);
         env.storage().persistent().set(&key, &power);
@@ -601,32 +635,32 @@ impl Governance {
 
         if parameter == &liq_thr {
             // Liquidation threshold: 50-95% (5000-9500 bps)
-            if value < 5000 || value > 9500 {
+            if !(5000..=9500).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else if parameter == &liq_pen {
             // Liquidation penalty: 1-10% (100-1000 bps)
-            if value < 100 || value > 1000 {
+            if !(100..=1000).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else if parameter == &min_hf {
             // Min health factor: 1.0-1.5 (10000-15000 bps)
-            if value < 10000 || value > 15000 {
+            if !(10000..=15000).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else if parameter == &max_liq {
             // Max liquidation ratio: 25-50% (2500-5000 bps)
-            if value < 2500 || value > 5000 {
+            if !(2500..=5000).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else if parameter == &grace_pd {
             // Grace period: 5 min - 24 hours (300-86400 seconds)
-            if value < 300 || value > 86400 {
+            if !(300..=86400).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else if parameter == &liq_bon {
             // Liquidator bonus: 1-10% (100-1000 bps)
-            if value < 100 || value > 1000 {
+            if !(100..=1000).contains(&value) {
                 return Err(ContractError::InvalidValue);
             }
         } else {
@@ -636,24 +670,93 @@ impl Governance {
         Ok(())
     }
 
-    /// Execute parameter update via cross-contract call
+    /// Execute parameter update via cross-contract call to RiskAssessment
     fn execute_parameter_update(
         env: &Env,
-        _target_contract: &Address,
+        target_contract: &Address,
         parameter: &Symbol,
         value: i128,
     ) -> Result<(), ContractError> {
-        // In production, this would make a cross-contract call to RiskAssessment
-        // For now, we store the update for testing
-        let key = (symbol_short!("upd"), parameter.clone());
-        env.storage().persistent().set(&key, &value);
+        let client = RiskAssessmentClient::new(env, target_contract);
 
-        // TODO: Implement actual cross-contract call
-        // Example:
-        // let risk_client = RiskAssessmentClient::new(env, _target_contract);
-        // risk_client.update_single_parameter(parameter, value as u32);
+        // Fetch current parameters from RiskAssessment
+        let mut params = client.get_risk_parameters();
+
+        // Apply the single parameter change
+        let liq_thr = symbol_short!("liq_thr");
+        let liq_pen = symbol_short!("liq_pen");
+        let min_hf = symbol_short!("min_hf");
+        let max_liq = symbol_short!("max_liq");
+        let grace_pd = symbol_short!("grace_pd");
+        let liq_bon = symbol_short!("liq_bon");
+
+        if parameter == &liq_thr {
+            params.liquidation_threshold = value as u32;
+        } else if parameter == &liq_pen {
+            params.liquidation_penalty = value as u32;
+        } else if parameter == &min_hf {
+            params.min_health_factor = value as u32;
+        } else if parameter == &max_liq {
+            params.max_liquidation_ratio = value as u32;
+        } else if parameter == &grace_pd {
+            params.grace_period = value as u64;
+        } else if parameter == &liq_bon {
+            params.liquidator_bonus = value as u32;
+        }
+
+        // Cross-contract call to RiskAssessment::update_risk_parameters
+        client.update_risk_parameters(&params);
 
         Ok(())
+    }
+
+    /// Get the current lifecycle status of a proposal
+    pub fn get_proposal_status(env: Env, proposal_id: u64) -> Result<ProposalStatus, ContractError> {
+        let proposal = Self::get_proposal(env.clone(), proposal_id)?;
+
+        if proposal.executed {
+            return Ok(ProposalStatus::Executed);
+        }
+
+        let current_ts = env.ledger().timestamp();
+
+        // Still in voting window
+        if current_ts < proposal.voting_end_ts {
+            return Ok(ProposalStatus::Active);
+        }
+
+        // Voting ended — check quorum + majority
+        let config = Self::get_config(env.clone());
+        let total_votes = proposal
+            .votes_for
+            .checked_add(proposal.votes_against)
+            .unwrap_or(0);
+
+        let total_voting_power: i128 = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("total_pwr"))
+            .unwrap_or(1_000_000);
+
+        let quorum_required = total_voting_power
+            .checked_mul(config.quorum_bps as i128)
+            .unwrap_or(0)
+            / 10000;
+
+        if total_votes < quorum_required {
+            return Ok(ProposalStatus::Failed);
+        }
+
+        let majority_required = total_votes
+            .checked_mul(config.majority_bps as i128)
+            .unwrap_or(0)
+            / 10000;
+
+        if proposal.votes_for >= majority_required {
+            Ok(ProposalStatus::Succeeded)
+        } else {
+            Ok(ProposalStatus::Failed)
+        }
     }
 }
 
@@ -665,17 +768,42 @@ impl Governance {
 mod test {
     use super::*;
     use soroban_sdk::{
+        contract, contractimpl,
         testutils::{Address as _, Ledger as _},
         Env,
     };
 
+    // ── Mock RiskAssessment ──────────────────────────────────────────────────
+    // Used so execute_proposal's cross-contract call has a real target.
+
+    #[contract]
+    pub struct MockRiskAssessment;
+
+    #[contractimpl]
+    impl MockRiskAssessment {
+        pub fn get_risk_parameters(_env: Env) -> RiskParameters {
+            RiskParameters {
+                liquidation_threshold: 8000,
+                liquidation_penalty: 500,
+                min_health_factor: 10000,
+                max_liquidation_ratio: 5000,
+                grace_period: 3600,
+                liquidator_bonus: 500,
+            }
+        }
+
+        pub fn update_risk_parameters(_env: Env, _new_params: RiskParameters) {}
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// Returns (env, admin, token, mock_risk_assessment_address)
     fn setup_env() -> (Env, Address, Address, Address) {
         let env = Env::default();
         let admin = Address::generate(&env);
         let token = Address::generate(&env);
-        let risk_assessment = Address::generate(&env);
-
-        (env, admin, token, risk_assessment)
+        let mock_risk = env.register_contract(None, MockRiskAssessment);
+        (env, admin, token, mock_risk)
     }
 
     // ========================================================================
@@ -994,6 +1122,7 @@ mod test {
         });
     }
 
+    #[test]
     fn test_cast_vote_voting_ended() {
         let (env, admin, token, risk_assessment) = setup_env();
         let contract_id = env.register_contract(None, Governance);
@@ -1465,7 +1594,111 @@ mod test {
         });
     }
 
-    // ========================================================================
-    // Parameter Validation Tests
-    // ========================================================================
+    #[test]
+    fn test_get_proposal_status_lifecycle() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let contract_id = env.register_contract(None, Governance);
+
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                risk_assessment.clone(),
+            )
+            .unwrap();
+
+            Governance::set_total_voting_power(env.clone(), 100000).unwrap();
+
+            let proposer = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), proposer.clone(), 2000);
+
+            let proposal_id = Governance::create_proposal(
+                env.clone(),
+                proposer.clone(),
+                risk_assessment.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap();
+
+            // Should be Active during voting
+            assert_eq!(
+                Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
+                ProposalStatus::Active
+            );
+
+            // Cast enough votes to pass
+            let voter = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), voter.clone(), 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true).unwrap();
+
+            // Advance past voting period only → Succeeded (not yet executed)
+            env.ledger()
+                .set_timestamp(env.ledger().timestamp() + 604801);
+
+            assert_eq!(
+                Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
+                ProposalStatus::Succeeded
+            );
+
+            // Advance past timelock and execute
+            env.ledger()
+                .set_timestamp(env.ledger().timestamp() + 86401);
+
+            Governance::execute_proposal(env.clone(), proposal_id).unwrap();
+
+            assert_eq!(
+                Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
+                ProposalStatus::Executed
+            );
+        });
+    }
+
+    #[test]
+    fn test_get_proposal_status_failed() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let contract_id = env.register_contract(None, Governance);
+
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                risk_assessment.clone(),
+            )
+            .unwrap();
+
+            Governance::set_total_voting_power(env.clone(), 100000).unwrap();
+
+            let proposer = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), proposer.clone(), 2000);
+
+            let proposal_id = Governance::create_proposal(
+                env.clone(),
+                proposer.clone(),
+                risk_assessment.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap();
+
+            // Only 2% votes → below 10% quorum → Failed
+            let voter = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), voter.clone(), 2000);
+            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true).unwrap();
+
+            env.ledger()
+                .set_timestamp(env.ledger().timestamp() + 604801);
+
+            assert_eq!(
+                Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
+                ProposalStatus::Failed
+            );
+        });
+    }
 }
