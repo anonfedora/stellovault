@@ -31,6 +31,8 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
 
       - name: Type Check
         run: npx tsc --noEmit
