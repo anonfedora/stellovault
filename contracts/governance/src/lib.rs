@@ -618,7 +618,7 @@ impl Governance {
     }
 
     /// Set voting power for testing
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testutils"))]
     pub fn set_voting_power(env: Env, voter: Address, power: i128) {
         let key = (symbol_short!("vp"), voter);
         env.storage().persistent().set(&key, &power);
