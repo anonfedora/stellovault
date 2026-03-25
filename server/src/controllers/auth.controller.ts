@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { authService } from "../services/auth.service";
+import { recordFailedAuthChallenge } from "../middleware/rate-limit.middleware";
 
 /**
  * POST /api/auth/challenge
@@ -45,6 +46,8 @@ export async function verifySignature(req: Request, res: Response, next: NextFun
 
         res.status(200).json({ success: true, data: tokens });
     } catch (err) {
+        // Record the failure so repeated bad attempts trigger throttling
+        recordFailedAuthChallenge(req.ip ?? "");
         next(err);
     }
 }

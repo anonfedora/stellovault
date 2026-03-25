@@ -22,7 +22,10 @@ import analyticsRoutes from "./routes/analytics.routes";
 import collateralService from "./services/collateral.service";
 
 // Middleware
-import { rateLimitMiddleware } from "./middleware/rate-limit.middleware";
+import {
+  geoIpBlockMiddleware,
+  tieredRateLimitMiddleware,
+} from "./middleware/rate-limit.middleware";
 import {
   errorMiddleware,
   notFoundMiddleware,
@@ -37,7 +40,8 @@ app.use(requestTraceMiddleware);
 app.use(cors({ origin: env.corsAllowedOrigins }));
 app.use(morgan("dev"));
 app.use(express.json());
-app.use(rateLimitMiddleware);
+app.use(geoIpBlockMiddleware);
+app.use(tieredRateLimitMiddleware);
 
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
