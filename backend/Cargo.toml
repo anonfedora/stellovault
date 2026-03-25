@@ -58,6 +58,9 @@ tokio-cron-scheduler = "0.9"
 thiserror = "1.0"
 anyhow = "1.0"
 
+# Async trait
+async-trait = "0.1"
+
 # For interacting with Stellar/Soroban, we'll use reqwest to make HTTP calls
 # to Horizon API instead of the stellar-sdk which is still experimental
 
