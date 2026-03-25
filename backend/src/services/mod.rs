@@ -1,10 +1,12 @@
 //! Business logic services for StelloVault
 
 mod analytics;
+pub mod kyc;
 pub mod risk_engine;
 mod user;
 
 pub use analytics::AnalyticsService;
+pub use kyc::KycService;
 pub use risk_engine::RiskEngine;
 pub use user::UserService;
 

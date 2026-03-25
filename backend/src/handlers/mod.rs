@@ -4,6 +4,7 @@ pub mod analytics;
 pub mod auth;
 pub mod collateral;
 mod escrow;
+pub mod kyc;
 pub mod oracle;
 pub mod risk;
 pub mod user;
@@ -14,6 +15,7 @@ pub use risk::*;
 pub use auth::*;
 pub use collateral::*;
 pub use escrow::*;
+pub use kyc::*;
 pub use user::{create_user, get_user};
 pub use wallet::*;
 

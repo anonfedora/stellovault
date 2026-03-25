@@ -93,6 +93,8 @@ pub struct UserResponse {
     pub email: Option<String>,
     pub name: Option<String>,
     pub role: UserRole,
+    pub kyc_status: KycStatus,
+    pub kyc_expiry: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
 }
 
