@@ -307,7 +307,12 @@ impl EscrowManager {
         Ok(escrow_id)
     }
 
-    pub fn raise_dispute(env: Env, escrow_id: u64, disputer: Address, reason: Bytes) -> Result<(), ContractError> {
+    pub fn raise_dispute(
+        env: Env,
+        escrow_id: u64,
+        disputer: Address,
+        reason: Bytes,
+    ) -> Result<(), ContractError> {
         let mut escrow: Escrow = env
             .storage()
             .persistent()
@@ -331,11 +336,11 @@ impl EscrowManager {
         escrow.status = EscrowStatus::Disputed;
         escrow.disputed_at = Some(env.ledger().timestamp());
         escrow.disputed_by = Some(disputer.clone());
-        escrow.dispute_reason = Some(reason);
+        escrow.dispute_reason = Some(reason.clone());
 
         env.storage().persistent().set(&escrow_id, &escrow);
         env.events()
-            .publish((symbol_short!("esc_disp"),), (escrow_id, disputer));
+            .publish((symbol_short!("esc_disp"),), (escrow_id, disputer, reason));
 
         Ok(())
     }
@@ -435,119 +440,9 @@ impl EscrowManager {
             }
         }
 
-        // Execute payment: path payment if assets differ, direct transfer otherwise
-        if escrow.asset == escrow.destination_asset {
-            // Direct transfer - no conversion needed
-            let token_client = token::Client::new(&env, &escrow.asset);
-            token_client.transfer(
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-        } else {
-            // Path payment - use Stellar's built-in DEX
-            let source_token = token::Client::new(&env, &escrow.asset);
-
-            // Execute path payment using Stellar's native path payment functionality
-            // This leverages the Stellar DEX to find the best conversion path
-            let _amount_received = source_token.try_transfer_from(
-                &env.current_contract_address(),
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-
-            // For path payments, we need to use a different approach
-            // Since Soroban doesn't have direct path payment support yet,
-            // we simulate it by doing a swap through the contract
-            // In production, this would integrate with Stellar's path payment protocol
-
-            // For now, we'll use a simplified approach:
-            // 1. Transfer source asset from escrow to a temporary holding
-            // 2. Invoke a swap operation (would be DEX in production)
-            // 3. Transfer destination asset to seller
-
-            // This is a placeholder for the actual path payment implementation
-            // In a real scenario, you'd call into Stellar's path payment host function
-            let _dest_token = token::Client::new(&env, &escrow.destination_asset);
-
-            // Simulate path payment by checking if we can meet minimum destination amount
-            // In production, this would be handled by Stellar's path payment protocol
-            let estimated_dest_amount = Self::estimate_path_payment(
-                &env,
-                &escrow.asset,
-                &escrow.destination_asset,
-                escrow.amount,
-            )?;
-
-            if estimated_dest_amount < escrow.min_destination_amount {
-                return Err(ContractError::SlippageExceeded);
-            }
-
-            // Execute the path payment
-            // Note: In production Stellar contracts, this would use the native path payment
-            // host function which automatically finds the best path through the DEX
-            source_token.transfer(
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-
-            // Emit path payment event for tracking
-            env.events().publish(
-                (symbol_short!("path_pay"),),
-                (escrow_id, escrow.amount, estimated_dest_amount),
-            );
-        }
-
-        // Calculate and collect protocol fee if treasury is configured
-        let treasury_opt: Option<Address> =
-            env.storage().instance().get(&symbol_short!("treasury"));
-        let _protocol_fee = if let Some(treasury) = treasury_opt {
-            // Query fee_bps from ProtocolTreasury
-            let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
-            let fee_bps: u32 =
-                env.invoke_contract(&treasury, &Symbol::new(&env, "get_fee_bps"), fee_bps_args);
-
-            // Calculate fee on the escrow amount
-            let fee_amount = (escrow.amount * fee_bps as i128) / 10000;
-
-            if fee_amount > 0 {
-                // Record the fee deposit in treasury
-                // Note: In a full implementation, the actual token transfer would happen
-                // before this call, either deducted from the payment or transferred separately
-                let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
-                    &env,
-                    [escrow.asset.into_val(&env), fee_amount.into_val(&env)],
-                );
-                let _: () =
-                    env.invoke_contract(&treasury, &Symbol::new(&env, "deposit_fee"), deposit_args);
-
-                // Emit fee collection event
-                env.events().publish(
-                    (symbol_short!("fee_col"),),
-                    (escrow_id, fee_amount, escrow.asset.clone()),
-                );
-            }
-
-            fee_amount
-        } else {
-            0i128
-        };
-
-        // Unlock collateral via CollateralRegistry
-        let coll_reg: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("coll_reg"))
-            .ok_or(ContractError::Unauthorized)?;
-
-        let unlock_args: Vec<Val> = Vec::from_array(&env, [escrow.collateral_id.into_val(&env)]);
-        env.invoke_contract::<Val>(
-            &coll_reg,
-            &Symbol::new(&env, "unlock_collateral"),
-            unlock_args,
-        );
+        Self::execute_release_payout(&env, escrow_id, &escrow)?;
+        Self::collect_protocol_fee(&env, escrow_id, &escrow);
+        Self::unlock_collateral(&env, escrow.collateral_id)?;
 
         escrow.status = EscrowStatus::Released;
         env.storage().persistent().set(&escrow_id, &escrow);
@@ -583,6 +478,92 @@ impl EscrowManager {
             .ok_or(ContractError::PathPaymentFailed)?;
 
         Ok(dest_amount)
+    }
+
+    fn execute_release_payout(
+        env: &Env,
+        escrow_id: u64,
+        escrow: &Escrow,
+    ) -> Result<(), ContractError> {
+        // Execute payment: path payment if assets differ, direct transfer otherwise
+        if escrow.asset == escrow.destination_asset {
+            let token_client = token::Client::new(env, &escrow.asset);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.seller,
+                &escrow.amount,
+            );
+            return Ok(());
+        }
+
+        let estimated_dest_amount = Self::estimate_path_payment(
+            env,
+            &escrow.asset,
+            &escrow.destination_asset,
+            escrow.amount,
+        )?;
+
+        if estimated_dest_amount < escrow.min_destination_amount {
+            return Err(ContractError::SlippageExceeded);
+        }
+
+        // Placeholder settlement for cross-asset payout:
+        // transfer destination-asset amount to seller.
+        let dest_token = token::Client::new(env, &escrow.destination_asset);
+        dest_token.transfer(
+            &env.current_contract_address(),
+            &escrow.seller,
+            &estimated_dest_amount,
+        );
+
+        env.events().publish(
+            (symbol_short!("path_pay"),),
+            (escrow_id, escrow.amount, estimated_dest_amount),
+        );
+
+        Ok(())
+    }
+
+    fn collect_protocol_fee(env: &Env, escrow_id: u64, escrow: &Escrow) {
+        let treasury_opt: Option<Address> =
+            env.storage().instance().get(&symbol_short!("treasury"));
+        if let Some(treasury) = treasury_opt {
+            let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(env);
+            let fee_bps: u32 =
+                env.invoke_contract(&treasury, &Symbol::new(env, "get_fee_bps"), fee_bps_args);
+
+            let fee_amount = (escrow.amount * fee_bps as i128) / 10000;
+            if fee_amount <= 0 {
+                return;
+            }
+
+            let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
+                env,
+                [escrow.asset.clone().into_val(env), fee_amount.into_val(env)],
+            );
+            let _: () =
+                env.invoke_contract(&treasury, &Symbol::new(env, "deposit_fee"), deposit_args);
+
+            env.events().publish(
+                (symbol_short!("fee_col"),),
+                (escrow_id, fee_amount, escrow.asset.clone()),
+            );
+        }
+    }
+
+    fn unlock_collateral(env: &Env, collateral_id: u64) -> Result<(), ContractError> {
+        let coll_reg: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("coll_reg"))
+            .ok_or(ContractError::Unauthorized)?;
+        let unlock_args: Vec<Val> = Vec::from_array(env, [collateral_id.into_val(env)]);
+        env.invoke_contract::<Val>(
+            &coll_reg,
+            &Symbol::new(env, "unlock_collateral"),
+            unlock_args,
+        );
+        Ok(())
     }
 
     /// Set exchange rate for testing path payments.
@@ -672,107 +653,15 @@ impl EscrowManager {
 
         match decision {
             DisputeDecision::ReleaseToSeller => {
-                // Execute payment: path payment if assets differ, direct transfer otherwise
-                if escrow.asset == escrow.destination_asset {
-                    let token_client = token::Client::new(&env, &escrow.asset);
-                    token_client.transfer(
-                        &env.current_contract_address(),
-                        &escrow.seller,
-                        &escrow.amount,
-                    );
-                } else {
-                    let source_token = token::Client::new(&env, &escrow.asset);
-
-                    // Placeholder path-payment simulation (same as oracle-based release)
-                    let _amount_received = source_token.try_transfer_from(
-                        &env.current_contract_address(),
-                        &env.current_contract_address(),
-                        &escrow.seller,
-                        &escrow.amount,
-                    );
-
-                    let _dest_token = token::Client::new(&env, &escrow.destination_asset);
-
-                    let estimated_dest_amount = Self::estimate_path_payment(
-                        &env,
-                        &escrow.asset,
-                        &escrow.destination_asset,
-                        escrow.amount,
-                    )?;
-
-                    if estimated_dest_amount < escrow.min_destination_amount {
-                        return Err(ContractError::SlippageExceeded);
-                    }
-
-                    source_token.transfer(
-                        &env.current_contract_address(),
-                        &escrow.seller,
-                        &escrow.amount,
-                    );
-
-                    env.events().publish(
-                        (symbol_short!("path_pay"),),
-                        (escrow_id, escrow.amount, estimated_dest_amount),
-                    );
-                }
-
-                // Calculate and collect protocol fee if treasury is configured
-                let treasury_opt: Option<Address> =
-                    env.storage().instance().get(&symbol_short!("treasury"));
-                let _protocol_fee = if let Some(treasury) = treasury_opt {
-                    let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
-                    let fee_bps: u32 = env.invoke_contract(
-                        &treasury,
-                        &Symbol::new(&env, "get_fee_bps"),
-                        fee_bps_args,
-                    );
-
-                    let fee_amount = (escrow.amount * fee_bps as i128) / 10000;
-
-                    if fee_amount > 0 {
-                        let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
-                            &env,
-                            [escrow.asset.into_val(&env), fee_amount.into_val(&env)],
-                        );
-                        let _: () = env.invoke_contract(
-                            &treasury,
-                            &Symbol::new(&env, "deposit_fee"),
-                            deposit_args,
-                        );
-
-                        env.events().publish(
-                            (symbol_short!("fee_col"),),
-                            (escrow_id, fee_amount, escrow.asset.clone()),
-                        );
-                    }
-
-                    fee_amount
-                } else {
-                    0i128
-                };
-
-                // Unlock collateral via CollateralRegistry
-                let coll_reg: Address = env
-                    .storage()
-                    .instance()
-                    .get(&symbol_short!("coll_reg"))
-                    .ok_or(ContractError::Unauthorized)?;
-
-                let unlock_args: Vec<Val> =
-                    Vec::from_array(&env, [escrow.collateral_id.into_val(&env)]);
-                env.invoke_contract::<Val>(
-                    &coll_reg,
-                    &Symbol::new(&env, "unlock_collateral"),
-                    unlock_args,
-                );
+                Self::execute_release_payout(&env, escrow_id, &escrow)?;
+                Self::collect_protocol_fee(&env, escrow_id, &escrow);
+                Self::unlock_collateral(&env, escrow.collateral_id)?;
 
                 escrow.status = EscrowStatus::Released;
                 env.storage().persistent().set(&escrow_id, &escrow);
 
-                env.events().publish(
-                    (symbol_short!("esc_rslv"),),
-                    (escrow_id, decision),
-                );
+                env.events()
+                    .publish((symbol_short!("esc_rslv"),), (escrow_id, decision));
                 Ok(())
             }
             DisputeDecision::RefundToLender => {
@@ -784,28 +673,13 @@ impl EscrowManager {
                     &escrow.amount,
                 );
 
-                // Unlock collateral via CollateralRegistry
-                let coll_reg: Address = env
-                    .storage()
-                    .instance()
-                    .get(&symbol_short!("coll_reg"))
-                    .ok_or(ContractError::Unauthorized)?;
-
-                let unlock_args: Vec<Val> =
-                    Vec::from_array(&env, [escrow.collateral_id.into_val(&env)]);
-                env.invoke_contract::<Val>(
-                    &coll_reg,
-                    &Symbol::new(&env, "unlock_collateral"),
-                    unlock_args,
-                );
+                Self::unlock_collateral(&env, escrow.collateral_id)?;
 
                 escrow.status = EscrowStatus::Refunded;
                 env.storage().persistent().set(&escrow_id, &escrow);
 
-                env.events().publish(
-                    (symbol_short!("esc_rslv"),),
-                    (escrow_id, decision),
-                );
+                env.events()
+                    .publish((symbol_short!("esc_rslv"),), (escrow_id, decision));
                 Ok(())
             }
         }
@@ -1296,14 +1170,13 @@ mod test {
         let escrow_id = create_test_escrow(&t);
 
         let reason = Bytes::from_slice(&t.env, b"oracle offline");
-        t.escrow_client
-            .raise_dispute(&escrow_id, &t.buyer, &reason);
+        t.escrow_client.raise_dispute(&escrow_id, &t.buyer, &reason);
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Disputed);
         assert_eq!(escrow.disputed_by, Some(t.buyer.clone()));
         assert!(escrow.disputed_at.is_some());
-        assert!(escrow.dispute_reason.is_some());
+        assert_eq!(escrow.dispute_reason, Some(reason));
     }
 
     #[test]
@@ -1328,7 +1201,8 @@ mod test {
 
         let attacker = Address::generate(&t.env);
         let reason = Bytes::from_slice(&t.env, b"grief");
-        t.escrow_client.raise_dispute(&escrow_id, &attacker, &reason);
+        t.escrow_client
+            .raise_dispute(&escrow_id, &attacker, &reason);
     }
 
     #[test]
@@ -1338,8 +1212,7 @@ mod test {
         let escrow_id = create_test_escrow(&t);
 
         let reason = Bytes::from_slice(&t.env, b"dispute");
-        t.escrow_client
-            .raise_dispute(&escrow_id, &t.buyer, &reason);
+        t.escrow_client.raise_dispute(&escrow_id, &t.buyer, &reason);
 
         // Even with confirmation, release should be blocked while disputed
         set_oracle_confirmation(&t, escrow_id, 2, true);
@@ -1383,8 +1256,7 @@ mod test {
         let lender_balance_before = token.balance(&t.lender);
 
         let reason = Bytes::from_slice(&t.env, b"dispute");
-        t.escrow_client
-            .raise_dispute(&escrow_id, &t.buyer, &reason);
+        t.escrow_client.raise_dispute(&escrow_id, &t.buyer, &reason);
 
         t.escrow_client
             .resolve_dispute(&escrow_id, &DisputeDecision::RefundToLender);
@@ -1425,6 +1297,50 @@ mod test {
             let locked: bool = t.env.storage().persistent().get(&1u64).unwrap();
             assert!(!locked);
         });
+    }
+
+    #[test]
+    fn test_resolve_dispute_release_to_seller_path_payment() {
+        let t = setup();
+
+        // Create a second token for destination
+        let token_admin = Address::generate(&t.env);
+        let dest_token_contract = t
+            .env
+            .register_stellar_asset_contract_v2(token_admin.clone());
+        let dest_token_addr = dest_token_contract.address();
+        let dest_token_admin_client = token::StellarAssetClient::new(&t.env, &dest_token_addr);
+        dest_token_admin_client.mint(&t.escrow_id_addr, &10_000);
+
+        let expiry = t.env.ledger().timestamp() + 3600;
+        let escrow_id = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: t.seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: dest_token_addr.clone(),
+            min_destination_amount: 4500i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
+
+        // Set exchange rate: 0.95
+        t.escrow_client.set_test_exchange_rate(&950_000i128);
+
+        let reason = Bytes::from_slice(&t.env, b"dispute");
+        t.escrow_client
+            .raise_dispute(&escrow_id, &t.seller, &reason);
+        t.escrow_client
+            .resolve_dispute(&escrow_id, &DisputeDecision::ReleaseToSeller);
+
+        let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Released);
+        let dest_token = token::Client::new(&t.env, &dest_token_addr);
+        assert_eq!(dest_token.balance(&t.seller), 4_750);
     }
 
     #[test]
@@ -1509,6 +1425,8 @@ mod test {
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Released);
+        let dest_token = token::Client::new(&t.env, &dest_token_addr);
+        assert_eq!(dest_token.balance(&t.seller), 4_750);
     }
 
     #[test]

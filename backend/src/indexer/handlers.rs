@@ -208,7 +208,7 @@ impl EventHandler {
                     // DisputeDecision: 0=ReleaseToSeller, 1=RefundToLender
                     let new_status = match decision_raw {
                         0 => "released",
-                        1 => "cancelled",
+                        1 => "refunded",
                         _ => return Err(anyhow!("Invalid dispute decision value")),
                     };
 
@@ -223,7 +223,7 @@ impl EventHandler {
                     if let Some(ws) = &self.ws_state {
                         match decision_raw {
                             0 => ws.broadcast_event(WsEscrowEvent::Released { escrow_id: id as i64 }).await,
-                            1 => ws.broadcast_event(WsEscrowEvent::Cancelled { escrow_id: id as i64 }).await,
+                            1 => ws.broadcast_event(WsEscrowEvent::Refunded { escrow_id: id as i64 }).await,
                             _ => {}
                         }
                     }
