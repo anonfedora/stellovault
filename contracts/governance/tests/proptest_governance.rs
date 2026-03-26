@@ -18,9 +18,7 @@ mod proptest_governance {
         Address, Env, Symbol,
     };
 
-    use governance::{
-        ContractError, Governance, GovernanceConfig, ProposalStatus,
-    };
+    use governance::{ContractError, Governance, GovernanceConfig, ProposalStatus};
 
     // ── Mock RiskAssessment ─────────────────────────────────────────────
 

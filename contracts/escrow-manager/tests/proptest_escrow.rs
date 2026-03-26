@@ -17,9 +17,7 @@ mod proptest_escrow {
         token, Address, Bytes, Env, Vec,
     };
 
-    use escrow_manager::{
-        ConfirmationData, EscrowConfig, EscrowManager, EscrowStatus,
-    };
+    use escrow_manager::{ConfirmationData, EscrowConfig, EscrowManager, EscrowStatus};
 
     // ── Mock contracts ──────────────────────────────────────────────────
 
@@ -37,10 +35,7 @@ mod proptest_escrow {
 
     #[contractimpl]
     impl MockOracleAdapter {
-        pub fn get_confirmation(
-            _env: Env,
-            _escrow_id: Bytes,
-        ) -> Option<Vec<ConfirmationData>> {
+        pub fn get_confirmation(_env: Env, _escrow_id: Bytes) -> Option<Vec<ConfirmationData>> {
             None
         }
         pub fn check_consensus(
