@@ -3,6 +3,7 @@ import { contracts } from "../config/contracts";
 import { env } from "../config/env";
 import { NotFoundError, ValidationError } from "../config/errors";
 import contractService from "./contract.service";
+import feePayerService from "./fee-payer.service";
 import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
 
@@ -129,11 +130,12 @@ export class EscrowService {
             throw new Error("Escrow contract ID not configured: contracts.escrow is empty");
         }
 
+        const feePayerPublicKey = await feePayerService.getFeePayer();
         const unsignedXdr = await contractService.buildContractInvokeXDR(
             escrowContractId,
             "create_escrow",
             [buyerId, sellerId, amount.toString(), payload.assetCode || "USDC", expiresAt.toISOString()].map(v => xdr.ScVal.scvString(v)),
-            env.feePayer.publicKey
+            feePayerPublicKey
         );
 
         const escrow = await db.escrow.create({
