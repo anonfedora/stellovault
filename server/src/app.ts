@@ -20,6 +20,7 @@ import governanceRoutes from "./routes/governance.routes";
 import riskRoutes from "./routes/risk.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import collateralService from "./services/collateral.service";
+import metricsService from "./services/metrics.service";
 
 // Middleware
 import {
@@ -40,12 +41,18 @@ app.use(requestTraceMiddleware);
 app.use(cors({ origin: env.corsAllowedOrigins }));
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(metricsService.metricsMiddleware.bind(metricsService));
 app.use(geoIpBlockMiddleware);
 app.use(tieredRateLimitMiddleware);
 
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", version: "1.0.0", timestamp: new Date() });
+});
+
+app.get("/metrics", async (_req: Request, res: Response) => {
+    res.set("Content-Type", metricsService.getRegistry().contentType);
+    res.end(await metricsService.getRegistry().metrics());
 });
 
 // ── API Routes ───────────────────────────────────────────────────────────────
@@ -75,6 +82,7 @@ const server = app.listen(port, () => {
     
     // Start background jobs
     collateralService.startIndexer();
+    metricsService.startBackgroundMonitoring();
 });
 
 function gracefulShutdown(signal: string) {

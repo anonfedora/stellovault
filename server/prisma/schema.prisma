@@ -303,6 +303,21 @@ model RiskScore {
   @@index([walletAddress, computedAt])
 }
 
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  resourceId String?
+  ipAddress  String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceId])
+  @@index([createdAt])
+}
+
 // ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
