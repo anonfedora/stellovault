@@ -385,15 +385,16 @@ impl Governance {
             return Err(ContractError::AlreadyVoted);
         }
 
-        // Get voting power (available tokens)
-        let total_tokens = Self::get_total_controlled_tokens(&env, &voter);
+        // Get max quadratic voting power
+        let max_votes = Self::get_voting_power(&env, &voter);
+        if num_votes > max_votes {
+            return Err(ContractError::InsufficientVotingPower);
+        }
+
+        // Deduct tokens
         let cost = num_votes
             .checked_mul(num_votes)
             .ok_or(ContractError::MathOverflow)?;
-
-        if total_tokens < cost {
-            return Err(ContractError::InsufficientVotingPower);
-        }
 
         // Deduct tokens (simplified - in production, this might move tokens or update state)
         // Here we reduce the stored voting power tokens
