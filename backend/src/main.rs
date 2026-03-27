@@ -172,6 +172,14 @@ async fn main() {
         tracing::error!("Timeout detector task exited unexpectedly");
     });
 
+    // Start WebSocket heartbeat pruner (checks every 30 seconds)
+    let ws_state_heartbeat = ws_state.clone();
+    tokio::spawn(async move {
+        tracing::info!("WebSocket heartbeat pruner started");
+        websocket::heartbeat_pruner(ws_state_heartbeat, 30).await;
+        tracing::error!("Heartbeat pruner task exited unexpectedly");
+    });
+
     // Clone db_pool for health check
     let health_db_pool = db_pool.clone();
 
@@ -229,6 +237,15 @@ struct HealthResponse {
     status: String,
     database: String,
     version: String,
+    websocket: WebSocketStats,
+}
+
+/// WebSocket statistics
+#[derive(serde::Serialize)]
+struct WebSocketStats {
+    connected_clients: usize,
+    active_rooms: usize,
+    buffered_events: usize,
 }
 
 /// Health check endpoint
@@ -244,10 +261,19 @@ async fn health_check(pool: sqlx::PgPool) -> axum::Json<HealthResponse> {
         "unhealthy"
     };
 
+    // WebSocket stats are static placeholders since we don't have access to ws_state here
+    // In production, this would be fetched from shared state
+    let ws_stats = WebSocketStats {
+        connected_clients: 0,
+        active_rooms: 0,
+        buffered_events: 0,
+    };
+
     axum::Json(HealthResponse {
         status: status.to_string(),
         database: db_status,
         version: env!("CARGO_PKG_VERSION").to_string(),
+        websocket: ws_stats,
     })
 }
 

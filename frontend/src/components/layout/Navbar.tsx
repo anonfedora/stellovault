@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Wallet, LogOut, Menu, X } from 'lucide-react'
+import { Wallet, LogOut, Menu, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
+import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -11,6 +13,7 @@ export function Navbar() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { pendingCount } = useTransactionStatus()
 
   const handleWalletConnect = async () => {
     const mockAddress = 'G' + Math.random().toString(16).slice(2, 54).toUpperCase()
@@ -70,6 +73,17 @@ export function Navbar() {
         </div>
         
         <div className="flex items-center gap-4">
+          {/* Pending Transaction Indicator */}
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{pendingCount} Pending</span>
+            </div>
+          )}
+          
+          {/* Transaction History Button */}
+          <TransactionHistoryButton />
+          
           <div className="relative">
             {isConnected ? (
               <button
