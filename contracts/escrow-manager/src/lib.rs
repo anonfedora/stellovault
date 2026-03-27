@@ -277,6 +277,16 @@ impl EscrowManager {
             .instance()
             .set(&symbol_short!("next_id"), &(escrow_id + 1));
 
+        // Index escrow by seller (merchant) address for efficient querying
+        let seller_key = (symbol_short!("seller"), escrow.seller.clone());
+        let mut seller_escrows: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&seller_key)
+            .unwrap_or(Vec::new(&env));
+        seller_escrows.push_back(escrow_id);
+        env.storage().persistent().set(&seller_key, &seller_escrows);
+
         env.events().publish(
             (symbol_short!("esc_crtd"),),
             (
@@ -596,6 +606,24 @@ impl EscrowManager {
     /// Get escrow details.
     pub fn get_escrow(env: Env, escrow_id: u64) -> Option<Escrow> {
         env.storage().persistent().get(&escrow_id)
+    }
+
+    /// Get all escrow IDs for a specific merchant (seller).
+    ///
+    /// Returns a vector of escrow IDs where the given address is the seller.
+    /// This enables efficient querying without client-side filtering.
+    ///
+    /// # Arguments
+    /// * `merchant` - The seller address to query escrows for
+    ///
+    /// # Returns
+    /// Vector of escrow IDs, or empty vector if merchant has no escrows
+    pub fn get_merchant_escrows(env: Env, merchant: Address) -> Vec<u64> {
+        let seller_key = (symbol_short!("seller"), merchant);
+        env.storage()
+            .persistent()
+            .get(&seller_key)
+            .unwrap_or(Vec::new(&env))
     }
 }
 
@@ -1090,6 +1118,50 @@ mod test {
     fn test_get_escrow_not_found() {
         let t = setup();
         assert!(t.escrow_client.get_escrow(&999u64).is_none());
+    }
+
+    #[test]
+    fn test_get_merchant_escrows() {
+        let t = setup();
+
+        // Create multiple escrows with the same seller
+        let escrow_id1 = create_test_escrow(&t);
+        let escrow_id2 = create_test_escrow(&t);
+
+        // Create an escrow with a different seller
+        let different_seller = Address::generate(&t.env);
+        let expiry = t.env.ledger().timestamp() + 3600;
+        let escrow_id3 = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: different_seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+        });
+
+        // Query escrows for the original seller
+        let seller_escrows = t.escrow_client.get_merchant_escrows(&t.seller);
+        assert_eq!(seller_escrows.len(), 2);
+        assert!(seller_escrows.iter().any(|id| id == escrow_id1));
+        assert!(seller_escrows.iter().any(|id| id == escrow_id2));
+        assert!(!seller_escrows.iter().any(|id| id == escrow_id3));
+
+        // Query escrows for the different seller
+        let different_seller_escrows = t.escrow_client.get_merchant_escrows(&different_seller);
+        assert_eq!(different_seller_escrows.len(), 1);
+        assert_eq!(different_seller_escrows.get(0).unwrap(), escrow_id3);
+
+        // Query escrows for an address with no escrows
+        let no_escrows_address = Address::generate(&t.env);
+        let no_escrows = t.escrow_client.get_merchant_escrows(&no_escrows_address);
+        assert_eq!(no_escrows.len(), 0);
     }
 
     #[test]
