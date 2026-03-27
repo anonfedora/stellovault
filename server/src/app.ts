@@ -6,6 +6,7 @@ import { createServer } from "http";
 import WebSocket from "ws";
 import { env } from "./config/env";
 import websocketService, { WsState } from "./services/websocket.service";
+import transactionQueueService from "./services/transaction-queue.service";
 
 // Routes
 import authRoutes from "./routes/auth.routes";
@@ -80,6 +81,14 @@ const server = app.listen(port, () => {
 function gracefulShutdown(signal: string) {
     console.log(`Received ${signal}. Shutting down gracefully...`);
     collateralService.stopIndexer();
+    
+    // Close transaction queue
+    transactionQueueService.close().then(() => {
+        console.log("Transaction queue closed.");
+    }).catch((err) => {
+        console.error("Error closing transaction queue:", err);
+    });
+    
     server.close(() => {
         console.log("Server closed.");
         process.exit(0);
