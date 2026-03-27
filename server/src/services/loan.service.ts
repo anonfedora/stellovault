@@ -4,6 +4,7 @@ import { xdr } from "@stellar/stellar-sdk";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
+import notificationService, { NotificationType, NotificationChannel } from "./notification.service";
 import { env } from "../config/env";
 import Decimal from "decimal.js";
 
@@ -234,6 +235,23 @@ export class LoanService {
                 });
                 
                 websocketService.broadcastLoanUpdated(loanId, nextStatus);
+
+                // Send notification if loan is approved (moved to ACTIVE)
+                if (nextStatus === "ACTIVE") {
+                    await notificationService.sendNotification({
+                        userId: loan.borrowerId,
+                        type: NotificationType.LOAN_APPROVED,
+                        channel: NotificationChannel.BOTH,
+                        data: {
+                            loanId,
+                            amount: loan.amount.toString(),
+                            assetCode: loan.assetCode,
+                            interestRate: loan.interestRate.toString(),
+                            dueDate: loan.dueDate?.toISOString() || "N/A",
+                            dashboardUrl: `${process.env.FRONTEND_URL || "https://stellovault.com"}/loans/${loanId}`,
+                        },
+                    });
+                }
             }
 
             const updatedLoan = await tx.loan.findUnique({
