@@ -2,6 +2,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "../config/errors
 import { contracts } from "../config/contracts";
 import { xdr } from "@stellar/stellar-sdk";
 import contractService from "./contract.service";
+import feePayerService from "./fee-payer.service";
 import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
 import { env } from "../config/env";
@@ -87,6 +88,7 @@ export class LoanService {
             throw new ValidationError("LOAN_CONTRACT_ID not configured");
         }
 
+        const feePayerPublicKey = await feePayerService.getFeePayer();
         const xdrResult = await contractService.buildContractInvokeXDR(
             loanContractId,
             "issue_loan",
@@ -98,7 +100,7 @@ export class LoanService {
                 payload.assetCode || "USDC",
                 payload.escrowAddress || "",
             ].map(v => xdr.ScVal.scvString(v)),
-            env.feePayer.publicKey
+            feePayerPublicKey
         );
 
         const loan = await db.loan.create({

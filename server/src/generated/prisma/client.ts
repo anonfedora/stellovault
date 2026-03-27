@@ -127,3 +127,8 @@ export type GovernanceAuditLog = Prisma.GovernanceAuditLogModel
  * 
  */
 export type RiskScore = Prisma.RiskScoreModel
+/**
+ * Model FeePayer
+ * 
+ */
+export type FeePayer = Prisma.FeePayerModel

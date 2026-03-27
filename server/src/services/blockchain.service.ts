@@ -4,9 +4,10 @@ import {
   BASE_FEE,
   Operation,
   Asset,
-  Keypair,
+  Transaction,
 } from "@stellar/stellar-sdk";
 import { env } from "../config/env";
+import feePayerService from "./fee-payer.service";
 
 export class BlockchainService {
   private server: Horizon.Server;
@@ -56,9 +57,8 @@ export class BlockchainService {
     to: string,
     amount: string,
   ): Promise<string> {
-    const feePayerAccount = await this.server.loadAccount(
-      env.feePayer.publicKey,
-    );
+    const feePayerPublicKey = await feePayerService.getFeePayer();
+    const feePayerAccount = await this.server.loadAccount(feePayerPublicKey);
 
     const tx = new TransactionBuilder(feePayerAccount, {
       fee: BASE_FEE,
@@ -75,8 +75,7 @@ export class BlockchainService {
       .setTimeout(30)
       .build();
 
-    const feePayerKeypair = Keypair.fromSecret(env.feePayer.secretKey);
-    tx.sign(feePayerKeypair);
+    await feePayerService.sign(feePayerPublicKey, tx as Transaction);
 
     return tx.toXDR();
   }
@@ -93,9 +92,8 @@ export class BlockchainService {
     assetCode: string = "USDC",
     assetIssuer?: string,
   ): Promise<string> {
-    const feePayerAccount = await this.server.loadAccount(
-      env.feePayer.publicKey,
-    );
+    const feePayerPublicKey = await feePayerService.getFeePayer();
+    const feePayerAccount = await this.server.loadAccount(feePayerPublicKey);
 
     if (assetCode !== "native" && assetCode !== "XLM" && !assetIssuer) {
       throw new Error(
@@ -123,8 +121,7 @@ export class BlockchainService {
       .setTimeout(30)
       .build();
 
-    const feePayerKeypair = Keypair.fromSecret(env.feePayer.secretKey);
-    tx.sign(feePayerKeypair);
+    await feePayerService.sign(feePayerPublicKey, tx as Transaction);
 
     return tx.toXDR();
   }

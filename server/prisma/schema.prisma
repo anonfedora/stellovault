@@ -303,6 +303,19 @@ model RiskScore {
   @@index([walletAddress, computedAt])
 }
 
+model FeePayer {
+  id            String   @id @default(uuid())
+  publicKey     String   @unique
+  isPaused      Boolean  @default(false)
+  lastUsedAt    DateTime?
+  balance       Decimal? @db.Decimal(20, 7)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isPaused])
+  @@index([lastUsedAt])
+}
+
 // ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────

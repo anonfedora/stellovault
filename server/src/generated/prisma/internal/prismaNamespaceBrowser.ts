@@ -68,7 +68,8 @@ export const ModelName = {
   GovernanceProposal: 'GovernanceProposal',
   GovernanceVote: 'GovernanceVote',
   GovernanceAuditLog: 'GovernanceAuditLog',
-  RiskScore: 'RiskScore'
+  RiskScore: 'RiskScore',
+  FeePayer: 'FeePayer'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -320,6 +321,19 @@ export const RiskScoreScalarFieldEnum = {
 } as const
 
 export type RiskScoreScalarFieldEnum = (typeof RiskScoreScalarFieldEnum)[keyof typeof RiskScoreScalarFieldEnum]
+
+
+export const FeePayerScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  isPaused: 'isPaused',
+  lastUsedAt: 'lastUsedAt',
+  balance: 'balance',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FeePayerScalarFieldEnum = (typeof FeePayerScalarFieldEnum)[keyof typeof FeePayerScalarFieldEnum]
 
 
 export const SortOrder = {

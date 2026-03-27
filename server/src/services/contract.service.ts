@@ -4,13 +4,13 @@ import {
   scValToNative,
   TransactionBuilder,
   BASE_FEE,
-  Keypair,
   Operation,
   Horizon,
   SorobanRpc,
   Transaction,
 } from "@stellar/stellar-sdk";
 import { env } from "../config/env";
+import feePayerService from "./fee-payer.service";
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 1000;
@@ -40,8 +40,9 @@ export class ContractService {
     sourcePublicKey: string,
   ): Promise<string> {
     const contract = new Contract(contractId);
+    const feePayerPublicKey = await feePayerService.getFeePayer();
     const feePayerAccount = await this.horizonServer.loadAccount(
-      env.feePayer.publicKey,
+      feePayerPublicKey,
     );
 
     const tx = new TransactionBuilder(feePayerAccount, {
@@ -75,10 +76,7 @@ export class ContractService {
 
     const assembled = SorobanRpc.assembleTransaction(tx, simulated).build();
 
-    const feePayerKeypair = Keypair.fromSecret(env.feePayer.secretKey);
-    (tx as Transaction).sign(feePayerKeypair);
-    // const feePayerKeypair = Keypair.fromSecret(env.feePayer.secretKey);
-    // assembled.sign(feePayerKeypair);
+    await feePayerService.sign(feePayerPublicKey, assembled as Transaction);
 
     return assembled.toXDR();
   }
@@ -93,8 +91,9 @@ export class ContractService {
     args: xdr.ScVal[],
   ): Promise<unknown> {
     const contract = new Contract(contractId);
+    const feePayerPublicKey = await feePayerService.getFeePayer();
     const sourceAccount = await this.horizonServer.loadAccount(
-      env.feePayer.publicKey,
+      feePayerPublicKey,
     );
 
     const tx = new TransactionBuilder(sourceAccount, {

@@ -16,6 +16,16 @@ export const env = {
     feePayer: {
         publicKey: process.env.FEE_PAYER_PUBLIC || "",
         secretKey: process.env.FEE_PAYER_SECRET || "",
+        minBalance: parseFloat(process.env.FEE_PAYER_MIN_BALANCE || "50"),
+    },
+
+    treasury: {
+        secretKey: process.env.TREASURY_SECRET || "",
+    },
+
+    vault: {
+        address: process.env.VAULT_ADDR || "http://127.0.0.1:8200",
+        token: process.env.VAULT_TOKEN || "",
     },
 
     jwt: {

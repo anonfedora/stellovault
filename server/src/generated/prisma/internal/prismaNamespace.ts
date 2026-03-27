@@ -401,7 +401,8 @@ export const ModelName = {
   GovernanceProposal: 'GovernanceProposal',
   GovernanceVote: 'GovernanceVote',
   GovernanceAuditLog: 'GovernanceAuditLog',
-  RiskScore: 'RiskScore'
+  RiskScore: 'RiskScore',
+  FeePayer: 'FeePayer'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -417,7 +418,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore"
+    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore" | "feePayer"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1753,6 +1754,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FeePayer: {
+      payload: Prisma.$FeePayerPayload<ExtArgs>
+      fields: Prisma.FeePayerFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FeePayerFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FeePayerFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        findFirst: {
+          args: Prisma.FeePayerFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FeePayerFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        findMany: {
+          args: Prisma.FeePayerFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>[]
+        }
+        create: {
+          args: Prisma.FeePayerCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        createMany: {
+          args: Prisma.FeePayerCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FeePayerCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>[]
+        }
+        delete: {
+          args: Prisma.FeePayerDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        update: {
+          args: Prisma.FeePayerUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        deleteMany: {
+          args: Prisma.FeePayerDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FeePayerUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FeePayerUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>[]
+        }
+        upsert: {
+          args: Prisma.FeePayerUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeePayerPayload>
+        }
+        aggregate: {
+          args: Prisma.FeePayerAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFeePayer>
+        }
+        groupBy: {
+          args: Prisma.FeePayerGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FeePayerGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FeePayerCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FeePayerCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2025,6 +2100,19 @@ export const RiskScoreScalarFieldEnum = {
 } as const
 
 export type RiskScoreScalarFieldEnum = (typeof RiskScoreScalarFieldEnum)[keyof typeof RiskScoreScalarFieldEnum]
+
+
+export const FeePayerScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  isPaused: 'isPaused',
+  lastUsedAt: 'lastUsedAt',
+  balance: 'balance',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FeePayerScalarFieldEnum = (typeof FeePayerScalarFieldEnum)[keyof typeof FeePayerScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2374,6 +2462,7 @@ export type GlobalOmitConfig = {
   governanceVote?: Prisma.GovernanceVoteOmit
   governanceAuditLog?: Prisma.GovernanceAuditLogOmit
   riskScore?: Prisma.RiskScoreOmit
+  feePayer?: Prisma.FeePayerOmit
 }
 
 /* Types for Logging */
