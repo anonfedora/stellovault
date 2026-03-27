@@ -11,9 +11,8 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+/// Default TTL for refund/dispute entries: 30 days (~518400 ledgers)
+const DEFAULT_TTL_LEDGER_COUNT: u32 = 518400;
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,6 +20,7 @@ pub enum EscrowStatus {
     Active = 0,
     Released = 1,
     Refunded = 2,
+    Disputed = 3,
 }
 
 #[contracttype]
@@ -587,6 +587,11 @@ impl EscrowManager {
         escrow.status = EscrowStatus::Refunded;
         env.storage().persistent().set(&escrow_id, &escrow);
 
+        // Extend TTL for refund entry (30 days / 518400 ledgers)
+        env.storage()
+            .persistent()
+            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+
         env.events()
             .publish((symbol_short!("esc_rfnd"),), (escrow_id,));
 
@@ -596,6 +601,85 @@ impl EscrowManager {
     /// Get escrow details.
     pub fn get_escrow(env: Env, escrow_id: u64) -> Option<Escrow> {
         env.storage().persistent().get(&escrow_id)
+    }
+
+    /// Dispute an escrow (can be called by buyer, seller, or lender)
+    ///
+    /// # Arguments
+    /// * `escrow_id` - ID of the escrow to dispute
+    /// * `caller` - Address of the party raising the dispute
+    ///
+    /// # Events
+    /// Emits `EscrowDisputed` event
+    pub fn dispute_escrow(env: Env, escrow_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        // Only Buyer, Seller, or Lender can raise dispute
+        if caller != escrow.buyer && caller != escrow.seller && caller != escrow.lender {
+            return Err(ContractError::Unauthorized);
+        }
+
+        if escrow.status != EscrowStatus::Active {
+            return Err(ContractError::EscrowNotActive);
+        }
+
+        escrow.status = EscrowStatus::Disputed;
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        // Extend TTL for dispute entry (30 days / 518400 ledgers)
+        // Dispute entries start with full TTL, can be renewed if still active
+        env.storage()
+            .persistent()
+            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+
+        env.events()
+            .publish((symbol_short!("esc_dsp"),), (escrow_id,));
+
+        Ok(())
+    }
+
+    /// Renew TTL for an active dispute
+    ///
+    /// Can be called by any party (buyer, seller, lender) to extend the TTL
+    /// of an active dispute that hasn't been resolved.
+    ///
+    /// # Arguments
+    /// * `escrow_id` - ID of the escrow with active dispute
+    /// * `caller` - Address of the party renewing the TTL
+    pub fn renew_dispute_ttl(env: Env, escrow_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        // Only allow TTL renewal for active disputes
+        if escrow.status != EscrowStatus::Disputed {
+            return Err(ContractError::EscrowNotActive);
+        }
+
+        // Only Buyer, Seller, or Lender can renew dispute TTL
+        if caller != escrow.buyer && caller != escrow.seller && caller != escrow.lender {
+            return Err(ContractError::Unauthorized);
+        }
+
+        // Renew TTL for dispute entry
+        env.storage()
+            .persistent()
+            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+
+        env.events()
+            .publish((symbol_short!("dsp_rnew"),), (escrow_id,));
+
+        Ok(())
     }
 }
 
