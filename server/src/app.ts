@@ -62,6 +62,7 @@ app.use(`${api}/confirmations`, confirmationRoutes);
 app.use(`${api}/governance`, governanceRoutes);
 app.use(`${api}/risk`, riskRoutes);
 app.use(`${api}/analytics`, analyticsRoutes);
+app.use(`${api}/v1/analytics`, analyticsRoutes);
 
 // ── Error Handling (must be last) ────────────────────────────────────────────
 app.use(notFoundMiddleware);
