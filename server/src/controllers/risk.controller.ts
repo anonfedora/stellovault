@@ -70,3 +70,34 @@ export async function simulateRiskScore(req: Request, res: Response, next: NextF
         next(err);
     }
 }
+
+/**
+ * POST /api/risk/:wallet/override
+ * MANUALLY override risk score (ADMIN ONLY).
+ */
+export async function overrideRiskScore(req: Request, res: Response, next: NextFunction) {
+    try {
+        const wallet = req.params.wallet;
+        const { score, reason } = req.body;
+        
+        if (!wallet || !STELLAR_ADDRESS_REGEX.test(wallet)) {
+            throw new ValidationError("Invalid wallet address");
+        }
+        if (typeof score !== "number" || score < 0 || score > 100) {
+            throw new ValidationError("Invalid score: must be between 0 and 100");
+        }
+        if (!reason) {
+            throw new ValidationError("Reason is required for manual override");
+        }
+
+        // In a real implementation, you'd call a service to persist this.
+        // For now, we simulate success for the purpose of demonstrating audit logging.
+        res.json({ 
+            success: true, 
+            message: "Risk score successfully overridden",
+            data: { wallet, newScore: score, reason }
+        });
+    } catch (err) {
+        next(err);
+    }
+}

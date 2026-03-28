@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { isAllowed, setAllowed, getAddress, signMessage } from '@stellar/freighter-api';
 import { useRouter } from 'next/navigation';
+import { markQuickStartDone } from '@/utils/onboarding';
 
 interface WalletAuth {
     isConnected: boolean;
@@ -29,6 +30,7 @@ export function useWalletAuth(): WalletAuth {
                     if (address && !addressError) {
                         setIsConnected(true);
                         setPublicKey(address);
+                        markQuickStartDone("connectWallet");
                     }
                 }
             } catch (err) {
@@ -49,6 +51,7 @@ export function useWalletAuth(): WalletAuth {
                 if (address && !addressError) {
                     setIsConnected(true);
                     setPublicKey(address);
+                    markQuickStartDone("connectWallet");
                     key = address;
                 }
             } else {

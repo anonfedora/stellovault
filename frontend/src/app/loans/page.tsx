@@ -6,6 +6,7 @@ import { useLoans } from "@/hooks/useLoans";
 import { LoanCard } from "@/components/loans/LoanCard";
 import type { LoanStatus } from "@/types";
 import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { markQuickStartDone } from "@/utils/onboarding";
 
 const STATUSES: Array<LoanStatus | "ALL"> = [
   "ALL",
@@ -31,6 +32,10 @@ export default function LoansPage() {
   useEffect(() => {
     fetchLoans(activeStatus, page);
   }, [activeStatus, page, fetchLoans]);
+
+  useEffect(() => {
+    markQuickStartDone("monitorLoan");
+  }, []);
 
   const handleStatusChange = (status: LoanStatus | "ALL") => {
     setActiveStatus(status);
@@ -59,7 +64,10 @@ export default function LoansPage() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5 overflow-x-auto">
+      <div
+        id="sv-onboarding-monitor-loan"
+        className="flex gap-1 mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5 overflow-x-auto"
+      >
         {STATUSES.map((status) => (
           <button
             key={status}

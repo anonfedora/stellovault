@@ -392,6 +392,7 @@ export const ModelName = {
   Collateral: 'Collateral',
   Loan: 'Loan',
   Repayment: 'Repayment',
+  PaymentSession: 'PaymentSession',
   Investment: 'Investment',
   OracleEvent: 'OracleEvent',
   Oracle: 'Oracle',
@@ -401,7 +402,8 @@ export const ModelName = {
   GovernanceProposal: 'GovernanceProposal',
   GovernanceVote: 'GovernanceVote',
   GovernanceAuditLog: 'GovernanceAuditLog',
-  RiskScore: 'RiskScore'
+  RiskScore: 'RiskScore',
+  AuditLog: 'AuditLog'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -417,7 +419,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore"
+    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "paymentSession" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore" | "auditLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1010,6 +1012,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.RepaymentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.RepaymentCountAggregateOutputType> | number
+        }
+      }
+    }
+    PaymentSession: {
+      payload: Prisma.$PaymentSessionPayload<ExtArgs>
+      fields: Prisma.PaymentSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PaymentSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PaymentSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.PaymentSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PaymentSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        findMany: {
+          args: Prisma.PaymentSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        create: {
+          args: Prisma.PaymentSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        createMany: {
+          args: Prisma.PaymentSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PaymentSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.PaymentSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        update: {
+          args: Prisma.PaymentSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.PaymentSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PaymentSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PaymentSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.PaymentSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.PaymentSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePaymentSession>
+        }
+        groupBy: {
+          args: Prisma.PaymentSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PaymentSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentSessionCountAggregateOutputType> | number
         }
       }
     }
@@ -1753,6 +1829,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AuditLog: {
+      payload: Prisma.$AuditLogPayload<ExtArgs>
+      fields: Prisma.AuditLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AuditLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AuditLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        findFirst: {
+          args: Prisma.AuditLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AuditLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        findMany: {
+          args: Prisma.AuditLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>[]
+        }
+        create: {
+          args: Prisma.AuditLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        createMany: {
+          args: Prisma.AuditLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AuditLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>[]
+        }
+        delete: {
+          args: Prisma.AuditLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        update: {
+          args: Prisma.AuditLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.AuditLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AuditLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AuditLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.AuditLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuditLogPayload>
+        }
+        aggregate: {
+          args: Prisma.AuditLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAuditLog>
+        }
+        groupBy: {
+          args: Prisma.AuditLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuditLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AuditLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuditLogCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1903,6 +2053,25 @@ export const RepaymentScalarFieldEnum = {
 export type RepaymentScalarFieldEnum = (typeof RepaymentScalarFieldEnum)[keyof typeof RepaymentScalarFieldEnum]
 
 
+export const PaymentSessionScalarFieldEnum = {
+  id: 'id',
+  loanId: 'loanId',
+  repaymentId: 'repaymentId',
+  sessionToken: 'sessionToken',
+  checkoutUrl: 'checkoutUrl',
+  successUrl: 'successUrl',
+  cancelUrl: 'cancelUrl',
+  webhookUrl: 'webhookUrl',
+  webhookSecret: 'webhookSecret',
+  status: 'status',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentSessionScalarFieldEnum = (typeof PaymentSessionScalarFieldEnum)[keyof typeof PaymentSessionScalarFieldEnum]
+
+
 export const InvestmentScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -2027,6 +2196,19 @@ export const RiskScoreScalarFieldEnum = {
 export type RiskScoreScalarFieldEnum = (typeof RiskScoreScalarFieldEnum)[keyof typeof RiskScoreScalarFieldEnum]
 
 
+export const AuditLogScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  action: 'action',
+  resourceId: 'resourceId',
+  ipAddress: 'ipAddress',
+  payload: 'payload',
+  createdAt: 'createdAt'
+} as const
+
+export type AuditLogScalarFieldEnum = (typeof AuditLogScalarFieldEnum)[keyof typeof AuditLogScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2040,6 +2222,14 @@ export const JsonNullValueInput = {
 } as const
 
 export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
@@ -2189,6 +2379,20 @@ export type EnumLoanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Prism
  * Reference to a field of type 'LoanStatus[]'
  */
 export type ListEnumLoanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LoanStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentSessionStatus'
+ */
+export type EnumPaymentSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentSessionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentSessionStatus[]'
+ */
+export type ListEnumPaymentSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentSessionStatus[]'>
     
 
 
@@ -2364,6 +2568,7 @@ export type GlobalOmitConfig = {
   collateral?: Prisma.CollateralOmit
   loan?: Prisma.LoanOmit
   repayment?: Prisma.RepaymentOmit
+  paymentSession?: Prisma.PaymentSessionOmit
   investment?: Prisma.InvestmentOmit
   oracleEvent?: Prisma.OracleEventOmit
   oracle?: Prisma.OracleOmit
@@ -2374,6 +2579,7 @@ export type GlobalOmitConfig = {
   governanceVote?: Prisma.GovernanceVoteOmit
   governanceAuditLog?: Prisma.GovernanceAuditLogOmit
   riskScore?: Prisma.RiskScoreOmit
+  auditLog?: Prisma.AuditLogOmit
 }
 
 /* Types for Logging */

@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useGovernance } from "@/hooks/useGovernance";
 import { ProposalCard } from "@/components/governance/ProposalCard";
+import { Footer, Navbar } from "@/components";
 
 export default function GovernancePage() {
   const { proposals } = useGovernance();
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6 lg:px-8">
+    <>
+    <Navbar />
+     <div className="mt-10 min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
           <div>
@@ -41,5 +44,8 @@ export default function GovernancePage() {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
+   
   );
 }
