@@ -393,75 +393,9 @@ impl EscrowManager {
             }
         }
 
-        // Execute payment: path payment if assets differ, direct transfer otherwise
-        if escrow.asset == escrow.destination_asset {
-            // Direct transfer - no conversion needed
-            let token_client = token::Client::new(&env, &escrow.asset);
-            token_client.transfer(
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-        } else {
-            // Path payment - use Stellar's built-in DEX
-            let source_token = token::Client::new(&env, &escrow.asset);
-
-            // Execute path payment using Stellar's native path payment functionality
-            // This leverages the Stellar DEX to find the best conversion path
-            let _amount_received = source_token.try_transfer_from(
-                &env.current_contract_address(),
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-
-            // For path payments, we need to use a different approach
-            // Since Soroban doesn't have direct path payment support yet,
-            // we simulate it by doing a swap through the contract
-            // In production, this would integrate with Stellar's path payment protocol
-
-            // For now, we'll use a simplified approach:
-            // 1. Transfer source asset from escrow to a temporary holding
-            // 2. Invoke a swap operation (would be DEX in production)
-            // 3. Transfer destination asset to seller
-
-            // This is a placeholder for the actual path payment implementation
-            // In a real scenario, you'd call into Stellar's path payment host function
-            let _dest_token = token::Client::new(&env, &escrow.destination_asset);
-
-            // Simulate path payment by checking if we can meet minimum destination amount
-            // In production, this would be handled by Stellar's path payment protocol
-            let estimated_dest_amount = Self::estimate_path_payment(
-                &env,
-                &escrow.asset,
-                &escrow.destination_asset,
-                escrow.amount,
-            )?;
-
-            if estimated_dest_amount < escrow.min_destination_amount {
-                return Err(ContractError::SlippageExceeded);
-            }
-
-            // Execute the path payment
-            // Note: In production Stellar contracts, this would use the native path payment
-            // host function which automatically finds the best path through the DEX
-            source_token.transfer(
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-
-            // Emit path payment event for tracking
-            env.events().publish(
-                (symbol_short!("path_pay"),),
-                (escrow_id, escrow.amount, estimated_dest_amount),
-            );
-        }
-
-        // Calculate and collect protocol fee if treasury is configured
-        let treasury_opt: Option<Address> =
-            env.storage().instance().get(&symbol_short!("treasury"));
-        let _protocol_fee = if let Some(treasury) = treasury_opt {
+        // Calculate and collect protocol fee if treasury is configured (BEFORE payment)
+        let treasury_opt: Option<Address> = env.storage().instance().get(&symbol_short!("treasury"));
+        let protocol_fee = if let Some(treasury) = treasury_opt {
             // Query fee_bps from ProtocolTreasury
             let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
             let fee_bps: u32 =
@@ -471,9 +405,11 @@ impl EscrowManager {
             let fee_amount = (escrow.amount * fee_bps as i128) / 10000;
 
             if fee_amount > 0 {
+                // Transfer fee to treasury FIRST
+                let token_client = token::Client::new(&env, &escrow.asset);
+                token_client.transfer(&env.current_contract_address(), &treasury, &fee_amount);
+
                 // Record the fee deposit in treasury
-                // Note: In a full implementation, the actual token transfer would happen
-                // before this call, either deducted from the payment or transferred separately
                 let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
                     &env,
                     [escrow.asset.into_val(&env), fee_amount.into_val(&env)],
@@ -492,6 +428,51 @@ impl EscrowManager {
         } else {
             0i128
         };
+
+        let net_amount = escrow.amount - protocol_fee;
+
+        // Execute payment: path payment if assets differ, direct transfer otherwise
+        if escrow.asset == escrow.destination_asset {
+            // Direct transfer - no conversion needed
+            let token_client = token::Client::new(&env, &escrow.asset);
+            token_client.transfer(&env.current_contract_address(), &escrow.seller, &net_amount);
+        } else {
+            // Path payment - use Stellar's built-in DEX
+            let source_token = token::Client::new(&env, &escrow.asset);
+
+            // For now, we'll use a simplified approach:
+            // 1. Transfer source asset from escrow to a temporary holding
+            // 2. Invoke a swap operation (would be DEX in production)
+            // 3. Transfer destination asset to seller
+
+            // This is a placeholder for the actual path payment implementation
+            // In a real scenario, you'd call into Stellar's path payment host function
+            let _dest_token = token::Client::new(&env, &escrow.destination_asset);
+
+            // Simulate path payment by checking if we can meet minimum destination amount
+            // In production, this would be handled by Stellar's path payment protocol
+            let estimated_dest_amount = Self::estimate_path_payment(
+                &env,
+                &escrow.asset,
+                &escrow.destination_asset,
+                net_amount,
+            )?;
+
+            if estimated_dest_amount < escrow.min_destination_amount {
+                return Err(ContractError::SlippageExceeded);
+            }
+
+            // Execute the path payment
+            // Note: In production Stellar contracts, this would use the native path payment
+            // host function which automatically finds the best path through the DEX
+            source_token.transfer(&env.current_contract_address(), &escrow.seller, &net_amount);
+
+            // Emit path payment event for tracking
+            env.events().publish(
+                (symbol_short!("path_pay"),),
+                (escrow_id, net_amount, estimated_dest_amount),
+            );
+        }
 
         // Unlock collateral via CollateralRegistry
         let coll_reg: Address = env

@@ -62,8 +62,8 @@ pub struct ProtocolTreasury;
 
 #[contractimpl]
 impl ProtocolTreasury {
-    /// Initialize the treasury with an admin address.
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+    /// Initialize the treasury with an admin and governance addresses.
+    pub fn initialize(env: Env, admin: Address, governance: Address) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("admin")) {
             return Err(ContractError::AlreadyInitialized);
         }
@@ -73,13 +73,16 @@ impl ProtocolTreasury {
             .set(&symbol_short!("admin"), &admin);
         env.storage()
             .instance()
+            .set(&symbol_short!("governance"), &governance);
+        env.storage()
+            .instance()
             .set(&symbol_short!("fee_bps"), &DEFAULT_FEE_BPS);
         env.storage()
             .instance()
             .set(&symbol_short!("tot_wt"), &0u32);
 
         env.events()
-            .publish((symbol_short!("trs_init"),), (admin, DEFAULT_FEE_BPS));
+            .publish((symbol_short!("trs_init"),), (admin, governance, DEFAULT_FEE_BPS));
 
         Ok(())
     }
@@ -296,6 +299,41 @@ impl ProtocolTreasury {
             .instance()
             .get(&symbol_short!("tot_wt"))
             .unwrap_or(0)
+    }
+
+    /// Governance-only withdrawal of treasury funds to DAO treasury.
+    /// Protected by governance contract authorization.
+    pub fn withdraw_treasury(env: Env, asset: Address, amount: i128) -> Result<(), ContractError> {
+        let governance: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("governance"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        governance.require_auth();
+
+        if amount <= 0 {
+            return Err(ContractError::ZeroAmount);
+        }
+
+        let fee_key = (symbol_short!("fees"), asset.clone());
+        let total_fees: i128 = env.storage().persistent().get(&fee_key).unwrap_or(0);
+
+        if total_fees < amount {
+            return Err(ContractError::NoFeesAvailable);
+        }
+
+        // Transfer tokens to governance
+        let token_client = token::Client::new(&env, &asset);
+        token_client.transfer(&env.current_contract_address(), &governance, &amount);
+
+        // Update recorded fees
+        env.storage().persistent().set(&fee_key, &(total_fees - amount));
+
+        env.events()
+            .publish((symbol_short!("trs_wd"),), (asset.clone(), amount));
+
+        Ok(())
     }
 }
 
