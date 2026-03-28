@@ -165,6 +165,15 @@ export class ContractService {
       status: getResponse.status,
     };
   }
+
+  /**
+   * Submits a signed transaction and returns the transaction hash.
+   * Used by the transaction queue service.
+   */
+  async submitSignedTransaction(signedXDR: string): Promise<string> {
+    const result = await this.submitXDR(signedXDR);
+    return result.hash;
+  }
 }
 
 export default new ContractService();
