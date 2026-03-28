@@ -403,58 +403,33 @@ impl EscrowManager {
                 &escrow.amount,
             );
         } else {
-            // Path payment - use Stellar's built-in DEX
-            let source_token = token::Client::new(&env, &escrow.asset);
+            // Path payment: source asset (held in escrow) → destination asset (received by seller)
+            //
+            // In production Soroban, this integrates with Stellar's DEX path payment protocol.
+            // Here we simulate the swap: the contract holds source tokens and pays out
+            // destination tokens, enforcing slippage protection via min_destination_amount.
 
-            // Execute path payment using Stellar's native path payment functionality
-            // This leverages the Stellar DEX to find the best conversion path
-            let _amount_received = source_token.try_transfer_from(
-                &env.current_contract_address(),
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
-
-            // For path payments, we need to use a different approach
-            // Since Soroban doesn't have direct path payment support yet,
-            // we simulate it by doing a swap through the contract
-            // In production, this would integrate with Stellar's path payment protocol
-
-            // For now, we'll use a simplified approach:
-            // 1. Transfer source asset from escrow to a temporary holding
-            // 2. Invoke a swap operation (would be DEX in production)
-            // 3. Transfer destination asset to seller
-
-            // This is a placeholder for the actual path payment implementation
-            // In a real scenario, you'd call into Stellar's path payment host function
-            let _dest_token = token::Client::new(&env, &escrow.destination_asset);
-
-            // Simulate path payment by checking if we can meet minimum destination amount
-            // In production, this would be handled by Stellar's path payment protocol
-            let estimated_dest_amount = Self::estimate_path_payment(
+            // 1. Estimate how many destination tokens the source amount yields
+            let dest_amount = Self::estimate_path_payment(
                 &env,
                 &escrow.asset,
                 &escrow.destination_asset,
                 escrow.amount,
             )?;
 
-            if estimated_dest_amount < escrow.min_destination_amount {
+            // 2. Slippage guard: revert if conversion falls below the caller's minimum
+            if dest_amount < escrow.min_destination_amount {
                 return Err(ContractError::SlippageExceeded);
             }
 
-            // Execute the path payment
-            // Note: In production Stellar contracts, this would use the native path payment
-            // host function which automatically finds the best path through the DEX
-            source_token.transfer(
-                &env.current_contract_address(),
-                &escrow.seller,
-                &escrow.amount,
-            );
+            // 3. Transfer destination asset to seller (contract must hold sufficient balance)
+            let dest_token = token::Client::new(&env, &escrow.destination_asset);
+            dest_token.transfer(&env.current_contract_address(), &escrow.seller, &dest_amount);
 
-            // Emit path payment event for tracking
+            // Emit path payment event for off-chain tracking
             env.events().publish(
                 (symbol_short!("path_pay"),),
-                (escrow_id, escrow.amount, estimated_dest_amount),
+                (escrow_id, escrow.amount, dest_amount),
             );
         }
 
@@ -1195,7 +1170,7 @@ mod test {
         let dest_token_addr = dest_token_contract.address();
         let dest_token_admin_client = token::StellarAssetClient::new(&t.env, &dest_token_addr);
 
-        // Mint destination tokens to the escrow contract for the swap
+        // Mint destination tokens to the escrow contract to simulate DEX liquidity
         dest_token_admin_client.mint(&t.escrow_id_addr, &10_000);
 
         // Create escrow with different destination asset
@@ -1215,7 +1190,7 @@ mod test {
             oracle_set: Vec::new(&t.env),
         });
 
-        // Set exchange rate: 0.95 (5% loss in conversion)
+        // Set exchange rate: 0.95 (5% slippage) → dest_amount = 4750 ≥ min 4500
         t.escrow_client.set_test_exchange_rate(&950_000i128);
 
         // Set oracle confirmation
@@ -1226,6 +1201,14 @@ mod test {
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Released);
+
+        // Seller must receive destination tokens (not source tokens)
+        let dest_token = token::Client::new(&t.env, &dest_token_addr);
+        assert_eq!(dest_token.balance(&t.seller), 4750); // 5000 * 0.95
+
+        // Seller must NOT receive source tokens
+        let src_token = token::Client::new(&t.env, &t.token_addr);
+        assert_eq!(src_token.balance(&t.seller), 0);
     }
 
     #[test]
