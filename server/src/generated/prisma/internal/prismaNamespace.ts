@@ -392,6 +392,7 @@ export const ModelName = {
   Collateral: 'Collateral',
   Loan: 'Loan',
   Repayment: 'Repayment',
+  PaymentSession: 'PaymentSession',
   Investment: 'Investment',
   OracleEvent: 'OracleEvent',
   Oracle: 'Oracle',
@@ -418,7 +419,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore" | "auditLog"
+    modelProps: "user" | "wallet" | "session" | "walletChallenge" | "escrow" | "collateral" | "loan" | "repayment" | "paymentSession" | "investment" | "oracleEvent" | "oracle" | "oracleRateLimit" | "oracleConfirmation" | "dispute" | "governanceProposal" | "governanceVote" | "governanceAuditLog" | "riskScore" | "auditLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1011,6 +1012,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.RepaymentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.RepaymentCountAggregateOutputType> | number
+        }
+      }
+    }
+    PaymentSession: {
+      payload: Prisma.$PaymentSessionPayload<ExtArgs>
+      fields: Prisma.PaymentSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PaymentSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PaymentSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.PaymentSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PaymentSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        findMany: {
+          args: Prisma.PaymentSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        create: {
+          args: Prisma.PaymentSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        createMany: {
+          args: Prisma.PaymentSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PaymentSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.PaymentSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        update: {
+          args: Prisma.PaymentSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.PaymentSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PaymentSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PaymentSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.PaymentSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.PaymentSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePaymentSession>
+        }
+        groupBy: {
+          args: Prisma.PaymentSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PaymentSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentSessionCountAggregateOutputType> | number
         }
       }
     }
@@ -1978,6 +2053,25 @@ export const RepaymentScalarFieldEnum = {
 export type RepaymentScalarFieldEnum = (typeof RepaymentScalarFieldEnum)[keyof typeof RepaymentScalarFieldEnum]
 
 
+export const PaymentSessionScalarFieldEnum = {
+  id: 'id',
+  loanId: 'loanId',
+  repaymentId: 'repaymentId',
+  sessionToken: 'sessionToken',
+  checkoutUrl: 'checkoutUrl',
+  successUrl: 'successUrl',
+  cancelUrl: 'cancelUrl',
+  webhookUrl: 'webhookUrl',
+  webhookSecret: 'webhookSecret',
+  status: 'status',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentSessionScalarFieldEnum = (typeof PaymentSessionScalarFieldEnum)[keyof typeof PaymentSessionScalarFieldEnum]
+
+
 export const InvestmentScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -2289,6 +2383,20 @@ export type ListEnumLoanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$P
 
 
 /**
+ * Reference to a field of type 'PaymentSessionStatus'
+ */
+export type EnumPaymentSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentSessionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentSessionStatus[]'
+ */
+export type ListEnumPaymentSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentSessionStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -2460,6 +2568,7 @@ export type GlobalOmitConfig = {
   collateral?: Prisma.CollateralOmit
   loan?: Prisma.LoanOmit
   repayment?: Prisma.RepaymentOmit
+  paymentSession?: Prisma.PaymentSessionOmit
   investment?: Prisma.InvestmentOmit
   oracleEvent?: Prisma.OracleEventOmit
   oracle?: Prisma.OracleOmit

@@ -12,22 +12,22 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model User {
-  id                  String                @id @default(uuid())
-  stellarAddress      String                @unique
-  name                String?
-  role                Role                  @default(USER)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  id             String   @id @default(uuid())
+  stellarAddress String   @unique
+  name           String?
+  role           Role     @default(USER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   wallets             Wallet[]
   challenges          WalletChallenge[]
-  boughtEscrows       Escrow[]              @relation("BuyerEscrows")
-  soldEscrows         Escrow[]              @relation("SellerEscrows")
+  boughtEscrows       Escrow[]             @relation("BuyerEscrows")
+  soldEscrows         Escrow[]             @relation("SellerEscrows")
   investments         Investment[]
   sessions            Session[]
-  borrowedLoans       Loan[]                @relation("BorrowerLoans")
-  lentLoans           Loan[]                @relation("LenderLoans")
-  governanceProposals GovernanceProposal[]  @relation("ProposerProposals")
+  borrowedLoans       Loan[]               @relation("BorrowerLoans")
+  lentLoans           Loan[]               @relation("LenderLoans")
+  governanceProposals GovernanceProposal[] @relation("ProposerProposals")
 }
 
 model Wallet {
@@ -138,7 +138,8 @@ model Loan {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  repayments Repayment[]
+  repayments      Repayment[]
+  paymentSessions PaymentSession[]
 
   @@index([borrowerId])
   @@index([lenderId])
@@ -147,14 +148,36 @@ model Loan {
 }
 
 model Repayment {
-  id        String   @id @default(uuid())
-  loanId    String
-  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  amount    Decimal  @db.Decimal(20, 7)
-  paidAt    DateTime @default(now())
-  createdAt DateTime @default(now())
+  id             String          @id @default(uuid())
+  loanId         String
+  loan           Loan            @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount         Decimal         @db.Decimal(20, 7)
+  paidAt         DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  paymentSession PaymentSession?
 
   @@index([loanId])
+}
+
+model PaymentSession {
+  id            String               @id @default(uuid())
+  loanId        String
+  loan          Loan                 @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  repaymentId   String?              @unique
+  repayment     Repayment?           @relation(fields: [repaymentId], references: [id], onDelete: SetNull)
+  sessionToken  String               @unique
+  checkoutUrl   String
+  successUrl    String
+  cancelUrl     String
+  webhookUrl    String?
+  webhookSecret String?
+  status        PaymentSessionStatus @default(PENDING)
+  completedAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([loanId])
+  @@index([status])
 }
 
 model Investment {
@@ -353,6 +376,13 @@ enum LoanStatus {
   ACTIVE
   REPAID
   DEFAULTED
+}
+
+enum PaymentSessionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  EXPIRED
 }
 
 enum GovernanceStatus {

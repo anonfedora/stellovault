@@ -1,6 +1,7 @@
 import {
   Contract,
   xdr,
+  nativeToScVal,
   scValToNative,
   TransactionBuilder,
   BASE_FEE,
@@ -11,6 +12,7 @@ import {
   Transaction,
 } from "@stellar/stellar-sdk";
 import { env } from "../config/env";
+import { contracts } from "../config/contracts";
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 1000;
@@ -173,6 +175,26 @@ export class ContractService {
   async submitSignedTransaction(signedXDR: string): Promise<string> {
     const result = await this.submitXDR(signedXDR);
     return result.hash;
+  }
+
+  async getEscrowState(
+    escrowId: string | number,
+  ): Promise<Record<string, unknown> | null> {
+    const contractId = contracts.escrow?.trim();
+    if (!contractId) {
+      throw new Error("ESCROW_CONTRACT_ID not configured");
+    }
+
+    const numericEscrowId = Number(escrowId);
+    if (!Number.isInteger(numericEscrowId) || numericEscrowId < 0) {
+      throw new Error(
+        "Escrow on-chain identifier must be a non-negative integer",
+      );
+    }
+
+    return (await this.simulateCall(contractId, "get_escrow", [
+      nativeToScVal(BigInt(numericEscrowId), { type: "u64" }),
+    ])) as Record<string, unknown> | null;
   }
 }
 
