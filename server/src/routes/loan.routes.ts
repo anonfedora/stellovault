@@ -10,6 +10,15 @@ router.use(authMiddleware);
 router.post("/", auditLog("LOAN_CREATION"), loanController.createLoan);
 router.get("/", loanController.listLoans);
 router.get("/:id", loanController.getLoan);
-router.post("/repay", auditLog("LOAN_REPAYMENT"), loanController.recordRepayment);
+router.post(
+  "/:id/payments",
+  auditLog("PAYMENT_SESSION_CREATED"),
+  loanController.createPayment,
+);
+router.post(
+  "/repay",
+  auditLog("LOAN_REPAYMENT"),
+  loanController.recordRepayment,
+);
 
 export default router;

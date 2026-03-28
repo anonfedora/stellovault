@@ -59,6 +59,7 @@ export const ModelName = {
   Collateral: 'Collateral',
   Loan: 'Loan',
   Repayment: 'Repayment',
+  PaymentSession: 'PaymentSession',
   Investment: 'Investment',
   OracleEvent: 'OracleEvent',
   Oracle: 'Oracle',
@@ -197,6 +198,25 @@ export const RepaymentScalarFieldEnum = {
 } as const
 
 export type RepaymentScalarFieldEnum = (typeof RepaymentScalarFieldEnum)[keyof typeof RepaymentScalarFieldEnum]
+
+
+export const PaymentSessionScalarFieldEnum = {
+  id: 'id',
+  loanId: 'loanId',
+  repaymentId: 'repaymentId',
+  sessionToken: 'sessionToken',
+  checkoutUrl: 'checkoutUrl',
+  successUrl: 'successUrl',
+  cancelUrl: 'cancelUrl',
+  webhookUrl: 'webhookUrl',
+  webhookSecret: 'webhookSecret',
+  status: 'status',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentSessionScalarFieldEnum = (typeof PaymentSessionScalarFieldEnum)[keyof typeof PaymentSessionScalarFieldEnum]
 
 
 export const InvestmentScalarFieldEnum = {

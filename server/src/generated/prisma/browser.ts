@@ -58,6 +58,11 @@ export type Loan = Prisma.LoanModel
  */
 export type Repayment = Prisma.RepaymentModel
 /**
+ * Model PaymentSession
+ * 
+ */
+export type PaymentSession = Prisma.PaymentSessionModel
+/**
  * Model Investment
  * 
  */

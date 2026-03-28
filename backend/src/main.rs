@@ -9,32 +9,23 @@ use axum::{routing::get, Router};
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tower_http::cors::{CorsLayer, Any};
 
-// Re-declare modules for binary
-mod app_state;
-mod collateral;
-mod escrow;
-mod escrow_service;
-mod event_listener;
-mod governance_service;
-mod handlers;
-mod loan;
-mod loan_service;
-mod middleware;
-mod models;
-mod oracle_service;
-mod routes;
-mod services;
-mod state;
-
-// Domain modules
-mod websocket;
-mod indexer;
-
-use config::Config;
-use escrow::{timeout_detector, EscrowService, EventListener};
-use middleware::RateLimiter;
-use state::AppState;
+// Use modules from lib
+use stellovault_server::{
+    auth::AuthService,
+    collateral::{CollateralIndexer, CollateralService},
+    config::Config,
+    escrow::{timeout_detector, EscrowService},
+    indexer::IndexerService,
+    loan_service::LoanService,
+    middleware::{self, RateLimiter},
+    oracle::OracleService,
+    routes,
+    services::RiskEngine,
+    state::AppState,
+    websocket::{self, WsState},
+};
 
 #[tokio::main]
 async fn main() {
@@ -93,10 +84,10 @@ async fn main() {
     tracing::info!("Database connected successfully");
 
     // Initialize WebSocket state
-    let ws_state = websocket::WsState::new();
+    let ws_state = WsState::new();
 
     // Initialize collateral service
-    let collateral_service = collateral::CollateralService::new(
+    let collateral_service = CollateralService::new(
         db_pool.clone(),
         config.soroban_rpc_url.clone(),
         config.contract_id.clone(),
@@ -113,23 +104,40 @@ async fn main() {
     let collateral_service = Arc::new(collateral_service);
 
     // Initialize oracle service
-    let oracle_service = Arc::new(oracle_service::OracleService::new(
+    let oracle_service = Arc::new(OracleService::new(
+        db_pool.clone(),
+        horizon_url.clone(),
+        network_passphrase.clone(),
+        soroban_rpc_url.clone(),
+    ));
+
+    // Initialize loan service
+    let loan_service = Arc::new(LoanService::new(
         db_pool.clone(),
     ));
 
-    // Initialize governance service
-    let governance_service = Arc::new(governance_service::GovernanceService::new(
+    // Initialize auth service (with default TTL values)
+    let auth_service = Arc::new(AuthService::new(
         db_pool.clone(),
-        contract_id.clone(), // governance contract ID (same as main contract for now)
-        network_passphrase.clone(),
+        config.jwt_secret.clone(),
+        300,      // nonce_ttl_seconds: 5 minutes
+        3600,     // access_token_ttl_seconds: 1 hour
+        30,       // refresh_token_ttl_days: 30 days
+    ));
+
+    // Initialize risk engine
+    let risk_engine = Arc::new(RiskEngine::new(
+        db_pool.clone(),
     ));
 
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
         collateral_service.clone(),
+        loan_service.clone(),
+        auth_service.clone(),
+        risk_engine.clone(),
         oracle_service.clone(),
-        governance_service.clone(),
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -141,7 +149,7 @@ async fn main() {
     contracts_map.insert("escrow".to_string(), escrow_id);
     contracts_map.insert("loan".to_string(), loan_id);
 
-    let indexer_service = Arc::new(indexer::IndexerService::new(
+    let indexer_service = Arc::new(IndexerService::new(
         soroban_rpc_url,
         db_pool.clone(),
         contracts_map,
@@ -153,7 +161,7 @@ async fn main() {
     });
 
     // Start collateral indexer
-    let collateral_indexer = collateral::CollateralIndexer::new(
+    let collateral_indexer = CollateralIndexer::new(
         db_pool.clone(),
         config.soroban_rpc_url.clone(),
         config.contract_id.clone(),
@@ -189,10 +197,10 @@ async fn main() {
         .merge(routes::escrow_routes())
         .merge(routes::collateral_routes())
         .merge(routes::oracle_routes())
-        .merge(routes::governance_routes())
         .merge(routes::analytics_routes())
         .merge(routes::risk_routes())
-        .merge(routes::oracle_routes())
+        .merge(routes::loan_routes())
+        .merge(routes::document_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))
@@ -273,14 +281,14 @@ fn configure_cors() -> CorsLayer {
 /// Graceful shutdown signal handler
 async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
+        tokio::signal::ctrl_c()
             .await
             .expect("Failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
             .expect("Failed to install SIGTERM handler")
             .recv()
             .await;
