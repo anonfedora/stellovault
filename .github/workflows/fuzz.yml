@@ -1,0 +1,106 @@
+name: Fuzzing & Property Tests
+
+on:
+  push:
+    branches: [main, master, contract]
+    paths:
+      - 'contracts/**'
+  pull_request:
+    branches: [main, master, contract]
+    paths:
+      - 'contracts/**'
+  # Allow manual triggering for extended fuzzing campaigns
+  workflow_dispatch:
+    inputs:
+      fuzz_duration:
+        description: 'Fuzzing duration in seconds per target'
+        required: false
+        default: '300'
+
+jobs:
+  # ── Property-based tests (proptest) ────────────────────────────────────
+  proptest:
+    name: Property-Based Tests (proptest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-proptest-${{ hashFiles('contracts/Cargo.lock') }}
+
+      - name: Run proptest suite (escrow-manager)
+        run: cargo test --package escrow-manager --features testutils -- --include-ignored fuzz --test-threads=1
+        env:
+          PROPTEST_CASES: 10000
+
+      - name: Run proptest suite (governance)
+        run: cargo test --package governance --features testutils -- --include-ignored fuzz --test-threads=1
+        env:
+          PROPTEST_CASES: 10000
+
+  # ── Cargo-fuzz (libfuzzer) ─────────────────────────────────────────────
+  cargo-fuzz:
+    name: Cargo Fuzz (libfuzzer)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts/fuzz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly (required by cargo-fuzz)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/fuzz/target
+          key: ${{ runner.os }}-cargo-fuzz-${{ hashFiles('contracts/fuzz/Cargo.lock') }}
+
+      - name: Fuzz escrow invariants
+        run: |
+          DURATION=${{ github.event.inputs.fuzz_duration || '120' }}
+          cargo +nightly fuzz run fuzz_escrow_invariants -- \
+            -max_total_time=${DURATION} \
+            -max_len=4096 \
+            -runs=1000000
+
+      - name: Fuzz governance voting
+        run: |
+          DURATION=${{ github.event.inputs.fuzz_duration || '120' }}
+          cargo +nightly fuzz run fuzz_governance_voting -- \
+            -max_total_time=${DURATION} \
+            -max_len=4096 \
+            -runs=1000000
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: contracts/fuzz/artifacts/
+          retention-days: 30

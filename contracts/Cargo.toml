@@ -11,3 +11,4 @@ members = [
     "risk-assessment",
 ]
 resolver = "2"
+exclude = ["fuzz"]

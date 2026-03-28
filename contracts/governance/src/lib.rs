@@ -720,13 +720,6 @@ impl Governance {
         x
     }
 
-    /// Set voting power for testing
-    #[cfg(test)]
-    pub fn set_voting_power(env: Env, voter: Address, power: i128) {
-        let key = (symbol_short!("vp"), voter);
-        env.storage().persistent().set(&key, &power);
-    }
-
     /// Validate parameter symbol and value
     fn validate_parameter(parameter: &Symbol, value: i128) -> Result<(), ContractError> {
         // Validate based on parameter type
@@ -914,6 +907,20 @@ impl Governance {
         } else {
             Ok(ProposalStatus::Failed)
         }
+    }
+}
+
+// ============================================================================
+// Test Utilities (available in tests and when testutils feature is enabled)
+// ============================================================================
+
+#[cfg(any(test, feature = "testutils"))]
+#[contractimpl]
+impl Governance {
+    /// Set voting power for testing
+    pub fn set_voting_power(env: Env, voter: Address, power: i128) {
+        let key = (symbol_short!("vp"), voter);
+        env.storage().persistent().set(&key, &power);
     }
 }
 
