@@ -137,8 +137,8 @@ model Loan {
   collateral   Collateral? @relation(fields: [collateralId], references: [id])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-
-  repayments      Repayment[]
+  repayments   Repayment[]
+  payments     Payment[]
   paymentSessions PaymentSession[]
 
   @@index([borrowerId])
@@ -175,6 +175,21 @@ model PaymentSession {
   completedAt   DateTime?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+
+  @@index([loanId])
+  @@index([status])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  loanId      String
+  loan        Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(20, 7)
+  status      PaymentStatus @default(PENDING)
+  txHash      String?
+  errorMessage String?
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
 
   @@index([loanId])
   @@index([status])
@@ -344,6 +359,13 @@ model AuditLog {
 // ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
 enum Role {
   USER

@@ -3,25 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLoans } from "@/hooks/useLoans";
+import { LoanStatus } from "@/types";
 import { LoanCard } from "@/components/loans/LoanCard";
-import type { LoanStatus } from "@/types";
 import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { markQuickStartDone } from "@/utils/onboarding";
 
 const STATUSES: Array<LoanStatus | "ALL"> = [
   "ALL",
-  "PENDING",
-  "ACTIVE",
-  "REPAID",
-  "DEFAULTED",
+  LoanStatus.PENDING,
+  LoanStatus.ACTIVE,
+  LoanStatus.REPAID,
+  LoanStatus.DEFAULTED,
 ];
 
 const STATUS_TAB_STYLES: Record<string, string> = {
   ALL: "hover:bg-gray-100 dark:hover:bg-gray-800",
-  PENDING: "hover:bg-yellow-50 dark:hover:bg-yellow-900/20",
-  ACTIVE: "hover:bg-green-50 dark:hover:bg-green-900/20",
-  REPAID: "hover:bg-blue-50 dark:hover:bg-blue-900/20",
-  DEFAULTED: "hover:bg-red-50 dark:hover:bg-red-900/20",
+  [LoanStatus.PENDING]: "hover:bg-yellow-50 dark:hover:bg-yellow-900/20",
+  [LoanStatus.ACTIVE]: "hover:bg-green-50 dark:hover:bg-green-900/20",
+  [LoanStatus.REPAID]: "hover:bg-blue-50 dark:hover:bg-blue-900/20",
+  [LoanStatus.DEFAULTED]: "hover:bg-red-50 dark:hover:bg-red-900/20",
 };
 
 export default function LoansPage() {
