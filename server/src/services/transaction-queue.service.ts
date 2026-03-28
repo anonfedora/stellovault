@@ -279,8 +279,10 @@ export class TransactionQueueService {
                 status = TransactionStatus.FAILED;
                 break;
             case 'active':
-            case 'waiting':
                 status = TransactionStatus.PROCESSING;
+                break;
+            case 'waiting':
+                status = TransactionStatus.PENDING;
                 break;
             default:
                 status = TransactionStatus.PENDING;

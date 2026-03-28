@@ -139,6 +139,7 @@ model Loan {
   updatedAt    DateTime    @updatedAt
 
   repayments Repayment[]
+  payments   Payment[]
 
   @@index([borrowerId])
   @@index([lenderId])
@@ -147,14 +148,30 @@ model Loan {
 }
 
 model Repayment {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   loanId    String
-  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  amount    Decimal  @db.Decimal(20, 7)
-  paidAt    DateTime @default(now())
-  createdAt DateTime @default(now())
+  loan      Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount    Decimal       @db.Decimal(20, 7)
+  status    PaymentStatus @default(PENDING)
+  paidAt    DateTime      @default(now())
+  createdAt DateTime      @default(now())
 
   @@index([loanId])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  loanId      String
+  loan        Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(20, 7)
+  status      PaymentStatus @default(PENDING)
+  txHash      String?
+  errorMessage String?
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
+
+  @@index([loanId])
+  @@index([status])
 }
 
 model Investment {
