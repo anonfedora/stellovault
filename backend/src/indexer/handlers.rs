@@ -205,7 +205,7 @@ impl EventHandler {
                     let id = scval_to_u64(&args[0])?;
                     let decision_raw = scval_to_u64(&args[1])?;
 
-                    // DisputeDecision: 0=ReleaseToSeller, 1=RefundToLender
+                    // DisputeDecision: 0=ReleaseToSeller, 1=RefundToBuyer
                     let new_status = match decision_raw {
                         0 => "released",
                         1 => "refunded",
