@@ -137,9 +137,8 @@ model Loan {
   collateral   Collateral? @relation(fields: [collateralId], references: [id])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-  repayments Repayment[]
-  payments   Payment[]
-  repayments      Repayment[]
+  repayments   Repayment[]
+  payments     Payment[]
   paymentSessions PaymentSession[]
 
   @@index([borrowerId])
