@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Upload collateral tutorial animation">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071A12" />
+      <stop offset="1" stop-color="#0B3B2A" />
+    </linearGradient>
+    <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22C55E" />
+      <stop offset="1" stop-color="#16A34A" />
+    </linearGradient>
+    <style>
+      .label { font: 600 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #ECFDF5; }
+      .muted { font: 500 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: rgba(236,253,245,0.75); }
+      .btnText { font: 700 16px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #062412; }
+      .cursor { animation: cursorMove 15s infinite cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .file { animation: fileDrop 15s infinite cubic-bezier(0.2, 0.8, 0.2, 1); }
+      @keyframes cursorMove {
+        0% { transform: translate(110px, 260px); opacity: 0; }
+        10% { opacity: 1; }
+        30% { transform: translate(210px, 180px); }
+        50% { transform: translate(260px, 175px); }
+        60% { transform: translate(300px, 195px); }
+        75% { transform: translate(360px, 230px); }
+        100% { transform: translate(110px, 260px); opacity: 0; }
+      }
+      @keyframes fileDrop {
+        0%, 35% { transform: translate(0px, -60px); opacity: 0; }
+        45% { opacity: 1; }
+        60% { transform: translate(0px, 0px); opacity: 1; }
+        75% { opacity: 0; }
+        100% { opacity: 0; }
+      }
+    </style>
+  </defs>
+
+  <rect width="640" height="360" rx="18" fill="url(#bg2)" />
+
+  <rect x="90" y="64" width="460" height="232" rx="18" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.18)" />
+  <text x="120" y="112" class="label">Upload collateral</text>
+  <text x="120" y="140" class="muted">Drag an invoice or document → Mint collateral token</text>
+
+  <!-- Drop zone -->
+  <rect x="120" y="160" width="260" height="100" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(236,253,245,0.35)" stroke-dasharray="6 6" />
+  <text x="250" y="218" text-anchor="middle" class="muted">Drop file here</text>
+
+  <!-- Action button -->
+  <rect x="400" y="214" width="120" height="42" rx="12" fill="url(#accent2)" />
+  <text x="460" y="242" text-anchor="middle" class="btnText">Upload</text>
+
+  <!-- Dropping file -->
+  <g class="file" transform="translate(230 170)">
+    <rect x="0" y="0" width="40" height="52" rx="8" fill="rgba(236,253,245,0.85)" />
+    <path d="M10 14 H30" stroke="#14532D" stroke-width="3" stroke-linecap="round" />
+    <path d="M10 24 H28" stroke="#14532D" stroke-width="3" stroke-linecap="round" opacity="0.8" />
+    <path d="M10 34 H26" stroke="#14532D" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+  </g>
+
+  <!-- Cursor -->
+  <g class="cursor">
+    <path d="M10 0 L0 32 L12 26 L18 40 L26 36 L20 22 L34 22 Z" fill="#FFFFFF" opacity="0.95" />
+  </g>
+</svg>
+

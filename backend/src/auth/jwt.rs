@@ -160,6 +160,7 @@ pub fn verify_token(token: &str, secret: &str) -> Result<Claims, JwtError> {
 }
 
 /// Extract user ID from claims
+#[allow(dead_code)]
 pub fn get_user_id_from_claims(claims: &Claims) -> Result<Uuid, JwtError> {
     Uuid::parse_str(&claims.sub).map_err(|e| JwtError::InvalidToken(e.to_string()))
 }

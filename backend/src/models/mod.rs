@@ -16,6 +16,11 @@ pub struct User {
     pub name: Option<String>,
     pub role: UserRole,
     pub risk_score: Option<i32>,
+    pub kyc_status: KycStatus,
+    pub kyc_expiry: Option<DateTime<Utc>>,
+    pub kyc_provider: Option<String>,
+    pub kyc_verified_at: Option<DateTime<Utc>>,
+    pub kyc_reference_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -28,6 +33,8 @@ impl From<User> for UserResponse {
             email: user.email,
             name: user.name,
             role: user.role.clone(),
+            kyc_status: user.kyc_status,
+            kyc_expiry: user.kyc_expiry,
             created_at: user.created_at,
         }
     }
@@ -41,6 +48,17 @@ pub enum UserRole {
     Seller,
     Oracle,
     Admin,
+}
+
+/// KYC verification status
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, PartialEq, Eq)]
+#[sqlx(type_name = "kyc_status", rename_all = "lowercase")]
+pub enum KycStatus {
+    Unverified,
+    Pending,
+    Verified,
+    Rejected,
+    Expired,
 }
 
 /// Trade escrow model
@@ -66,6 +84,7 @@ pub enum EscrowStatus {
     Pending,
     Active,
     Released,
+    Refunded,
     Cancelled,
 }
 
