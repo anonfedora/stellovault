@@ -6,6 +6,10 @@
 
 #![no_std]
 
+extern crate alloc;
+
+mod refund;
+
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, token, Address, Bytes, Env, IntoVal,
     Symbol, Val, Vec,
@@ -106,7 +110,7 @@ pub struct Escrow {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DisputeDecision {
     ReleaseToSeller = 0,
-    RefundToLender = 1,
+    RefundToBuyer = 1,
 }
 
 /// Local mirror of OracleAdapter's ConfirmationData for cross-contract deserialization.
@@ -585,10 +589,10 @@ impl EscrowManager {
             .set(&symbol_short!("test_rate"), &rate);
     }
 
-    /// Refund the escrowed funds to the lender if the escrow has expired.
+    /// Refund the escrowed funds to the buyer if the escrow has expired.
     ///
     /// Anyone can call this after expiry. Unlocks collateral and returns
-    /// funds to the lender.
+    /// funds to the buyer.
     pub fn refund_escrow(env: Env, escrow_id: u64) -> Result<(), ContractError> {
         let mut escrow: Escrow = env
             .storage()
@@ -608,13 +612,8 @@ impl EscrowManager {
             return Err(ContractError::EscrowNotExpired);
         }
 
-        // Refund lender
-        let token_client = token::Client::new(&env, &escrow.asset);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &escrow.lender,
-            &escrow.amount,
-        );
+        // Refund using the new refund module
+        refund::process_refund(&env, &mut escrow, escrow_id)?;
 
         // Unlock collateral via CollateralRegistry
         let coll_reg: Address = env
@@ -674,18 +673,12 @@ impl EscrowManager {
                     .publish((symbol_short!("esc_rslv"),), (escrow_id, decision));
                 Ok(())
             }
-            DisputeDecision::RefundToLender => {
-                // Refund lender
-                let token_client = token::Client::new(&env, &escrow.asset);
-                token_client.transfer(
-                    &env.current_contract_address(),
-                    &escrow.lender,
-                    &escrow.amount,
-                );
+            DisputeDecision::RefundToBuyer => {
+                // Refund using the new refund module
+                refund::process_refund(&env, &mut escrow, escrow_id)?;
 
                 Self::unlock_collateral(&env, escrow.collateral_id)?;
 
-                escrow.status = EscrowStatus::Refunded;
                 env.storage().persistent().set(&escrow_id, &escrow);
 
                 env.events()
@@ -1272,7 +1265,7 @@ mod test {
         let escrow_id = create_test_escrow(&t);
 
         t.escrow_client
-            .resolve_dispute(&escrow_id, &DisputeDecision::RefundToLender);
+            .resolve_dispute(&escrow_id, &DisputeDecision::RefundToBuyer);
     }
 
     #[test]
@@ -1287,7 +1280,7 @@ mod test {
         t.escrow_client.raise_dispute(&escrow_id, &t.buyer, &reason);
 
         t.escrow_client
-            .resolve_dispute(&escrow_id, &DisputeDecision::RefundToLender);
+            .resolve_dispute(&escrow_id, &DisputeDecision::RefundToBuyer);
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Refunded);
