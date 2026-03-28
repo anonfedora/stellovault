@@ -6,7 +6,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, String,
 };
 
 /// Contract errors
@@ -44,6 +44,8 @@ pub struct Collateral {
     pub realized_value: i128,
     pub expiry_ts: u64,
     pub metadata_hash: BytesN<32>,
+    pub metadata_uri: String,
+    pub is_verified: bool,
     pub registered_at: u64,
     pub last_valuation_ts: u64,
     pub locked: bool,
@@ -87,6 +89,7 @@ impl CollateralRegistry {
     /// * `face_value` - Face value of the collateral (must be > 0)
     /// * `expiry_ts` - Expiry timestamp (must be in future)
     /// * `metadata_hash` - SHA-256 hash of off-chain metadata
+    /// * `metadata_uri` - URI pointing to off-chain metadata (IPFS/S3)
     ///
     /// # Returns
     /// The sequential collateral ID
@@ -99,6 +102,7 @@ impl CollateralRegistry {
         face_value: i128,
         expiry_ts: u64,
         metadata_hash: BytesN<32>,
+        metadata_uri: String,
     ) -> Result<u64, ContractError> {
         owner.require_auth();
 
@@ -137,6 +141,8 @@ impl CollateralRegistry {
             realized_value: face_value,
             expiry_ts,
             metadata_hash: metadata_hash.clone(),
+            metadata_uri: metadata_uri.clone(),
+            is_verified: false,
             registered_at: current_ts,
             last_valuation_ts: current_ts,
             locked: false,
@@ -355,6 +361,36 @@ impl CollateralRegistry {
 
         Ok(())
     }
+
+    /// Verify collateral (admin only)
+    ///
+    /// # Arguments
+    /// * `id` - Collateral ID to verify
+    ///
+    /// # Events
+    /// Emits `CollateralVerified` event
+    pub fn verify_collateral(env: Env, id: u64) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .unwrap();
+
+        admin.require_auth();
+
+        let mut collateral: Collateral = env
+            .storage()
+            .persistent()
+            .get(&id)
+            .ok_or(ContractError::CollateralNotFound)?;
+
+        collateral.is_verified = true;
+        env.storage().persistent().set(&id, &collateral);
+
+        env.events().publish((symbol_short!("coll_verified"),), (id,));
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -393,6 +429,7 @@ mod test {
             // Register collateral
             let future_ts = env.ledger().timestamp() + 86400; // 1 day from now
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmTest123");
 
             let result = CollateralRegistry::register_collateral(
                 env.clone(),
@@ -400,6 +437,7 @@ mod test {
                 1000,
                 future_ts,
                 metadata_hash,
+                metadata_uri,
             );
 
             assert!(result.is_ok());
@@ -413,6 +451,7 @@ mod test {
             assert_eq!(collateral.face_value, 1000);
             assert_eq!(collateral.realized_value, 1000);
             assert_eq!(collateral.locked, false);
+            assert_eq!(collateral.is_verified, false);
         });
     }
 
@@ -433,12 +472,14 @@ mod test {
             // Register collateral
             let future_ts = env.ledger().timestamp() + 86400;
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmTest456");
             let collateral_id = CollateralRegistry::register_collateral(
                 env.clone(),
                 owner,
                 1000,
                 future_ts,
                 metadata_hash,
+                metadata_uri,
             )
             .unwrap();
 
@@ -468,6 +509,7 @@ mod test {
 
             let future_ts = env.ledger().timestamp() + 86400;
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmTest789");
 
             let result = CollateralRegistry::register_collateral(
                 env.clone(),
@@ -475,6 +517,7 @@ mod test {
                 0, // Invalid amount
                 future_ts,
                 metadata_hash,
+                metadata_uri,
             );
 
             assert_eq!(result, Err(ContractError::InvalidAmount));
@@ -497,6 +540,7 @@ mod test {
 
             let past_ts = env.ledger().timestamp() - 1; // Already expired
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmTestExp");
 
             let result = CollateralRegistry::register_collateral(
                 env.clone(),
@@ -504,6 +548,7 @@ mod test {
                 1000,
                 past_ts,
                 metadata_hash,
+                metadata_uri,
             );
 
             assert_eq!(result, Err(ContractError::CollateralExpired));
@@ -524,6 +569,8 @@ mod test {
 
             let future_ts = env.ledger().timestamp() + 86400;
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri1 = String::from_slice(&env, "ipfs://QmTestDup1");
+            let metadata_uri2 = String::from_slice(&env, "ipfs://QmTestDup2");
 
             // Register first collateral
             CollateralRegistry::register_collateral(
@@ -532,6 +579,7 @@ mod test {
                 1000,
                 future_ts,
                 metadata_hash.clone(),
+                metadata_uri1,
             )
             .unwrap();
 
@@ -542,6 +590,7 @@ mod test {
                 2000,
                 future_ts,
                 metadata_hash, // Same hash
+                metadata_uri2,
             );
 
             assert_eq!(result, Err(ContractError::DuplicateMetadata));
@@ -563,7 +612,8 @@ mod test {
 
         let future_ts = env.ledger().timestamp() + 86400;
         let metadata_hash = BytesN::from_array(&env, &[1; 32]);
-        let collateral_id = client.register_collateral(&owner, &1000, &future_ts, &metadata_hash);
+        let metadata_uri = String::from_slice(&env, "ipfs://QmLockTest");
+        let collateral_id = client.register_collateral(&owner, &1000, &future_ts, &metadata_hash, &metadata_uri);
 
         client.lock_collateral(&collateral_id);
         assert!(client.is_locked(&collateral_id));
@@ -604,18 +654,105 @@ mod test {
             // Register collateral
             let future_ts = env.ledger().timestamp() + 86400;
             let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmUnauthorized");
             let collateral_id = CollateralRegistry::register_collateral(
                 env.clone(),
                 owner,
                 1000,
                 future_ts,
                 metadata_hash,
+                metadata_uri,
             )
             .unwrap();
 
             // Try to lock with unauthorized address (no escrow manager set)
             let result = CollateralRegistry::lock_collateral(env.clone(), collateral_id);
             assert_eq!(result, Err(ContractError::Unauthorized));
+        });
+    }
+
+    #[test]
+    fn test_verify_collateral_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let owner = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+
+        env.as_contract(&contract_id, || {
+            // Initialize
+            CollateralRegistry::initialize(env.clone(), admin.clone()).unwrap();
+
+            // Register collateral
+            let future_ts = env.ledger().timestamp() + 86400;
+            let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmVerifyTest");
+            let collateral_id = CollateralRegistry::register_collateral(
+                env.clone(),
+                owner,
+                1000,
+                future_ts,
+                metadata_hash,
+                metadata_uri,
+            )
+            .unwrap();
+
+            // Verify collateral as admin
+            let verify_result = CollateralRegistry::verify_collateral(env.clone(), collateral_id);
+            assert!(verify_result.is_ok());
+
+            // Verify is_verified is true
+            let collateral =
+                CollateralRegistry::get_collateral(env.clone(), collateral_id).unwrap();
+            assert_eq!(collateral.is_verified, true);
+        });
+    }
+
+    #[test]
+    fn test_verify_collateral_unauthorized() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let unauthorized = Address::generate(&env);
+        let owner = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+
+        env.as_contract(&contract_id, || {
+            CollateralRegistry::initialize(env.clone(), admin).unwrap();
+
+            // Register collateral
+            let future_ts = env.ledger().timestamp() + 86400;
+            let metadata_hash = BytesN::from_array(&env, &[1; 32]);
+            let metadata_uri = String::from_slice(&env, "ipfs://QmUnauthorizedVerify");
+            let collateral_id = CollateralRegistry::register_collateral(
+                env.clone(),
+                owner,
+                1000,
+                future_ts,
+                metadata_hash,
+                metadata_uri,
+            )
+            .unwrap();
+
+            // Try to verify with non-admin (should fail due to auth)
+            let result = CollateralRegistry::verify_collateral(env.clone(), collateral_id);
+            assert_eq!(result, Err(ContractError::Unauthorized));
+        });
+    }
+
+    #[test]
+    fn test_verify_collateral_not_found() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+
+        env.as_contract(&contract_id, || {
+            CollateralRegistry::initialize(env.clone(), admin).unwrap();
+
+            // Try to verify non-existent collateral
+            let result = CollateralRegistry::verify_collateral(env.clone(), 999);
+            assert_eq!(result, Err(ContractError::CollateralNotFound));
         });
     }
 }
