@@ -4,6 +4,7 @@ members = [
     "escrow-manager",
     "example",
     "governance",
+    "invoice-contract",
     "loan-management",
     "oracle-adapter",
     "protocol-treasury",
