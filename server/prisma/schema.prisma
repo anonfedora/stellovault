@@ -322,6 +322,13 @@ model AuditLog {
 // Enums
 // ─────────────────────────────────────────────
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum Role {
   USER
   MERCHANT
