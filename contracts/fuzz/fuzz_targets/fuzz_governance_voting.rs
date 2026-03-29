@@ -105,6 +105,7 @@ fuzz_target!(|input: FuzzInput| {
         let config = governance::GovernanceConfig {
             voting_period: 604800,
             timelock_period: 86400,
+            tally_period: 3600,
             quorum_bps,
             majority_bps,
             min_voting_power: 100,
@@ -152,6 +153,7 @@ fuzz_target!(|input: FuzzInput| {
                     proposal_id,
                     voter_addrs[idx].clone(),
                     action.support,
+                    1,
                 );
                 assert!(
                     result.is_err(),
@@ -164,7 +166,7 @@ fuzz_target!(|input: FuzzInput| {
             governance::Governance::set_voting_power(
                 env.clone(),
                 voter_addrs[idx].clone(),
-                power,
+                power * power,
             );
 
             match governance::Governance::cast_vote(
@@ -172,6 +174,7 @@ fuzz_target!(|input: FuzzInput| {
                 proposal_id,
                 voter_addrs[idx].clone(),
                 action.support,
+                power,
             ) {
                 Ok(()) => {
                     voted.insert(effective_idx);

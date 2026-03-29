@@ -7,6 +7,8 @@
 //!   4. Proposal ID counter increments correctly
 //!   5. Double-voting is always rejected
 
+#![cfg(feature = "testutils")]
+
 #[cfg(test)]
 mod proptest_governance {
     extern crate std;
@@ -15,10 +17,10 @@ mod proptest_governance {
     use soroban_sdk::{
         contract, contractimpl, contracttype, symbol_short,
         testutils::{Address as _, Ledger as _},
-        Address, Env, Symbol,
+        Address, Env,
     };
 
-    use governance::{ContractError, Governance, GovernanceConfig, ProposalStatus};
+    use governance::{ContractError, Governance, GovernanceConfig};
 
     // ── Mock RiskAssessment ─────────────────────────────────────────────
 
@@ -97,7 +99,7 @@ mod proptest_governance {
             let t = setup();
             t.env.as_contract(&t.gov_contract, || {
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let result = Governance::create_proposal(
                     t.env.clone(),
@@ -130,7 +132,7 @@ mod proptest_governance {
             let t = setup();
             t.env.as_contract(&t.gov_contract, || {
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let result = Governance::create_proposal(
                     t.env.clone(),
@@ -163,7 +165,7 @@ mod proptest_governance {
             let t = setup();
             t.env.as_contract(&t.gov_contract, || {
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let result = Governance::create_proposal(
                     t.env.clone(),
@@ -197,7 +199,7 @@ mod proptest_governance {
             let t = setup();
             t.env.as_contract(&t.gov_contract, || {
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let proposal_id = Governance::create_proposal(
                     t.env.clone(),
@@ -216,8 +218,8 @@ mod proptest_governance {
                     let power = powers[i];
                     let support = supports[i];
 
-                    Governance::set_voting_power(t.env.clone(), voter.clone(), power);
-                    if Governance::cast_vote(t.env.clone(), proposal_id, voter, support).is_ok() {
+                    Governance::set_voting_power(t.env.clone(), voter.clone(), power * power);
+                    if Governance::cast_vote(t.env.clone(), proposal_id, voter, support, power).is_ok() {
                         if support {
                             expected_for += power;
                         } else {
@@ -249,7 +251,7 @@ mod proptest_governance {
             let t = setup();
             t.env.as_contract(&t.gov_contract, || {
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let proposal_id = Governance::create_proposal(
                     t.env.clone(),
@@ -260,15 +262,15 @@ mod proptest_governance {
                 ).unwrap();
 
                 let voter = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), voter.clone(), power);
+                Governance::set_voting_power(t.env.clone(), voter.clone(), power * power);
 
                 let first = Governance::cast_vote(
-                    t.env.clone(), proposal_id, voter.clone(), first_support,
+                    t.env.clone(), proposal_id, voter.clone(), first_support, power,
                 );
                 prop_assert!(first.is_ok());
 
                 let second = Governance::cast_vote(
-                    t.env.clone(), proposal_id, voter, second_support,
+                    t.env.clone(), proposal_id, voter, second_support, power,
                 );
                 prop_assert_eq!(second, Err(ContractError::AlreadyVoted));
                 Ok(())
@@ -290,7 +292,7 @@ mod proptest_governance {
 
                 for _ in 0..num_proposals {
                     let proposer = Address::generate(&t.env);
-                    Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                    Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                     if let Ok(id) = Governance::create_proposal(
                         t.env.clone(),
@@ -334,6 +336,7 @@ mod proptest_governance {
                 let config = GovernanceConfig {
                     voting_period: 604800,
                     timelock_period: 86400,
+                    tally_period: 3600,
                     quorum_bps,
                     majority_bps,
                     min_voting_power: 100,
@@ -342,7 +345,7 @@ mod proptest_governance {
                 Governance::set_total_voting_power(t.env.clone(), total_power).unwrap();
 
                 let proposer = Address::generate(&t.env);
-                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000);
+                Governance::set_voting_power(t.env.clone(), proposer.clone(), 2000 * 2000);
 
                 let proposal_id = Governance::create_proposal(
                     t.env.clone(),
@@ -355,15 +358,15 @@ mod proptest_governance {
                 // Vote for
                 if for_power > 0 {
                     let voter_for = Address::generate(&t.env);
-                    Governance::set_voting_power(t.env.clone(), voter_for.clone(), for_power);
-                    let _ = Governance::cast_vote(t.env.clone(), proposal_id, voter_for, true);
+                    Governance::set_voting_power(t.env.clone(), voter_for.clone(), for_power * for_power);
+                    let _ = Governance::cast_vote(t.env.clone(), proposal_id, voter_for, true, for_power);
                 }
 
                 // Vote against
                 if against_power > 0 {
                     let voter_against = Address::generate(&t.env);
-                    Governance::set_voting_power(t.env.clone(), voter_against.clone(), against_power);
-                    let _ = Governance::cast_vote(t.env.clone(), proposal_id, voter_against, false);
+                    Governance::set_voting_power(t.env.clone(), voter_against.clone(), against_power * against_power);
+                    let _ = Governance::cast_vote(t.env.clone(), proposal_id, voter_against, false, against_power);
                 }
 
                 // Advance past voting + timelock
