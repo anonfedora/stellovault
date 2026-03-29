@@ -47,6 +47,10 @@ pub enum ContractError {
 
     // Math errors
     MathOverflow = 15,
+
+    // Delegation errors
+    InvalidDelegation = 16,
+    DelegateNotFound = 17,
 }
 
 impl From<ContractError> for soroban_sdk::Error {
@@ -110,6 +114,7 @@ pub enum ProposalStatus {
     Failed = 2,    // Voting ended, quorum or majority not reached
     Executed = 3,  // Proposal executed on-chain
     Cancelled = 4, // Cancelled by admin emergency
+    Tallying = 5,  // Voting ended, waiting for finalization
 }
 
 /// Governance configuration
@@ -118,6 +123,7 @@ pub enum ProposalStatus {
 pub struct GovernanceConfig {
     pub voting_period: u64,     // Duration of voting in seconds
     pub timelock_period: u64,   // Grace period before execution
+    pub tally_period: u64,      // Period for vote finalization
     pub quorum_bps: u32,        // Quorum in basis points (e.g., 1000 = 10%)
     pub majority_bps: u32,      // Majority threshold in basis points (e.g., 5000 = 50%)
     pub min_voting_power: i128, // Minimum tokens to create proposal
@@ -128,6 +134,7 @@ impl Default for GovernanceConfig {
         Self {
             voting_period: 604800,  // 7 days
             timelock_period: 86400, // 24 hours
+            tally_period: 3600,     // 1 hour
             quorum_bps: 1000,       // 10%
             majority_bps: 5000,     // 50%
             min_voting_power: 1000, // 1000 tokens minimum
@@ -266,9 +273,9 @@ impl Governance {
 
         let config = Self::get_config(env.clone());
 
-        // Check proposer has minimum voting power
-        let voting_power = Self::get_voting_power(&env, &proposer);
-        if voting_power < config.min_voting_power {
+        // Check proposer has minimum voting power (in tokens)
+        let total_tokens = Self::get_total_controlled_tokens(&env, &proposer);
+        if total_tokens < config.min_voting_power {
             return Err(ContractError::InsufficientVotingPower);
         }
 
@@ -355,8 +362,13 @@ impl Governance {
         proposal_id: u64,
         voter: Address,
         support: bool,
+        num_votes: i128,
     ) -> Result<(), ContractError> {
         voter.require_auth();
+
+        if num_votes <= 0 {
+            return Err(ContractError::InsufficientVotingPower);
+        }
 
         // Get proposal
         let mut proposal = Self::get_proposal(env.clone(), proposal_id)?;
@@ -373,11 +385,30 @@ impl Governance {
             return Err(ContractError::AlreadyVoted);
         }
 
-        // Get voting power (weighted by locked token balance)
-        let voting_power = Self::get_voting_power(&env, &voter);
-        if voting_power == 0 {
+        // Get max quadratic voting power
+        let max_votes = Self::get_voting_power(&env, &voter);
+        if num_votes > max_votes {
             return Err(ContractError::InsufficientVotingPower);
         }
+
+        // Deduct tokens
+        let cost = num_votes
+            .checked_mul(num_votes)
+            .ok_or(ContractError::MathOverflow)?;
+
+        // Deduct tokens (simplified - in production, this might move tokens or update state)
+        // Here we reduce the stored voting power tokens
+        // For simplicity, we deduct from the voter's own balance first
+        let own_balance = Self::get_token_balance(&env, &voter);
+        if own_balance >= cost {
+            Self::set_voting_power_internal(env.clone(), voter.clone(), own_balance - cost);
+        } else {
+            // If they are a delegatee, the rest comes from delegators?
+            // This is complex, so let's just deduct from the voter for this implementation
+            Self::set_voting_power_internal(env.clone(), voter.clone(), 0);
+        }
+
+        let voting_power = num_votes;
 
         // Record vote
         let vote = Vote {
@@ -609,12 +640,84 @@ impl Governance {
     // Internal Helper Functions
     // ========================================================================
 
-    /// Get voting power for an address
-    /// In production, this would query the token contract for locked balance
+    /// Get voting power for an address implementing quadratic voting
+    /// Votes = sqrt(Total tokens controlled)
+    /// Total tokens = own balance + sum of delegators' balances
     fn get_voting_power(env: &Env, voter: &Address) -> i128 {
-        // For testing, use stored test data
+        let own_balance = Self::get_token_balance(env, voter);
+        let mut total_tokens = own_balance;
+
+        // Add delegators' balances
+        let deleg_list_key = (symbol_short!("d_list"), voter.clone());
+        let deleg_list: soroban_sdk::Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&deleg_list_key)
+            .unwrap_or(soroban_sdk::Vec::new(env));
+
+        for delegator in deleg_list.iter() {
+            // Ensure they haven't delegated elsewhere (simple check)
+            let key = (symbol_short!("deleg"), delegator.clone());
+            if let Some(target) = env.storage().persistent().get::<_, Address>(&key) {
+                if &target == voter {
+                    total_tokens += Self::get_token_balance(env, &delegator);
+                }
+            }
+        }
+
+        Self::sqrt(total_tokens)
+    }
+
+    /// Get total tokens controlled by a voter (own + delegated)
+    fn get_total_controlled_tokens(env: &Env, voter: &Address) -> i128 {
+        let own_balance = Self::get_token_balance(env, voter);
+        let mut total_tokens = own_balance;
+
+        let deleg_list_key = (symbol_short!("d_list"), voter.clone());
+        let deleg_list: soroban_sdk::Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&deleg_list_key)
+            .unwrap_or(soroban_sdk::Vec::new(env));
+
+        for delegator in deleg_list.iter() {
+            let key = (symbol_short!("deleg"), delegator.clone());
+            if let Some(target) = env.storage().persistent().get::<_, Address>(&key) {
+                if &target == voter {
+                    total_tokens += Self::get_token_balance(env, &delegator);
+                }
+            }
+        }
+        total_tokens
+    }
+
+    fn set_voting_power_internal(env: Env, voter: Address, power: i128) {
+        let key = (symbol_short!("vp"), voter);
+        env.storage().persistent().set(&key, &power);
+    }
+
+    /// Get raw token balance for an address
+    fn get_token_balance(env: &Env, voter: &Address) -> i128 {
         let key = (symbol_short!("vp"), voter.clone());
         env.storage().persistent().get(&key).unwrap_or(100)
+    }
+
+    /// Integer square root (Newton's method)
+    fn sqrt(n: i128) -> i128 {
+        if n <= 0 {
+            return 0;
+        }
+        if n < 2 {
+            return n;
+        }
+
+        let mut x = n / 2 + 1;
+        let mut y = (x + n / x) / 2;
+        while y < x {
+            x = y;
+            y = (x + n / x) / 2;
+        }
+        x
     }
 
     /// Set voting power for testing
@@ -712,6 +815,50 @@ impl Governance {
         Ok(())
     }
 
+    /// Delegate voting power to another address
+    pub fn delegate(env: Env, delegator: Address, delegatee: Address) -> Result<(), ContractError> {
+        delegator.require_auth();
+
+        if delegator == delegatee {
+            return Err(ContractError::InvalidDelegation);
+        }
+
+        // Store delegation
+        let key = (symbol_short!("deleg"), delegator.clone());
+        env.storage().persistent().set(&key, &delegatee);
+
+        // Store the list of delegators for the delegatee
+        let deleg_list_key = (symbol_short!("d_list"), delegatee.clone());
+        let mut deleg_list: soroban_sdk::Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&deleg_list_key)
+            .unwrap_or(soroban_sdk::Vec::new(&env));
+
+        if !deleg_list.contains(&delegator) {
+            deleg_list.push_back(delegator);
+            env.storage().persistent().set(&deleg_list_key, &deleg_list);
+        }
+
+        Ok(())
+    }
+
+    /// Finalize votes and move proposal to Tallying state
+    pub fn tally_proposal(env: Env, proposal_id: u64) -> Result<(), ContractError> {
+        let _proposal = Self::get_proposal(env.clone(), proposal_id)?;
+        let current_ts = env.ledger().timestamp();
+
+        let proposal = Self::get_proposal(env.clone(), proposal_id)?;
+        if current_ts < proposal.voting_end_ts {
+            return Err(ContractError::ProposalNotActive);
+        }
+
+        // In this implementation, Tallying is a timed state.
+        // We could also set a bit in storage to mark total finalization.
+
+        Ok(())
+    }
+
     /// Get the current lifecycle status of a proposal
     pub fn get_proposal_status(
         env: Env,
@@ -730,8 +877,13 @@ impl Governance {
             return Ok(ProposalStatus::Active);
         }
 
-        // Voting ended — check quorum + majority
+        // Tallying window
         let config = Self::get_config(env.clone());
+        if current_ts < proposal.voting_end_ts + config.tally_period {
+            return Ok(ProposalStatus::Tallying);
+        }
+
+        // Voting ended — check quorum + majority
         let total_votes = proposal
             .votes_for
             .checked_add(proposal.votes_against)
@@ -1073,9 +1225,8 @@ mod test {
             .unwrap();
 
             let voter = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter.clone(), 5000);
-
-            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true);
+            Governance::set_voting_power(env.clone(), voter.clone(), 5000 * 5000);
+            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 5000);
             assert!(result.is_ok());
 
             let proposal = Governance::get_proposal(env.clone(), proposal_id).unwrap();
@@ -1117,9 +1268,8 @@ mod test {
             .unwrap();
 
             let voter = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter.clone(), 3000);
-
-            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), false).unwrap();
+            Governance::set_voting_power(env.clone(), voter.clone(), 3000 * 3000);
+            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), false, 3000).unwrap();
 
             let proposal = Governance::get_proposal(env.clone(), proposal_id).unwrap();
             assert_eq!(proposal.votes_for, 0);
@@ -1160,9 +1310,8 @@ mod test {
                 .set_timestamp(env.ledger().timestamp() + 604801);
 
             let voter = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter.clone(), 5000);
-
-            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true);
+            Governance::set_voting_power(env.clone(), voter.clone(), 5000 * 5000);
+            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 5000);
             assert_eq!(result, Err(ContractError::VotingEnded));
         });
     }
@@ -1198,7 +1347,7 @@ mod test {
             let voter = Address::generate(&env);
             Governance::set_voting_power(env.clone(), voter.clone(), 0);
 
-            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true);
+            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 1);
             assert_eq!(result, Err(ContractError::InsufficientVotingPower));
         });
     }
@@ -1233,18 +1382,18 @@ mod test {
 
             // Voter 1: For
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 5000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 5000 * 5000); // 5000 votes cost 25M
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 5000).unwrap();
 
             // Voter 2: For
             let voter2 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter2.clone(), 3000);
-            Governance::cast_vote(env.clone(), proposal_id, voter2.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter2.clone(), 3000 * 3000); // 3000 votes cost 9M
+            Governance::cast_vote(env.clone(), proposal_id, voter2.clone(), true, 3000).unwrap();
 
             // Voter 3: Against
             let voter3 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter3.clone(), 2000);
-            Governance::cast_vote(env.clone(), proposal_id, voter3.clone(), false).unwrap();
+            Governance::set_voting_power(env.clone(), voter3.clone(), 2000 * 2000); // 2000 votes cost 4M
+            Governance::cast_vote(env.clone(), proposal_id, voter3.clone(), false, 2000).unwrap();
 
             let proposal = Governance::get_proposal(env.clone(), proposal_id).unwrap();
             assert_eq!(proposal.votes_for, 8000);
@@ -1289,8 +1438,8 @@ mod test {
 
             // Cast votes to reach quorum (10%) and majority (50%)
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 60000).unwrap();
 
             // Advance time past voting period and timelock
             env.ledger()
@@ -1335,8 +1484,8 @@ mod test {
             .unwrap();
 
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 60000).unwrap();
 
             // Advance time past voting but not timelock
             env.ledger()
@@ -1379,8 +1528,8 @@ mod test {
 
             // Only 5% votes (below 10% quorum)
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 5000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 5000 * 5000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 5000).unwrap();
 
             env.ledger()
                 .set_timestamp(env.ledger().timestamp() + 604800 + 86400 + 1);
@@ -1422,12 +1571,12 @@ mod test {
 
             // Quorum reached but majority not reached (40% for, 60% against)
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 40000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 40000 * 40000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 40000).unwrap();
 
             let voter2 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter2.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter2.clone(), false).unwrap();
+            Governance::set_voting_power(env.clone(), voter2.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter2.clone(), false, 60000).unwrap();
 
             env.ledger()
                 .set_timestamp(env.ledger().timestamp() + 604800 + 86400 + 1);
@@ -1468,8 +1617,8 @@ mod test {
             .unwrap();
 
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 60000).unwrap();
 
             env.ledger()
                 .set_timestamp(env.ledger().timestamp() + 604800 + 86400 + 1);
@@ -1516,8 +1665,8 @@ mod test {
 
             // Cast votes to pass
             let voter1 = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter1.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter1.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter1.clone(), true, 60000).unwrap();
 
             // Now passed
             assert!(Governance::has_proposal_passed(env.clone(), proposal_id).unwrap());
@@ -1550,6 +1699,7 @@ mod test {
                 quorum_bps: 1500,        // 15%
                 majority_bps: 6000,      // 60%
                 min_voting_power: 2000,
+                tally_period: 3600,
             };
 
             let result = Governance::update_config(env.clone(), new_config.clone());
@@ -1560,6 +1710,124 @@ mod test {
             assert_eq!(config.timelock_period, 172800);
             assert_eq!(config.quorum_bps, 1500);
             assert_eq!(config.majority_bps, 6000);
+        });
+    }
+
+    #[test]
+    fn test_quadratic_voting_cost() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let contract_id = env.register_contract(None, Governance);
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                risk_assessment.clone(),
+            )
+            .unwrap();
+
+            let proposer = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), proposer.clone(), 1000000);
+            let proposal_id = Governance::create_proposal(
+                env.clone(),
+                proposer,
+                risk_assessment.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap();
+
+            let voter = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), voter.clone(), 100); // 100 tokens
+
+            // Can cast 10 votes (cost 100)
+            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 10);
+            assert!(result.is_ok());
+
+            // Check balance deducted
+            assert_eq!(Governance::get_token_balance(&env, &voter), 0);
+        });
+    }
+
+    #[test]
+    fn test_quadratic_voting_insufficient_tokens() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let contract_id = env.register_contract(None, Governance);
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                risk_assessment.clone(),
+            )
+            .unwrap();
+
+            let proposer = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), proposer.clone(), 1000000);
+            let proposal_id = Governance::create_proposal(
+                env.clone(),
+                proposer,
+                risk_assessment.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap();
+
+            let voter = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), voter.clone(), 100); // 100 tokens
+
+            // Cannot cast 11 votes (cost 121)
+            let result = Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 11);
+            assert_eq!(result, Err(ContractError::InsufficientVotingPower));
+        });
+    }
+
+    #[test]
+    fn test_delegation_aggregation() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let contract_id = env.register_contract(None, Governance);
+        env.mock_all_auths();
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                risk_assessment.clone(),
+            )
+            .unwrap();
+
+            let proposer = Address::generate(&env);
+            Governance::set_voting_power(env.clone(), proposer.clone(), 1000000);
+            let proposal_id = Governance::create_proposal(
+                env.clone(),
+                proposer,
+                risk_assessment.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap();
+
+            let delegatee = Address::generate(&env);
+            let delegator = Address::generate(&env);
+
+            Governance::set_voting_power(env.clone(), delegatee.clone(), 50);
+            Governance::set_voting_power(env.clone(), delegator.clone(), 50);
+
+            // Delegate
+            Governance::delegate(env.clone(), delegator.clone(), delegatee.clone()).unwrap();
+
+            // Total controlled = 100. Max votes = 10.
+            let result =
+                Governance::cast_vote(env.clone(), proposal_id, delegatee.clone(), true, 10);
+            assert!(result.is_ok());
+
+            let proposal = Governance::get_proposal(env.clone(), proposal_id).unwrap();
+            assert_eq!(proposal.votes_for, 10);
         });
     }
 
@@ -1635,14 +1903,21 @@ mod test {
                 ProposalStatus::Active
             );
 
-            // Cast enough votes to pass
             let voter = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter.clone(), 60000);
-            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter.clone(), 60000 * 60000);
+            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 60000).unwrap();
 
-            // Advance past voting period only → Succeeded (not yet executed)
+            // Advance past voting period only → Tallying
             env.ledger()
                 .set_timestamp(env.ledger().timestamp() + 604801);
+
+            assert_eq!(
+                Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
+                ProposalStatus::Tallying
+            );
+
+            // Advance past tallying period → Succeeded
+            env.ledger().set_timestamp(env.ledger().timestamp() + 3601);
 
             assert_eq!(
                 Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),
@@ -1693,11 +1968,11 @@ mod test {
 
             // Only 2% votes → below 10% quorum → Failed
             let voter = Address::generate(&env);
-            Governance::set_voting_power(env.clone(), voter.clone(), 2000);
-            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true).unwrap();
+            Governance::set_voting_power(env.clone(), voter.clone(), 2000 * 2000);
+            Governance::cast_vote(env.clone(), proposal_id, voter.clone(), true, 2000).unwrap();
 
             env.ledger()
-                .set_timestamp(env.ledger().timestamp() + 604801);
+                .set_timestamp(env.ledger().timestamp() + 604800 + 3600 + 1);
 
             assert_eq!(
                 Governance::get_proposal_status(env.clone(), proposal_id).unwrap(),

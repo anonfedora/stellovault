@@ -191,7 +191,7 @@ impl OracleService {
     }
 
     /// Verify oracle signature (placeholder - implement cryptographic verification)
-    pub async fn verify_signature(&self, message: &[u8], signature: &str, oracle_address: &str) -> Result<bool, Error> {
+    pub async fn verify_signature(&self, _message: &[u8], signature: &str, oracle_address: &str) -> Result<bool, Error> {
         // Get oracle's public key
         let oracle = self.get_oracle_by_address(oracle_address).await?;
         let oracle = match oracle {

@@ -173,6 +173,62 @@ impl EventHandler {
                     }
                 }
             },
+            "esc_disp" => {
+                if let ScVal::Vec(Some(args)) = data {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Invalid args length for esc_disp"));
+                    }
+                    let id = scval_to_u64(&args[0])?;
+                    let _disputer = scval_to_address(&args[1])?;
+
+                    sqlx::query(
+                        "UPDATE escrows SET status = 'disputed'::escrow_status, disputed = true WHERE escrow_id = $1"
+                    )
+                    .bind(id as i64)
+                    .execute(&self.pool)
+                    .await?;
+
+                    if let Some(ws) = &self.ws_state {
+                        ws.broadcast_event(WsEscrowEvent::Disputed {
+                            escrow_id: id as i64,
+                            reason: "on-chain dispute raised".to_string(),
+                        })
+                        .await;
+                    }
+                }
+            }
+            "esc_rslv" => {
+                if let ScVal::Vec(Some(args)) = data {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Invalid args length for esc_rslv"));
+                    }
+                    let id = scval_to_u64(&args[0])?;
+                    let decision_raw = scval_to_u64(&args[1])?;
+
+                    // DisputeDecision: 0=ReleaseToSeller, 1=RefundToLender
+                    let new_status = match decision_raw {
+                        0 => "released",
+                        1 => "refunded",
+                        _ => return Err(anyhow!("Invalid dispute decision value")),
+                    };
+
+                    sqlx::query(
+                        "UPDATE escrows SET status = $1::escrow_status, disputed = false WHERE escrow_id = $2"
+                    )
+                    .bind(new_status)
+                    .bind(id as i64)
+                    .execute(&self.pool)
+                    .await?;
+
+                    if let Some(ws) = &self.ws_state {
+                        match decision_raw {
+                            0 => ws.broadcast_event(WsEscrowEvent::Released { escrow_id: id as i64 }).await,
+                            1 => ws.broadcast_event(WsEscrowEvent::Refunded { escrow_id: id as i64 }).await,
+                            _ => {}
+                        }
+                    }
+                }
+            }
             _ => {}
         }
         Ok(())

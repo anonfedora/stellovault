@@ -30,6 +30,7 @@ pub enum EscrowStatus {
     Pending,   // Created but not funded
     Active,    // Funded and awaiting conditions
     Released,  // Funds released to seller
+    Refunded,  // Funds returned to lender
     Cancelled, // Cancelled by parties
     TimedOut,  // Expired without completion
     Disputed,  // Under dispute resolution
@@ -118,6 +119,9 @@ pub enum EscrowEvent {
         escrow_id: i64,
     },
     Released {
+        escrow_id: i64,
+    },
+    Refunded {
         escrow_id: i64,
     },
     Cancelled {

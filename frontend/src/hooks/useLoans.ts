@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { Loan, LoanStatus } from "@/types";
+import { Loan, LoanStatus, TransactionStatus } from "@/types";
 
 // ── Mock data for development ──────────────────────────────────────────
 const MOCK_REPAYMENTS = [
@@ -11,6 +11,7 @@ const MOCK_REPAYMENTS = [
     amount: 5200,
     paidAt: new Date("2025-12-15"),
     txHash: "abc123def456",
+    status: TransactionStatus.COMPLETED,
   },
   {
     id: "rep-2",
@@ -18,6 +19,7 @@ const MOCK_REPAYMENTS = [
     amount: 5200,
     paidAt: new Date("2026-01-15"),
     txHash: "def456ghi789",
+    status: TransactionStatus.COMPLETED,
   },
   {
     id: "rep-3",
@@ -25,6 +27,7 @@ const MOCK_REPAYMENTS = [
     amount: 3100,
     paidAt: new Date("2026-01-10"),
     txHash: "ghi789jkl012",
+    status: TransactionStatus.COMPLETED,
   },
 ];
 
@@ -38,7 +41,7 @@ const MOCK_LOANS: Loan[] = [
     principal: 25000,
     interestRate: 8.5,
     termMonths: 12,
-    status: "ACTIVE",
+    status: LoanStatus.ACTIVE,
     repayments: [MOCK_REPAYMENTS[0], MOCK_REPAYMENTS[1]],
     createdAt: new Date("2025-11-01"),
     maturityDate: new Date("2026-11-01"),
@@ -52,7 +55,7 @@ const MOCK_LOANS: Loan[] = [
     principal: 40000,
     interestRate: 7.0,
     termMonths: 6,
-    status: "ACTIVE",
+    status: LoanStatus.ACTIVE,
     repayments: [MOCK_REPAYMENTS[2]],
     createdAt: new Date("2025-12-15"),
     maturityDate: new Date("2026-06-15"),
@@ -66,7 +69,7 @@ const MOCK_LOANS: Loan[] = [
     principal: 15000,
     interestRate: 9.0,
     termMonths: 3,
-    status: "PENDING",
+    status: LoanStatus.PENDING,
     repayments: [],
     createdAt: new Date("2026-02-01"),
     maturityDate: new Date("2026-05-01"),
@@ -80,7 +83,7 @@ const MOCK_LOANS: Loan[] = [
     principal: 60000,
     interestRate: 6.5,
     termMonths: 18,
-    status: "REPAID",
+    status: LoanStatus.REPAID,
     repayments: [
       {
         id: "rep-r1",
@@ -88,6 +91,7 @@ const MOCK_LOANS: Loan[] = [
         amount: 63900,
         paidAt: new Date("2025-10-01"),
         txHash: "mno345pqr678",
+        status: TransactionStatus.COMPLETED,
       },
     ],
     createdAt: new Date("2024-04-01"),
@@ -102,7 +106,7 @@ const MOCK_LOANS: Loan[] = [
     principal: 12000,
     interestRate: 10.0,
     termMonths: 6,
-    status: "DEFAULTED",
+    status: LoanStatus.DEFAULTED,
     repayments: [
       {
         id: "rep-d1",
@@ -110,6 +114,7 @@ const MOCK_LOANS: Loan[] = [
         amount: 2100,
         paidAt: new Date("2025-06-15"),
         txHash: "stu901vwx234",
+        status: TransactionStatus.COMPLETED,
       },
     ],
     createdAt: new Date("2025-01-01"),

@@ -9,6 +9,7 @@ use crate::models::CollateralStatus;
 #[derive(Clone)]
 pub struct CollateralService {
     db_pool: PgPool,
+    #[allow(dead_code)]
     rpc_url: String,
     contract_id: String,
 }

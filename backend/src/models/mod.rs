@@ -84,6 +84,7 @@ pub enum EscrowStatus {
     Pending,
     Active,
     Released,
+    Refunded,
     Cancelled,
 }
 

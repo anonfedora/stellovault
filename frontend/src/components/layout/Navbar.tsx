@@ -1,11 +1,12 @@
-
 'use client'
 
 import React, { useState } from 'react'
 import { Wallet, LogOut, Menu, X } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export function Navbar() {
+  const pathname = usePathname()
   const [isConnected, setIsConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false)
@@ -27,6 +28,21 @@ export function Navbar() {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
 
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/'
+    if (path.startsWith('/#')) return pathname === '/'
+    return pathname === path
+  }
+
+  const navLinks = [
+    { href: '/#features', label: 'Features' },
+    { href: '/#innovation', label: 'Innovation' },
+    { href: '/#impact', label: 'Impact' },
+    { href: '/about', label: 'About' },
+    { href: '/contact', label: 'Contact' },
+    { href: '/governance', label: 'Governance' },
+  ]
+
   return (
     <nav className="fixed w-full top-0 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -37,12 +53,20 @@ export function Navbar() {
           StelloVault
         </Link>
         
-        <div className="hidden md:flex gap-8 text-sm text-gray-600">
-          <Link href="/#features" className="hover:text-blue-900 transition">Features</Link>
-          <Link href="/#innovation" className="hover:text-blue-900 transition">Innovation</Link>
-          <Link href="/#impact" className="hover:text-blue-900 transition">Impact</Link>
-          <Link href="/about" className="hover:text-blue-900 transition">About</Link>
-          <Link href="/contact" className="text-blue-900 font-semibold">Contact</Link>
+        <div className="hidden md:flex gap-8 text-sm items-center">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`transition-colors duration-200 ${
+                isActive(link.href)
+                  ? 'text-blue-900 font-bold border-b-2 border-blue-900 pb-1'
+                  : 'text-gray-600 hover:text-blue-900'
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
         
         <div className="flex items-center gap-4">
@@ -114,11 +138,20 @@ export function Navbar() {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-gray-200 px-6 py-4 space-y-4">
-          <Link href="/#features" className="block text-gray-600 hover:text-blue-900 py-2">Features</Link>
-          <Link href="/#innovation" className="block text-gray-600 hover:text-blue-900 py-2">Innovation</Link>
-          <Link href="/#impact" className="block text-gray-600 hover:text-blue-900 py-2">Impact</Link>
-          <Link href="/about" className="block text-gray-600 hover:text-blue-900 py-2">About</Link>
-          <Link href="/contact" className="block text-blue-900 font-semibold py-2">Contact</Link>
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block py-2 transition-colors duration-200 ${
+                isActive(link.href)
+                  ? 'text-blue-900 font-bold bg-blue-50 px-3 rounded-lg'
+                  : 'text-gray-600 hover:text-blue-900'
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
       )}
     </nav>
