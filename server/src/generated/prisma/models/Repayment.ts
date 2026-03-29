@@ -217,6 +217,7 @@ export type RepaymentWhereInput = {
   paidAt?: Prisma.DateTimeFilter<"Repayment"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"Repayment"> | Date | string
   loan?: Prisma.XOR<Prisma.LoanScalarRelationFilter, Prisma.LoanWhereInput>
+  paymentSession?: Prisma.XOR<Prisma.PaymentSessionNullableScalarRelationFilter, Prisma.PaymentSessionWhereInput> | null
 }
 
 export type RepaymentOrderByWithRelationInput = {
@@ -226,6 +227,7 @@ export type RepaymentOrderByWithRelationInput = {
   paidAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   loan?: Prisma.LoanOrderByWithRelationInput
+  paymentSession?: Prisma.PaymentSessionOrderByWithRelationInput
 }
 
 export type RepaymentWhereUniqueInput = Prisma.AtLeast<{
@@ -238,6 +240,7 @@ export type RepaymentWhereUniqueInput = Prisma.AtLeast<{
   paidAt?: Prisma.DateTimeFilter<"Repayment"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"Repayment"> | Date | string
   loan?: Prisma.XOR<Prisma.LoanScalarRelationFilter, Prisma.LoanWhereInput>
+  paymentSession?: Prisma.XOR<Prisma.PaymentSessionNullableScalarRelationFilter, Prisma.PaymentSessionWhereInput> | null
 }, "id">
 
 export type RepaymentOrderByWithAggregationInput = {
@@ -270,6 +273,7 @@ export type RepaymentCreateInput = {
   paidAt?: Date | string
   createdAt?: Date | string
   loan: Prisma.LoanCreateNestedOneWithoutRepaymentsInput
+  paymentSession?: Prisma.PaymentSessionCreateNestedOneWithoutRepaymentInput
 }
 
 export type RepaymentUncheckedCreateInput = {
@@ -278,6 +282,7 @@ export type RepaymentUncheckedCreateInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Date | string
   createdAt?: Date | string
+  paymentSession?: Prisma.PaymentSessionUncheckedCreateNestedOneWithoutRepaymentInput
 }
 
 export type RepaymentUpdateInput = {
@@ -286,6 +291,7 @@ export type RepaymentUpdateInput = {
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   loan?: Prisma.LoanUpdateOneRequiredWithoutRepaymentsNestedInput
+  paymentSession?: Prisma.PaymentSessionUpdateOneWithoutRepaymentNestedInput
 }
 
 export type RepaymentUncheckedUpdateInput = {
@@ -294,6 +300,7 @@ export type RepaymentUncheckedUpdateInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  paymentSession?: Prisma.PaymentSessionUncheckedUpdateOneWithoutRepaymentNestedInput
 }
 
 export type RepaymentCreateManyInput = {
@@ -361,6 +368,11 @@ export type RepaymentSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
 }
 
+export type RepaymentNullableScalarRelationFilter = {
+  is?: Prisma.RepaymentWhereInput | null
+  isNot?: Prisma.RepaymentWhereInput | null
+}
+
 export type RepaymentCreateNestedManyWithoutLoanInput = {
   create?: Prisma.XOR<Prisma.RepaymentCreateWithoutLoanInput, Prisma.RepaymentUncheckedCreateWithoutLoanInput> | Prisma.RepaymentCreateWithoutLoanInput[] | Prisma.RepaymentUncheckedCreateWithoutLoanInput[]
   connectOrCreate?: Prisma.RepaymentCreateOrConnectWithoutLoanInput | Prisma.RepaymentCreateOrConnectWithoutLoanInput[]
@@ -403,11 +415,28 @@ export type RepaymentUncheckedUpdateManyWithoutLoanNestedInput = {
   deleteMany?: Prisma.RepaymentScalarWhereInput | Prisma.RepaymentScalarWhereInput[]
 }
 
+export type RepaymentCreateNestedOneWithoutPaymentSessionInput = {
+  create?: Prisma.XOR<Prisma.RepaymentCreateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedCreateWithoutPaymentSessionInput>
+  connectOrCreate?: Prisma.RepaymentCreateOrConnectWithoutPaymentSessionInput
+  connect?: Prisma.RepaymentWhereUniqueInput
+}
+
+export type RepaymentUpdateOneWithoutPaymentSessionNestedInput = {
+  create?: Prisma.XOR<Prisma.RepaymentCreateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedCreateWithoutPaymentSessionInput>
+  connectOrCreate?: Prisma.RepaymentCreateOrConnectWithoutPaymentSessionInput
+  upsert?: Prisma.RepaymentUpsertWithoutPaymentSessionInput
+  disconnect?: Prisma.RepaymentWhereInput | boolean
+  delete?: Prisma.RepaymentWhereInput | boolean
+  connect?: Prisma.RepaymentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.RepaymentUpdateToOneWithWhereWithoutPaymentSessionInput, Prisma.RepaymentUpdateWithoutPaymentSessionInput>, Prisma.RepaymentUncheckedUpdateWithoutPaymentSessionInput>
+}
+
 export type RepaymentCreateWithoutLoanInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Date | string
   createdAt?: Date | string
+  paymentSession?: Prisma.PaymentSessionCreateNestedOneWithoutRepaymentInput
 }
 
 export type RepaymentUncheckedCreateWithoutLoanInput = {
@@ -415,6 +444,7 @@ export type RepaymentUncheckedCreateWithoutLoanInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Date | string
   createdAt?: Date | string
+  paymentSession?: Prisma.PaymentSessionUncheckedCreateNestedOneWithoutRepaymentInput
 }
 
 export type RepaymentCreateOrConnectWithoutLoanInput = {
@@ -454,6 +484,54 @@ export type RepaymentScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Repayment"> | Date | string
 }
 
+export type RepaymentCreateWithoutPaymentSessionInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  paidAt?: Date | string
+  createdAt?: Date | string
+  loan: Prisma.LoanCreateNestedOneWithoutRepaymentsInput
+}
+
+export type RepaymentUncheckedCreateWithoutPaymentSessionInput = {
+  id?: string
+  loanId: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  paidAt?: Date | string
+  createdAt?: Date | string
+}
+
+export type RepaymentCreateOrConnectWithoutPaymentSessionInput = {
+  where: Prisma.RepaymentWhereUniqueInput
+  create: Prisma.XOR<Prisma.RepaymentCreateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedCreateWithoutPaymentSessionInput>
+}
+
+export type RepaymentUpsertWithoutPaymentSessionInput = {
+  update: Prisma.XOR<Prisma.RepaymentUpdateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedUpdateWithoutPaymentSessionInput>
+  create: Prisma.XOR<Prisma.RepaymentCreateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedCreateWithoutPaymentSessionInput>
+  where?: Prisma.RepaymentWhereInput
+}
+
+export type RepaymentUpdateToOneWithWhereWithoutPaymentSessionInput = {
+  where?: Prisma.RepaymentWhereInput
+  data: Prisma.XOR<Prisma.RepaymentUpdateWithoutPaymentSessionInput, Prisma.RepaymentUncheckedUpdateWithoutPaymentSessionInput>
+}
+
+export type RepaymentUpdateWithoutPaymentSessionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  loan?: Prisma.LoanUpdateOneRequiredWithoutRepaymentsNestedInput
+}
+
+export type RepaymentUncheckedUpdateWithoutPaymentSessionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  loanId?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type RepaymentCreateManyLoanInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -466,6 +544,7 @@ export type RepaymentUpdateWithoutLoanInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  paymentSession?: Prisma.PaymentSessionUpdateOneWithoutRepaymentNestedInput
 }
 
 export type RepaymentUncheckedUpdateWithoutLoanInput = {
@@ -473,6 +552,7 @@ export type RepaymentUncheckedUpdateWithoutLoanInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  paymentSession?: Prisma.PaymentSessionUncheckedUpdateOneWithoutRepaymentNestedInput
 }
 
 export type RepaymentUncheckedUpdateManyWithoutLoanInput = {
@@ -491,6 +571,7 @@ export type RepaymentSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   paidAt?: boolean
   createdAt?: boolean
   loan?: boolean | Prisma.LoanDefaultArgs<ExtArgs>
+  paymentSession?: boolean | Prisma.Repayment$paymentSessionArgs<ExtArgs>
 }, ExtArgs["result"]["repayment"]>
 
 export type RepaymentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -522,6 +603,7 @@ export type RepaymentSelectScalar = {
 export type RepaymentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "loanId" | "amount" | "paidAt" | "createdAt", ExtArgs["result"]["repayment"]>
 export type RepaymentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   loan?: boolean | Prisma.LoanDefaultArgs<ExtArgs>
+  paymentSession?: boolean | Prisma.Repayment$paymentSessionArgs<ExtArgs>
 }
 export type RepaymentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   loan?: boolean | Prisma.LoanDefaultArgs<ExtArgs>
@@ -534,6 +616,7 @@ export type $RepaymentPayload<ExtArgs extends runtime.Types.Extensions.InternalA
   name: "Repayment"
   objects: {
     loan: Prisma.$LoanPayload<ExtArgs>
+    paymentSession: Prisma.$PaymentSessionPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -936,6 +1019,7 @@ readonly fields: RepaymentFieldRefs;
 export interface Prisma__RepaymentClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   loan<T extends Prisma.LoanDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.LoanDefaultArgs<ExtArgs>>): Prisma.Prisma__LoanClient<runtime.Types.Result.GetResult<Prisma.$LoanPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  paymentSession<T extends Prisma.Repayment$paymentSessionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Repayment$paymentSessionArgs<ExtArgs>>): Prisma.Prisma__PaymentSessionClient<runtime.Types.Result.GetResult<Prisma.$PaymentSessionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1363,6 +1447,25 @@ export type RepaymentDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Limit how many Repayments to delete.
    */
   limit?: number
+}
+
+/**
+ * Repayment.paymentSession
+ */
+export type Repayment$paymentSessionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PaymentSession
+   */
+  select?: Prisma.PaymentSessionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PaymentSession
+   */
+  omit?: Prisma.PaymentSessionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PaymentSessionInclude<ExtArgs> | null
+  where?: Prisma.PaymentSessionWhereInput
 }
 
 /**

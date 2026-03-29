@@ -283,6 +283,13 @@ pub enum ServerMessage {
     Replay { events: Vec<WsEvent>, last_event_id: u64 },
     /// Welcome message with client info
     Welcome { client_id: String, reconnect_token: String },
+#[allow(dead_code)]
+enum ServerMessage {
+    Event { event: EscrowEvent },
+    Subscribed { escrow_ids: Vec<i64> },
+    Unsubscribed { escrow_ids: Vec<i64> },
+    Pong,
+    Error { message: String },
 }
 
 impl WsState {

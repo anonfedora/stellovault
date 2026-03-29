@@ -3,6 +3,7 @@
 mod analytics;
 mod auth;
 mod collateral;
+mod document;
 mod escrow;
 mod loan;
 mod oracle;
@@ -13,6 +14,7 @@ mod wallet;
 pub use analytics::analytics_routes;
 pub use auth::auth_routes;
 pub use collateral::collateral_routes;
+pub use document::document_routes;
 pub use escrow::escrow_routes;
 pub use loan::loan_routes;
 pub use oracle::oracle_routes;

@@ -137,6 +137,17 @@ impl EventListener {
                     escrow_id: 0, // Parse from event
                 })
             }
+            "esc_disp" => Some(EscrowEvent::Disputed {
+                escrow_id: 0, // Parse from event
+                reason: "on-chain dispute raised".to_string(),
+            }),
+            "esc_rslv" => {
+                // Dispute resolved (decision in event args)
+                Some(EscrowEvent::StatusUpdated {
+                    escrow_id: 0, // Parse from event
+                    status: EscrowStatus::Cancelled,
+                })
+            }
             _ => {
                 tracing::warn!("Unknown event type: {}", event_type);
                 None
