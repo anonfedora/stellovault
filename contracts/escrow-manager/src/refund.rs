@@ -1,5 +1,5 @@
 use soroban_sdk::{token, Address, Env};
-use crate::{ContractError, EscrowStatus, TradeEscrow};
+use crate::{ContractError, EscrowStatus, Escrow};
 
 /// Process a refund for an escrow
 /// 
@@ -8,8 +8,8 @@ use crate::{ContractError, EscrowStatus, TradeEscrow};
 /// and handles any error reporting.
 pub fn process_refund(
     env: &Env,
-    escrow: &mut TradeEscrow,
-    escrow_id: u64,
+    escrow: &mut Escrow,
+    _escrow_id: u64,
 ) -> Result<(), ContractError> {
     // 1. Validate that the escrow has sufficient balance
     let token_client = token::Client::new(env, &escrow.asset);

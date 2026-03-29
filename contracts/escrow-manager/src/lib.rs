@@ -45,6 +45,7 @@ pub enum ContractError {
     ConsensusNotMet = 12,
     EscrowDisputed = 13,
     EscrowNotDisputed = 14,
+    InsufficientBalance = 15,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -1118,7 +1119,7 @@ mod test {
         let escrow_id = create_test_escrow(&t);
 
         let token = token::Client::new(&t.env, &t.token_addr);
-        let lender_balance_before = token.balance(&t.lender);
+        let buyer_balance_before = token.balance(&t.buyer);
 
         // Advance past expiry
         t.env.ledger().with_mut(|li| {
@@ -1131,8 +1132,8 @@ mod test {
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Refunded);
 
-        // Verify funds returned to lender
-        assert_eq!(token.balance(&t.lender), lender_balance_before + 5000);
+        // Verify funds returned to buyer
+        assert_eq!(token.balance(&t.buyer), buyer_balance_before + 5000);
         assert_eq!(token.balance(&t.escrow_id_addr), 0);
 
         // Verify collateral unlocked
@@ -1269,12 +1270,12 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_dispute_refund_to_lender_success() {
+    fn test_resolve_dispute_refund_to_buyer_success() {
         let t = setup();
         let escrow_id = create_test_escrow(&t);
 
         let token = token::Client::new(&t.env, &t.token_addr);
-        let lender_balance_before = token.balance(&t.lender);
+        let buyer_balance_before = token.balance(&t.buyer);
 
         let reason = Bytes::from_slice(&t.env, b"dispute");
         t.escrow_client.raise_dispute(&escrow_id, &t.buyer, &reason);
@@ -1284,7 +1285,7 @@ mod test {
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Refunded);
-        assert_eq!(token.balance(&t.lender), lender_balance_before + 5000);
+        assert_eq!(token.balance(&t.buyer), buyer_balance_before + 5000);
         assert_eq!(token.balance(&t.escrow_id_addr), 0);
 
         // Verify collateral unlocked
