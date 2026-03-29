@@ -23,6 +23,7 @@ pub enum ContractError {
     NoFeesAvailable = 4,
     InvalidFee = 5,
     ZeroAmount = 6,
+    NoPendingAdmin = 7,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -107,6 +108,58 @@ impl ProtocolTreasury {
             .publish((symbol_short!("fee_upd"),), (new_fee_bps,));
 
         Ok(())
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Query the current protocol fee in basis points.
@@ -570,5 +623,57 @@ mod test {
     fn test_fee_bps_default() {
         let t = setup();
         assert_eq!(t.client.get_fee_bps(), DEFAULT_FEE_BPS);
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        assert!(t.client.get_pending_admin().is_none());
+        t.client.propose_admin(&new_admin);
+        assert_eq!(t.client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        t.client.propose_admin(&new_admin);
+        t.client.accept_admin();
+
+        t.env.as_contract(&t.treasury_addr, || {
+            let stored_admin: Address = t
+                .env
+                .storage()
+                .instance()
+                .get(&symbol_short!("admin"))
+                .unwrap();
+            assert_eq!(stored_admin, new_admin);
+        });
+        assert!(t.client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let treasury_addr = env.register(ProtocolTreasury, ());
+
+        env.as_contract(&treasury_addr, || {
+            ProtocolTreasury::initialize(env.clone(), admin).unwrap();
+            // No mocked auth — admin.require_auth() panics
+            ProtocolTreasury::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
+    fn test_accept_admin_no_pending() {
+        let t = setup();
+        t.client.accept_admin();
     }
 }

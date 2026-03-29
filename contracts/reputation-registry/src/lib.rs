@@ -18,6 +18,7 @@ pub enum ContractError {
     AlreadyInitialized = 2,
     ProfileNotFound = 3,
     InvalidValue = 4,
+    NoPendingAdmin = 5,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -335,6 +336,58 @@ impl ReputationRegistry {
             .set(&symbol_short!("loan_mgr"), &loan_management);
 
         Ok(())
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 }
 
@@ -730,5 +783,59 @@ mod test {
         // So multiplier should be slightly above 10000
         assert!(multiplier >= 10000);
         assert!(multiplier < 11000); // But not too high
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        assert!(t.client.get_pending_admin().is_none());
+        t.client.propose_admin(&new_admin);
+        assert_eq!(t.client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        t.client.propose_admin(&new_admin);
+        t.client.accept_admin();
+
+        t.env.as_contract(&t.contract_id, || {
+            let stored_admin: Address = t
+                .env
+                .storage()
+                .instance()
+                .get(&symbol_short!("admin"))
+                .unwrap();
+            assert_eq!(stored_admin, new_admin);
+        });
+        assert!(t.client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let escrow_mgr = Address::generate(&env);
+        let loan_mgr = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register_contract(None, ReputationRegistry);
+
+        env.as_contract(&contract_id, || {
+            ReputationRegistry::initialize(env.clone(), admin, escrow_mgr, loan_mgr).unwrap();
+            // No mocked auth — admin.require_auth() panics
+            ReputationRegistry::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #5)")]
+    fn test_accept_admin_no_pending() {
+        let t = setup();
+        t.client.accept_admin();
     }
 }
