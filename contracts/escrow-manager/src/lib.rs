@@ -6,8 +6,6 @@
 
 #![no_std]
 
-extern crate alloc;
-
 mod refund;
 
 use soroban_sdk::{
