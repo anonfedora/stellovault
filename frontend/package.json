@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "fast-check": "^3.23.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
