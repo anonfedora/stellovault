@@ -15,7 +15,7 @@ model User {
   id             String   @id @default(uuid())
   stellarAddress String   @unique
   name           String?
-  role           Role     @default(USER)
+  role           Role     @default(BUYER)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -28,6 +28,11 @@ model User {
   borrowedLoans       Loan[]               @relation("BorrowerLoans")
   lentLoans           Loan[]               @relation("LenderLoans")
   governanceProposals GovernanceProposal[] @relation("ProposerProposals")
+  
+  // RBAC relationships
+  userPermissions     UserPermission[]
+  assignedRole        UserRoleModel?                @relation(fields: [roleId], references: [id])
+  roleId              String?
 }
 
 model Wallet {
@@ -42,6 +47,63 @@ model Wallet {
   updatedAt  DateTime  @updatedAt
 
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// RBAC (Role-Based Access Control)
+// ─────────────────────────────────────────────
+
+model Permission {
+  id          String @id @default(uuid())
+  name        String @unique
+  scope       String @unique // e.g., "loan:read", "escrow:write"
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@index([scope])
+}
+
+model UserRoleModel {
+  id          String @id @default(uuid())
+  name        Role   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  users             User[]
+  rolePermissions   RolePermission[]
+
+  @@map("roles")
+  @@index([name])
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  role         UserRoleModel @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserPermission {
+  id           String @id @default(uuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy    String // User ID who granted this permission
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
 }
 
 model Session {
@@ -368,8 +430,10 @@ enum PaymentStatus {
 }
 
 enum Role {
-  USER
-  MERCHANT
+  BUYER
+  SELLER
+  LENDER
+  AUDITOR
   ADMIN
 }
 

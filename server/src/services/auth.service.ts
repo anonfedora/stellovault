@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { env } from "../config/env";
 import { JWT_CONFIG, TokenPayload } from "../config/jwt";
 import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from "../config/errors";
+import { UserRole, PermissionScope } from "../types/rbac";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -161,6 +162,7 @@ export class AuthService {
             userId: user.id,
             jti,
             walletAddress: normalizedAddress,
+            role: user.role as UserRole,
         };
 
         return {
@@ -206,6 +208,7 @@ export class AuthService {
             userId: user.id,
             jti: newJti,
             walletAddress: payload.walletAddress,
+            role: user.role as UserRole,
         };
 
         const newAccessToken = jwt.sign(tokenPayload, env.jwt.accessSecret, { expiresIn: accessTokenExpiresIn } as SignOptions);
