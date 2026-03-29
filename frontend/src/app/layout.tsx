@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
 import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
           />
           <TransactionHistoryDrawer />
         </TransactionStatusProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

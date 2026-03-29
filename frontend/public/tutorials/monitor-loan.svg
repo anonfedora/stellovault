@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Monitor loan tutorial animation">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0A0A" />
+      <stop offset="1" stop-color="#111827" />
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#60A5FA" />
+      <stop offset="1" stop-color="#2563EB" />
+    </linearGradient>
+    <style>
+      .label { font: 600 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: #F9FAFB; }
+      .muted { font: 500 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: rgba(249,250,251,0.72); }
+      .cursor { animation: cursorMove 15s infinite cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .dot { animation: dotPulse 15s infinite ease-in-out; transform-origin: 420px 230px; }
+      @keyframes cursorMove {
+        0% { transform: translate(130px, 260px); opacity: 0; }
+        10% { opacity: 1; }
+        30% { transform: translate(220px, 210px); }
+        50% { transform: translate(320px, 230px); }
+        65% { transform: translate(430px, 215px); }
+        80% { transform: translate(280px, 270px); }
+        100% { transform: translate(130px, 260px); opacity: 0; }
+      }
+      @keyframes dotPulse {
+        0%, 50% { opacity: 0.3; transform: scale(1); }
+        65% { opacity: 1; transform: scale(1.5); }
+        75% { opacity: 0.3; transform: scale(1); }
+        100% { opacity: 0.3; }
+      }
+    </style>
+  </defs>
+
+  <rect width="640" height="360" rx="18" fill="url(#bg4)" />
+
+  <rect x="90" y="64" width="460" height="232" rx="18" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)" />
+  <text x="120" y="112" class="label">Monitor your loan</text>
+  <text x="120" y="140" class="muted">Status → Repayments → Progress</text>
+
+  <!-- Mini chart -->
+  <g transform="translate(120 160)" opacity="0.95">
+    <rect x="0" y="0" width="400" height="120" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" />
+    <path d="M20 88 C70 60, 120 92, 170 62 C220 32, 270 54, 320 36 C350 26, 370 30, 380 22" fill="none" stroke="url(#line)" stroke-width="4" stroke-linecap="round" />
+    <circle class="dot" cx="300" cy="50" r="6" fill="#93C5FD" />
+    <g opacity="0.7">
+      <path d="M20 98 H380" stroke="rgba(255,255,255,0.10)" stroke-width="2" />
+      <path d="M20 68 H380" stroke="rgba(255,255,255,0.10)" stroke-width="2" />
+      <path d="M20 38 H380" stroke="rgba(255,255,255,0.10)" stroke-width="2" />
+    </g>
+  </g>
+
+  <!-- Cursor -->
+  <g class="cursor">
+    <path d="M10 0 L0 32 L12 26 L18 40 L26 36 L20 22 L34 22 Z" fill="#FFFFFF" opacity="0.95" />
+  </g>
+</svg>
+

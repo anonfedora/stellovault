@@ -78,6 +78,11 @@ export type Loan = Prisma.LoanModel
  */
 export type Repayment = Prisma.RepaymentModel
 /**
+ * Model PaymentSession
+ * 
+ */
+export type PaymentSession = Prisma.PaymentSessionModel
+/**
  * Model Investment
  * 
  */
@@ -127,3 +132,8 @@ export type GovernanceAuditLog = Prisma.GovernanceAuditLogModel
  * 
  */
 export type RiskScore = Prisma.RiskScoreModel
+/**
+ * Model AuditLog
+ * 
+ */
+export type AuditLog = Prisma.AuditLogModel

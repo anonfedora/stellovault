@@ -8,3 +8,10 @@ export async function getPlatformStats(_req: Request, res: Response, next: NextF
         res.json(stats);
     } catch (err) { next(err); }
 }
+
+export async function getProtocolAnalytics(_req: Request, res: Response, next: NextFunction) {
+    try {
+        const data = await analyticsService.getProtocolAnalytics();
+        res.json(data);
+    } catch (err) { next(err); }
+}
