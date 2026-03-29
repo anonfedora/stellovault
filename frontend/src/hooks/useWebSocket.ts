@@ -51,6 +51,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
 
     let ws: WebSocket | null = null;
+    let attempt = 0;
     let consecutiveFailures = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
