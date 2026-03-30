@@ -33,13 +33,7 @@ export class LiquidationService {
       return;
     }
 
-    // this.cronJob = cron.schedule(`*/${CHECK_INTERVAL_MINUTES} * * * *`, async () => {
-      await this.performLiquidationChecks();
-    });
-
-    console.log(`Liquidation worker started - checks every ${CHECK_INTERVAL_MINUTES} minutes`);
-    this.isRunning = true;
-  }
+    // TODO: Uncomment when cron is installed\n    // this.cronJob = cron.schedule(`*/${CHECK_INTERVAL_MINUTES} * * * *`, async () => {\n      await this.performLiquidationChecks();\n    // });\n\n    console.log(`Liquidation worker started - checks every ${CHECK_INTERVAL_MINUTES} minutes`);\n    this.isRunning = true;\n  }
 
   async stop() {
     if (this.cronJob) {
@@ -127,7 +121,7 @@ export class LiquidationService {
 
   private async triggerLiquidation(loanId: string, borrowerId: string, lenderId: string, retryCount = 0): Promise<void> {
     try {
-  const escrowManagerId = contracts.escrow || '';
+        const escrowManagerId = contracts.escrow || '';
       if (!escrowManagerId) {
         throw new Error('ESCROW_MANAGER_CONTRACT_ID not configured');
       }

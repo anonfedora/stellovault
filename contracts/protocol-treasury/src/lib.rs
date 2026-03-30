@@ -328,7 +328,8 @@ impl ProtocolTreasury {
         token_client.transfer(&env.current_contract_address(), &governance, &amount);
 
         // Update recorded fees
-        env.storage().persistent().set(&fee_key, &(total_fees - amount));
+        let new_balance = total_fees.checked_sub(amount).ok_or(ContractError::NoFeesAvailable)?;
+        env.storage().persistent().set(&fee_key, &new_balance);
 
         env.events()
             .publish((symbol_short!("trs_wd"),), (asset.clone(), amount));
