@@ -73,6 +73,8 @@ struct VoterAction {
 }
 
 fuzz_target!(|input: FuzzInput| {
+    let env = Env::default();
+    env.mock_all_auths();
 
 
         if input.voters.is_empty() || input.voters.len() > 32 {
