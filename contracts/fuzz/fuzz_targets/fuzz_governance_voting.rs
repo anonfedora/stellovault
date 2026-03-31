@@ -73,88 +73,93 @@ struct VoterAction {
 }
 
 fuzz_target!(|input: FuzzInput| {
-    if input.voters.is_empty() || input.voters.len() > 32 {
-        return;
-    }
 
-    let env = Env::default();
-    env.mock_all_auths();
 
-    let mock_risk = env.register_contract(None, MockRiskAssessment);
-    let gov_contract = env.register_contract(None, governance::Governance);
-    let admin = Address::generate(&env);
-    let token = Address::generate(&env);
+        if input.voters.is_empty() || input.voters.len() > 32 {
+            return;
+        }
+        let env = Env::default();
 
-    let total_power = (input.total_power as i128).max(10_000).min(10_000_000);
-    let quorum_bps = (input.quorum_bps as u32).max(100).min(5000);
-    let majority_bps = (input.majority_bps as u32).max(5000).min(9000);
+        let mock_risk = env.register_contract(None, MockRiskAssessment);
+        let gov_contract = env.register_contract(None, governance::Governance);
+        let admin = Address::generate(&env);
+        let token = Address::generate(&env);
 
-    // Phase 1: Initialize and write config/power directly to storage.
-    // We bypass update_config / set_total_voting_power (which call
-    // admin.require_auth()) to avoid HostError(Auth, ExistingValue)
-    // when mock_all_auths + as_contract interact in the same frame.
-    env.as_contract(&gov_contract, || {
-        governance::Governance::initialize(
-            env.clone(),
-            admin.clone(),
-            token.clone(),
-            mock_risk.clone(),
-        )
-        .unwrap();
+        let total_power = (input.total_power as i128).max(10_000).min(10_000_000);
+        let quorum_bps = (input.quorum_bps as u32).max(100).min(5000);
+        let majority_bps = (input.majority_bps as u32).max(5000).min(9000);
 
-        let config = governance::GovernanceConfig {
-            voting_period: 604800,
-            timelock_period: 86400,
-            tally_period: 3600,
-            quorum_bps,
-            majority_bps,
-            min_voting_power: 100,
-        };
-        env.storage()
-            .instance()
-            .set(&symbol_short!("config"), &config);
-        env.storage()
-            .instance()
-            .set(&symbol_short!("total_pwr"), &total_power);
-    });
+        // Phase 1: Initialize and write config/power directly to storage.
+        env.as_contract(&gov_contract, || {
+            env.mock_all_auths();
+            governance::Governance::initialize(
+                env.clone(),
+                admin.clone(),
+                token.clone(),
+                mock_risk.clone(),
+            )
+            .unwrap();
 
-    // Phase 2: Create a proposal (separate frame to reset auth state)
-    let proposer = Address::generate(&env);
-    let proposal_id = env.as_contract(&gov_contract, || {
-        governance::Governance::set_voting_power(env.clone(), proposer.clone(), 1000);
-        governance::Governance::create_proposal(
-            env.clone(),
-            proposer.clone(),
-            mock_risk.clone(),
-            symbol_short!("liq_thr"),
-            7500,
-        )
-        .unwrap()
-    });
+            let config = governance::GovernanceConfig {
+                voting_period: 604800,
+                timelock_period: 86400,
+                tally_period: 3600,
+                quorum_bps,
+                majority_bps,
+                min_voting_power: 100,
+            };
+            env.storage()
+                .instance()
+                .set(&symbol_short!("config"), &config);
+            env.storage()
+                .instance()
+                .set(&symbol_short!("total_pwr"), &total_power);
+        });
 
-    // Phase 3: Cast votes (separate frame)
-    let mut voter_addrs: std::vec::Vec<Address> = std::vec::Vec::new();
-    for _ in 0..16 {
-        voter_addrs.push(Address::generate(&env));
-    }
+        // Phase 2: Create a proposal (separate frame to reset auth state)
+        let proposer = Address::generate(&env);
+        env.as_contract(&gov_contract, || {
+            env.mock_all_auths();
+            governance::Governance::set_voting_power(env.clone(), proposer.clone(), 1000);
+        });
+        let proposal_id = env.as_contract(&gov_contract, || {
+            env.mock_all_auths();
+            governance::Governance::create_proposal(
+                env.clone(),
+                proposer.clone(),
+                mock_risk.clone(),
+                symbol_short!("liq_thr"),
+                7500,
+            )
+            .unwrap()
+        });
 
-    let mut total_for: i128 = 0;
-    let mut total_against: i128 = 0;
-    let mut voted: std::collections::HashSet<u8> = std::collections::HashSet::new();
+        // Phase 3: Cast votes (each set_voting_power and cast_vote in its own frame)
+        let mut voter_addrs: std::vec::Vec<Address> = std::vec::Vec::new();
+        for _ in 0..16 {
+            voter_addrs.push(Address::generate(&env));
+        }
 
-    env.as_contract(&gov_contract, || {
+        let mut total_for: i128 = 0;
+        let mut total_against: i128 = 0;
+        let mut voted: std::collections::HashSet<u8> = std::collections::HashSet::new();
+
         for action in &input.voters {
             let idx = (action.voter_idx % 16) as usize;
             let effective_idx = idx as u8;
 
             if voted.contains(&effective_idx) {
-                let result = governance::Governance::cast_vote(
-                    env.clone(),
-                    proposal_id,
-                    voter_addrs[idx].clone(),
-                    action.support,
-                    1,
-                );
+                // Try to cast a duplicate vote (should fail)
+                let result = env.as_contract(&gov_contract, || {
+                    env.mock_all_auths();
+                    governance::Governance::cast_vote(
+                        env.clone(),
+                        proposal_id,
+                        voter_addrs[idx].clone(),
+                        action.support,
+                        1,
+                    )
+                });
                 assert!(
                     result.is_err(),
                     "INVARIANT VIOLATED: duplicate vote should be rejected"
@@ -163,19 +168,25 @@ fuzz_target!(|input: FuzzInput| {
             }
 
             let power = (action.power as i128).max(1).min(1_000_000);
-            governance::Governance::set_voting_power(
-                env.clone(),
-                voter_addrs[idx].clone(),
-                power * power,
-            );
+            env.as_contract(&gov_contract, || {
+                env.mock_all_auths();
+                governance::Governance::set_voting_power(
+                    env.clone(),
+                    voter_addrs[idx].clone(),
+                    power * power,
+                );
+            });
 
-            match governance::Governance::cast_vote(
-                env.clone(),
-                proposal_id,
-                voter_addrs[idx].clone(),
-                action.support,
-                power,
-            ) {
+            match env.as_contract(&gov_contract, || {
+                env.mock_all_auths();
+                governance::Governance::cast_vote(
+                    env.clone(),
+                    proposal_id,
+                    voter_addrs[idx].clone(),
+                    action.support,
+                    power,
+                )
+            }) {
                 Ok(()) => {
                     voted.insert(effective_idx);
                     if action.support {
@@ -187,42 +198,43 @@ fuzz_target!(|input: FuzzInput| {
                 Err(_) => { /* validation errors are fine */ }
             }
         }
-    });
 
-    // ── INVARIANT 1: vote tally matches individual votes ────────────────
-    env.as_contract(&gov_contract, || {
-        let proposal = governance::Governance::get_proposal(env.clone(), proposal_id).unwrap();
-        assert_eq!(
-            proposal.votes_for, total_for,
-            "INVARIANT VIOLATED: votes_for ({}) != tracked for ({})",
-            proposal.votes_for, total_for
-        );
-        assert_eq!(
-            proposal.votes_against, total_against,
-            "INVARIANT VIOLATED: votes_against ({}) != tracked against ({})",
-            proposal.votes_against, total_against
-        );
-    });
-
-    // ── INVARIANT 2: execution respects quorum + majority ───────────────
-    if input.try_execute {
+        // ── INVARIANT 1: vote tally matches individual votes ────────────────
         env.as_contract(&gov_contract, || {
-            env.ledger()
-                .set_timestamp(env.ledger().timestamp() + 604800 + 86400 + 1);
-
-            let exec_result =
-                governance::Governance::execute_proposal(env.clone(), proposal_id);
-
-            let total_votes = total_for + total_against;
-            let quorum_needed = total_power * quorum_bps as i128 / 10000;
-            let majority_needed = total_votes * majority_bps as i128 / 10000;
-
-            if total_votes < quorum_needed || total_for < majority_needed {
-                assert!(
-                    exec_result.is_err(),
-                    "INVARIANT VIOLATED: proposal executed without quorum/majority"
-                );
-            }
+            env.mock_all_auths();
+            let proposal = governance::Governance::get_proposal(env.clone(), proposal_id).unwrap();
+            assert_eq!(
+                proposal.votes_for, total_for,
+                "INVARIANT VIOLATED: votes_for ({}) != tracked for ({})",
+                proposal.votes_for, total_for
+            );
+            assert_eq!(
+                proposal.votes_against, total_against,
+                "INVARIANT VIOLATED: votes_against ({}) != tracked against ({})",
+                proposal.votes_against, total_against
+            );
         });
-    }
-});
+
+        // ── INVARIANT 2: execution respects quorum + majority ───────────────
+        if input.try_execute {
+            env.as_contract(&gov_contract, || {
+                env.mock_all_auths();
+                env.ledger()
+                    .set_timestamp(env.ledger().timestamp() + 604800 + 86400 + 1);
+
+                let exec_result =
+                    governance::Governance::execute_proposal(env.clone(), proposal_id);
+
+                let total_votes = total_for + total_against;
+                let quorum_needed = total_power * quorum_bps as i128 / 10000;
+                let majority_needed = total_votes * majority_bps as i128 / 10000;
+
+                if total_votes < quorum_needed || total_for < majority_needed {
+                    assert!(
+                        exec_result.is_err(),
+                        "INVARIANT VIOLATED: proposal executed without quorum/majority"
+                    );
+                }
+            });
+        }
+    });
