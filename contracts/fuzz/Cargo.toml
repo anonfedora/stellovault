@@ -1,0 +1,29 @@
+[package]
+name = "stellovault-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+escrow-manager = { path = "../escrow-manager", features = ["testutils"] }
+governance = { path = "../governance", features = ["testutils"] }
+arbitrary = { version = "1", features = ["derive"] }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_escrow_invariants"
+path = "fuzz_targets/fuzz_escrow_invariants.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_governance_voting"
+path = "fuzz_targets/fuzz_governance_voting.rs"
+doc = false

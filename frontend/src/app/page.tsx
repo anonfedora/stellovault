@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   ChevronRight,
   Lock,
@@ -8,33 +8,11 @@ import {
   TrendingUp,
   CheckCircle2,
   ArrowUpRight,
-  Wallet,
-  LogOut,
 } from "lucide-react";
 import Link from "next/link";
 import { Footer, Navbar } from "@/components";
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
-
-  const handleWalletConnect = async () => {
-    const mockAddress =
-      "G" + Math.random().toString(16).slice(2, 54).toUpperCase();
-    setWalletAddress(mockAddress);
-    setIsConnected(true);
-    setIsWalletMenuOpen(false);
-  };
-
-  const handleWalletDisconnect = () => {
-    setWalletAddress(null);
-    setIsConnected(false);
-  };
-
-  const shortenAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
   return (
     <div className="w-full min-h-screen bg-white">
       {/* Navigation */}
@@ -58,9 +36,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <button
-              className="bg-blue-900 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 group"
-            >
+            <button className="bg-blue-900 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 group">
               Connect Wallet
               <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
             </button>
@@ -455,9 +431,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <button
-              className="bg-blue-900 text-white px-10 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all"
-            >
+            <button className="bg-blue-900 text-white px-10 py-4 rounded-full text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all">
               Connect Wallet & Start Trading
             </button>
             <button className="border-2 border-blue-900 text-blue-900 px-10 py-4 rounded-full text-lg font-semibold hover:bg-blue-50 transition-all">
@@ -468,7 +442,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-     <Footer />
+      <Footer />
     </div>
   );
 }

@@ -106,3 +106,6 @@ jobs:
 
       - name: Run Tests
         run: cargo test
+
+      - name: Run Property-Based Tests (proptest)
+        run: cargo test --features testutils -- --include-ignored fuzz --test-threads=1

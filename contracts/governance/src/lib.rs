@@ -51,6 +51,7 @@ pub enum ContractError {
     // Delegation errors
     InvalidDelegation = 16,
     DelegateNotFound = 17,
+    NoPendingAdmin = 18,
 }
 
 impl From<ContractError> for soroban_sdk::Error {
@@ -241,6 +242,58 @@ impl Governance {
             .instance()
             .get(&symbol_short!("admin"))
             .unwrap()
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Get governance configuration
@@ -720,13 +773,6 @@ impl Governance {
         x
     }
 
-    /// Set voting power for testing
-    #[cfg(test)]
-    pub fn set_voting_power(env: Env, voter: Address, power: i128) {
-        let key = (symbol_short!("vp"), voter);
-        env.storage().persistent().set(&key, &power);
-    }
-
     /// Validate parameter symbol and value
     fn validate_parameter(parameter: &Symbol, value: i128) -> Result<(), ContractError> {
         // Validate based on parameter type
@@ -914,6 +960,20 @@ impl Governance {
         } else {
             Ok(ProposalStatus::Failed)
         }
+    }
+}
+
+// ============================================================================
+// Test Utilities (available in tests and when testutils feature is enabled)
+// ============================================================================
+
+#[cfg(any(test, feature = "testutils"))]
+#[contractimpl]
+impl Governance {
+    /// Set voting power for testing
+    pub fn set_voting_power(env: Env, voter: Address, power: i128) {
+        let key = (symbol_short!("vp"), voter);
+        env.storage().persistent().set(&key, &power);
     }
 }
 
@@ -1979,5 +2039,60 @@ mod test {
                 ProposalStatus::Failed
             );
         });
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        env.mock_all_auths();
+        let contract_id = env.register(Governance, ());
+        let client = GovernanceClient::new(&env, &contract_id);
+        client.initialize(&admin, &token, &risk_assessment);
+
+        let new_admin = Address::generate(&env);
+        assert!(client.get_pending_admin().is_none());
+        client.propose_admin(&new_admin);
+        assert_eq!(client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        env.mock_all_auths();
+        let contract_id = env.register(Governance, ());
+        let client = GovernanceClient::new(&env, &contract_id);
+        client.initialize(&admin, &token, &risk_assessment);
+
+        let new_admin = Address::generate(&env);
+        client.propose_admin(&new_admin);
+        client.accept_admin();
+
+        assert_eq!(client.admin(), new_admin);
+        assert!(client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register(Governance, ());
+
+        env.as_contract(&contract_id, || {
+            Governance::initialize(env.clone(), admin, token, risk_assessment).unwrap();
+            // No mocked auth — admin.require_auth() panics
+            Governance::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #18)")]
+    fn test_accept_admin_no_pending() {
+        let (env, admin, token, risk_assessment) = setup_env();
+        env.mock_all_auths();
+        let contract_id = env.register(Governance, ());
+        let client = GovernanceClient::new(&env, &contract_id);
+        client.initialize(&admin, &token, &risk_assessment);
+        client.accept_admin();
     }
 }

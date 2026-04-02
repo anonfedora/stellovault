@@ -12,22 +12,27 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model User {
-  id                  String                @id @default(uuid())
-  stellarAddress      String                @unique
-  name                String?
-  role                Role                  @default(USER)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  id             String   @id @default(uuid())
+  stellarAddress String   @unique
+  name           String?
+  role           Role     @default(BUYER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   wallets             Wallet[]
   challenges          WalletChallenge[]
-  boughtEscrows       Escrow[]              @relation("BuyerEscrows")
-  soldEscrows         Escrow[]              @relation("SellerEscrows")
+  boughtEscrows       Escrow[]             @relation("BuyerEscrows")
+  soldEscrows         Escrow[]             @relation("SellerEscrows")
   investments         Investment[]
   sessions            Session[]
-  borrowedLoans       Loan[]                @relation("BorrowerLoans")
-  lentLoans           Loan[]                @relation("LenderLoans")
-  governanceProposals GovernanceProposal[]  @relation("ProposerProposals")
+  borrowedLoans       Loan[]               @relation("BorrowerLoans")
+  lentLoans           Loan[]               @relation("LenderLoans")
+  governanceProposals GovernanceProposal[] @relation("ProposerProposals")
+  
+  // RBAC relationships
+  userPermissions     UserPermission[]
+  assignedRole        UserRoleModel?                @relation(fields: [roleId], references: [id])
+  roleId              String?
 }
 
 model Wallet {
@@ -42,6 +47,63 @@ model Wallet {
   updatedAt  DateTime  @updatedAt
 
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// RBAC (Role-Based Access Control)
+// ─────────────────────────────────────────────
+
+model Permission {
+  id          String @id @default(uuid())
+  name        String @unique
+  scope       String @unique // e.g., "loan:read", "escrow:write"
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@index([scope])
+}
+
+model UserRoleModel {
+  id          String @id @default(uuid())
+  name        Role   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  users             User[]
+  rolePermissions   RolePermission[]
+
+  @@map("roles")
+  @@index([name])
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  role         UserRoleModel @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserPermission {
+  id           String @id @default(uuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy    String // User ID who granted this permission
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
 }
 
 model Session {
@@ -137,8 +199,9 @@ model Loan {
   collateral   Collateral? @relation(fields: [collateralId], references: [id])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-
-  repayments Repayment[]
+  repayments   Repayment[]
+  payments     Payment[]
+  paymentSessions PaymentSession[]
 
   @@index([borrowerId])
   @@index([lenderId])
@@ -147,14 +210,51 @@ model Loan {
 }
 
 model Repayment {
-  id        String   @id @default(uuid())
-  loanId    String
-  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  amount    Decimal  @db.Decimal(20, 7)
-  paidAt    DateTime @default(now())
-  createdAt DateTime @default(now())
+  id             String          @id @default(uuid())
+  loanId         String
+  loan           Loan            @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount         Decimal         @db.Decimal(20, 7)
+  paidAt         DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  paymentSession PaymentSession?
 
   @@index([loanId])
+}
+
+model PaymentSession {
+  id            String               @id @default(uuid())
+  loanId        String
+  loan          Loan                 @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  repaymentId   String?              @unique
+  repayment     Repayment?           @relation(fields: [repaymentId], references: [id], onDelete: SetNull)
+  sessionToken  String               @unique
+  checkoutUrl   String
+  successUrl    String
+  cancelUrl     String
+  webhookUrl    String?
+  webhookSecret String?
+  status        PaymentSessionStatus @default(PENDING)
+  completedAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([loanId])
+  @@index([status])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  loanId      String
+  loan        Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(20, 7)
+  status      PaymentStatus @default(PENDING)
+  txHash      String?
+  errorMessage String?
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
+
+  @@index([loanId])
+  @@index([status])
 }
 
 model Investment {
@@ -303,13 +403,37 @@ model RiskScore {
   @@index([walletAddress, computedAt])
 }
 
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  resourceId String?
+  ipAddress  String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceId])
+  @@index([createdAt])
+}
+
 // ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum Role {
-  USER
-  MERCHANT
+  BUYER
+  SELLER
+  LENDER
+  AUDITOR
   ADMIN
 }
 
@@ -338,6 +462,13 @@ enum LoanStatus {
   ACTIVE
   REPAID
   DEFAULTED
+}
+
+enum PaymentSessionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  EXPIRED
 }
 
 enum GovernanceStatus {

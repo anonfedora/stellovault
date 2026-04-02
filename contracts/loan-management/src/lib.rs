@@ -32,6 +32,7 @@ pub enum ContractError {
     InvalidRateParameters = 9,
     RiskEngineNotSet = 10,
     MathOverflow = 11,
+    NoPendingAdmin = 12,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -130,6 +131,58 @@ impl LoanManagement {
             .set(&symbol_short!("tot_bor"), &0i128);
 
         Ok(())
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Calculate dynamic interest rate based on risk and utilization
@@ -1346,5 +1399,72 @@ mod test {
         // Should still calculate rate with 0 utilization component
         // base_rate (200) + risk_premium * risk_factor (100 * 1) = 300
         assert_eq!(rate, 300);
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        assert!(client.get_pending_admin().is_none());
+        client.propose_admin(&new_admin);
+        assert_eq!(client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.propose_admin(&new_admin);
+        client.accept_admin();
+
+        env.as_contract(&contract_id, || {
+            let stored_admin: Address = env
+                .storage()
+                .instance()
+                .get(&symbol_short!("admin"))
+                .unwrap();
+            assert_eq!(stored_admin, new_admin);
+        });
+        assert!(client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register(LoanManagement, ());
+
+        env.as_contract(&contract_id, || {
+            LoanManagement::initialize(env.clone(), admin).unwrap();
+            // No mocked auth — admin.require_auth() panics
+            LoanManagement::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #12)")]
+    fn test_accept_admin_no_pending() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let contract_id = env.register(LoanManagement, ());
+        let client = LoanManagementClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.accept_admin();
     }
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Wallet } from "lucide-react";
 
 const NAVIGATION = [
   {
@@ -216,6 +217,15 @@ export const Sidebar = () => {
             </p>
           </div>
         </div>
+
+        <Link
+          id="sv-onboarding-connect-wallet"
+          href="/login"
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+        >
+          <Wallet className="h-4 w-4" />
+          Connect Wallet
+        </Link>
       </div>
     </div>
   );

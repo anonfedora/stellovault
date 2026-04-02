@@ -2,6 +2,8 @@
  * JWT configuration constants and utilities.
  */
 
+import { UserRole, PermissionScope } from "../types/rbac";
+
 export const JWT_CONFIG = {
     // Access token: short-lived (15 minutes by default)
     ACCESS_TOKEN_EXPIRY: "15m",
@@ -17,6 +19,8 @@ export interface TokenPayload {
     userId: string;
     jti: string;
     walletAddress: string;
+    role: UserRole;
+    permissions?: PermissionScope[];
     iat?: number;
     exp?: number;
 }

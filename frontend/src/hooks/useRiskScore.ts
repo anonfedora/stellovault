@@ -1,9 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useReducer } from 'react';
+import {
+  parseRiskScoreResponse,
+  parseHistoricalScores,
+  type RiskScoreResponseV2,
+  type HistoricalScore,
+  type SimulateResponse,
+} from '../utils/riskScoreParsers';
+
+// ─── Public types ────────────────────────────────────────────────────────────
 
 export interface RiskScoreBreakdown {
   label: string;
-  value: number; // 0-100
-  weight: number;
+  componentKey: string; // machine key e.g. "on_chain_activity"
+  value: number;        // 0–1000
+  weight: number;       // 0–1
 }
 
 export interface RiskHistoryEntry {
@@ -12,80 +22,224 @@ export interface RiskHistoryEntry {
 }
 
 export interface RiskScoreData {
-  score: number; // 0-1000
+  score: number;
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
   breakdown: RiskScoreBreakdown[];
   history: RiskHistoryEntry[];
+  confidence: number;
+  calculatedAt: string;
 }
 
-export const useRiskScore = (walletAddress: string | null) => {
+export interface SimulationResult {
+  currentScore: number;
+  projectedScore: number;
+  scoreDelta: number;
+  scenarioDescription: string;
+}
+
+// ─── Hook options / return ────────────────────────────────────────────────────
+
+export interface UseRiskScoreOptions {
+  walletAddress: string | null;
+  range?: '6m' | '1y' | 'all';
+}
+
+export interface UseRiskScoreReturn {
+  data: RiskScoreData | null;
+  history: RiskHistoryEntry[];
+  historyLoading: boolean;
+  historyError: string | null;
+  loading: boolean;
+  error: string | null;
+  simulationResult: SimulationResult | null;
+  simulationLoading: boolean;
+  simulationError: string | null;
+  activateSimulation: () => Promise<void>;
+  deactivateSimulation: () => void;
+  appendHistoryPoint: (entry: RiskHistoryEntry) => void;
+}
+
+// ─── History reducer ──────────────────────────────────────────────────────────
+
+type HistoryAction =
+  | { type: 'SET'; entries: RiskHistoryEntry[] }
+  | { type: 'APPEND'; entry: RiskHistoryEntry };
+
+function historyReducer(state: RiskHistoryEntry[], action: HistoryAction): RiskHistoryEntry[] {
+  switch (action.type) {
+    case 'SET':
+      return action.entries;
+    case 'APPEND':
+      return [...state, action.entry];
+    default:
+      return state;
+  }
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function getStartDate(range: '6m' | '1y' | 'all'): string | null {
+  if (range === 'all') return null;
+  const now = new Date();
+  if (range === '6m') {
+    now.setMonth(now.getMonth() - 6);
+  } else {
+    now.setFullYear(now.getFullYear() - 1);
+  }
+  return now.toISOString();
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useRiskScore(
+  walletAddress: string | null,
+  range: '6m' | '1y' | 'all' = '6m',
+): UseRiskScoreReturn {
   const [data, setData] = useState<RiskScoreData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [history, dispatchHistory] = useReducer(historyReducer, []);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+
+  // ── 1.3 Fetch current risk score ──────────────────────────────────────────
   useEffect(() => {
     if (!walletAddress) {
       setData(null);
+      setError(null);
       return;
     }
 
-    const fetchRiskScore = async () => {
+    let cancelled = false;
+
+    const fetchScore = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Mocking API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Basic validation for Stellar address (standard G...)
-        if (!/^G[A-Z2-7]{55}$/.test(walletAddress)) {
-          throw new Error('Invalid Stellar wallet address');
+        const res = await fetch(`/api/risk/${encodeURIComponent(walletAddress)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch risk score: ${res.status} ${res.statusText}`);
         }
-
-        // Generate mock data based on wallet address for consistency in demo
-        const hash = walletAddress.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const baseScore = 600 + (hash % 350);
-        
-        const mockData: RiskScoreData = {
-          score: baseScore,
-          grade: getGrade(baseScore),
-          breakdown: [
-            { label: 'On-chain Activity', value: 70 + (hash % 25), weight: 0.3 },
-            { label: 'Asset Diversity', value: 60 + (hash % 30), weight: 0.2 },
-            { label: 'Wallet Longevity', value: 80 + (hash % 15), weight: 0.25 },
-            { label: 'Transaction History', value: 65 + (hash % 30), weight: 0.25 },
-          ],
-          history: Array.from({ length: 6 }).map((_, i) => ({
-            date: new Date(Date.now() - (5 - i) * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            score: baseScore - (5 - i) * 10 + (Math.random() * 20 - 10),
-          })),
-        };
-
-        setData(mockData);
+        const raw: RiskScoreResponseV2 = await res.json();
+        if (!cancelled) {
+          setData(parseRiskScoreResponse(raw));
+        }
       } catch (err: unknown) {
-        setError((err as Error).message || 'Failed to fetch risk score');
-        setData(null);
+        if (!cancelled) {
+          setError((err as Error).message ?? 'Failed to fetch risk score');
+          setData(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchRiskScore();
+    fetchScore();
+    return () => { cancelled = true; };
   }, [walletAddress]);
 
-  const simulateScore = (loanAmount: number): number => {
-    if (!data) return 0;
-    // Simple simulation: more loan = higher risk = lower score
-    const impact = Math.min(loanAmount / 1000, 100);
-    return Math.max(0, data.score - impact);
+  // ── 1.4 Fetch history ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!walletAddress) {
+      dispatchHistory({ type: 'SET', entries: [] });
+      setHistoryError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const params = new URLSearchParams();
+        const startDate = getStartDate(range);
+        if (startDate) params.set('start_date', startDate);
+        // end_date defaults to now; omit for simplicity
+        const url = `/api/risk/${encodeURIComponent(walletAddress)}/history?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch history: ${res.status} ${res.statusText}`);
+        }
+        const raw: HistoricalScore[] = await res.json();
+        if (!cancelled) {
+          dispatchHistory({ type: 'SET', entries: parseHistoricalScores(raw) });
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setHistoryError((err as Error).message ?? 'Failed to fetch history');
+          dispatchHistory({ type: 'SET', entries: [] });
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    };
+
+    fetchHistory();
+    return () => { cancelled = true; };
+  }, [walletAddress, range]);
+
+  // ── 1.5 Simulation ────────────────────────────────────────────────────────
+  const activateSimulation = useCallback(async () => {
+    if (!walletAddress || !data) return;
+    setSimulationLoading(true);
+    setSimulationError(null);
+    try {
+      const res = await fetch(`/api/risk/${encodeURIComponent(walletAddress)}/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loan_amount: 5000, currency: 'USDC' }),
+      });
+      if (!res.ok) {
+        throw new Error(`Simulation request failed: ${res.status} ${res.statusText}`);
+      }
+      const raw: SimulateResponse = await res.json();
+      const projectedScore =
+        typeof raw.projected_score === 'number' ? raw.projected_score : 0;
+      const scenarioDescription =
+        typeof raw.scenario_description === 'string' ? raw.scenario_description : '';
+      const currentScore = data.score;
+      setSimulationResult({
+        currentScore,
+        projectedScore,
+        scoreDelta: projectedScore - currentScore,
+        scenarioDescription,
+      });
+    } catch (err: unknown) {
+      setSimulationError((err as Error).message ?? 'Simulation failed');
+      setSimulationResult(null);
+    } finally {
+      setSimulationLoading(false);
+    }
+  }, [walletAddress, data]);
+
+  const deactivateSimulation = useCallback(() => {
+    setSimulationResult(null);
+    setSimulationError(null);
+  }, []);
+
+  // ── 1.6 WebSocket-driven append ───────────────────────────────────────────
+  const appendHistoryPoint = useCallback((entry: RiskHistoryEntry) => {
+    dispatchHistory({ type: 'APPEND', entry });
+  }, []);
+
+  return {
+    data,
+    history,
+    historyLoading,
+    historyError,
+    loading,
+    error,
+    simulationResult,
+    simulationLoading,
+    simulationError,
+    activateSimulation,
+    deactivateSimulation,
+    appendHistoryPoint,
   };
-
-  return { data, loading, error, simulateScore };
-};
-
-const getGrade = (score: number): 'A' | 'B' | 'C' | 'D' | 'F' => {
-  if (score >= 850) return 'A';
-  if (score >= 700) return 'B';
-  if (score >= 550) return 'C';
-  if (score >= 400) return 'D';
-  return 'F';
-};
+}
