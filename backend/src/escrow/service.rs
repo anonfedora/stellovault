@@ -1,6 +1,6 @@
 //! Escrow service layer - Business logic for escrow management
 
-use antml::{Context, Result};
+use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use sqlx::PgPool;
@@ -323,7 +323,7 @@ impl EscrowService {
         amount: i64,
         oracle_address: &str,
         _release_conditions: &str,
-        timeout_at: Option<DateTime<Utc>>,
+        _timeout_at: Option<DateTime<Utc>>,
     ) -> Result<(i64, String)> {
         // TODO: Implement actual Soroban contract interaction
         // For now, simulate contract call
@@ -396,6 +396,7 @@ impl EscrowService {
     }
 
     /// Get collateral by ID
+    #[allow(dead_code)]
     async fn get_collateral(&self, id: &str) -> Result<CollateralToken> {
         let collateral = self.collateral_service
             .get_collateral_by_id_string(id)

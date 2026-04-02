@@ -43,6 +43,7 @@ enum ClientMessage {
 /// Server message types
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 enum ServerMessage {
     Event { event: EscrowEvent },
     Subscribed { escrow_ids: Vec<i64> },

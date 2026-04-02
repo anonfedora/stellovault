@@ -19,6 +19,11 @@ impl LoanService {
         Self { db_pool }
     }
 
+    /// Get reference to the database pool
+    pub fn db_pool(&self) -> &PgPool {
+        &self.db_pool
+    }
+
     /// Issue a new loan (simulated on-chain interaction)
     pub async fn issue_loan(&self, request: CreateLoanRequest) -> Result<Loan> {
         let timeout_at = Utc::now() + Duration::hours(request.timeout_hours);
@@ -56,6 +61,7 @@ impl LoanService {
     }
 
     /// Record a repayment and update loan balance
+    /// Also triggers risk score recalculation for the borrower
     pub async fn record_repayment(&self, request: RepaymentRequest) -> Result<Repayment> {
         let mut tx = self.db_pool.begin().await?;
 
@@ -100,7 +106,54 @@ impl LoanService {
 
         tx.commit().await?;
 
+        // 3. Trigger risk score update (async, non-blocking)
+        // Queue the update for background processing
+        let borrower_id = loan.borrower_id;
+        let db_pool = self.db_pool.clone();
+        
+        tokio::spawn(async move {
+            if let Err(e) = Self::trigger_risk_score_update(db_pool, borrower_id).await {
+                tracing::error!(
+                    borrower_id = %borrower_id,
+                    error = %e,
+                    "Failed to trigger risk score update after repayment"
+                );
+            }
+        });
+
+        tracing::info!(
+            loan_id = %request.loan_id,
+            borrower_id = %borrower_id,
+            amount = request.amount,
+            new_status = ?new_status,
+            "Repayment recorded and risk score update triggered"
+        );
+
         Ok(repayment)
+    }
+
+    /// Trigger risk score update for a user
+    /// This is called automatically after successful loan repayment
+    async fn trigger_risk_score_update(db_pool: PgPool, user_id: Uuid) -> Result<()> {
+        // Insert into a queue table for async processing
+        sqlx::query(
+            r#"
+            INSERT INTO risk_score_update_queue (user_id, trigger_type, created_at)
+            VALUES ($1, 'repayment', NOW())
+            ON CONFLICT DO NOTHING
+            "#
+        )
+        .bind(user_id)
+        .execute(&db_pool)
+        .await
+        .context("Failed to queue risk score update")?;
+
+        tracing::info!(
+            user_id = %user_id,
+            "Risk score update queued for processing"
+        );
+
+        Ok(())
     }
 
     /// Calculate interest accrual for all active loans

@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import { use, useCallback, useMemo, useState } from 'react';
 import { useRiskScore } from '../../../hooks/useRiskScore';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 import ScoreGauge from '../../../components/risk/ScoreGauge';
 import ScoreBreakdown from '../../../components/risk/ScoreBreakdown';
 import ScoreHistoryChart from '../../../components/risk/ScoreHistoryChart';
+import LoanTimeline from '../../../components/risk/LoanTimeline';
 import {
     ArrowLeft,
     TrendingUp,
@@ -15,24 +17,59 @@ import {
     Info
 } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+type Range = '6m' | '1y' | 'all';
+
+const VALID_RANGES: Range[] = ['6m', '1y', 'all'];
+
+function parseRange(value: string | null): Range {
+    if (value && VALID_RANGES.includes(value as Range)) return value as Range;
+    return '6m';
+}
 
 export default function WalletRiskPage({ params }: { params: Promise<{ wallet: string }> }) {
     const { wallet: walletAddress } = use(params);
     const searchParams = useSearchParams();
-    const startDate = searchParams.get('start_date');
-    const endDate = searchParams.get('end_date');
+    const router = useRouter();
 
-    const { data, loading, error, simulateScore } = useRiskScore(walletAddress);
-    const [loanSim, setLoanSim] = useState<string>('0');
-    const [projectedScore, setProjectedScore] = useState<number | null>(null);
+    const [range, setRange] = useState<Range>(() => parseRange(searchParams.get('range')));
 
-    const handleSimulate = () => {
-        const amount = parseFloat(loanSim);
-        if (!isNaN(amount)) {
-            setProjectedScore(simulateScore(amount));
-        }
-    };
+    const {
+        data,
+        history,
+        historyLoading,
+        historyError,
+        loading,
+        error,
+        simulationResult,
+        simulationLoading,
+        simulationError,
+        activateSimulation,
+        deactivateSimulation,
+        appendHistoryPoint,
+    } = useRiskScore(walletAddress, range);
+
+    const { connectionFailed } = useWebSocket({
+        walletAddress,
+        onScoreUpdate: useCallback((event) => {
+            appendHistoryPoint({ date: event.calculated_at, score: event.overall_score });
+        }, [appendHistoryPoint]),
+    });
+
+    function handleRangeChange(newRange: Range) {
+        setRange(newRange);
+        router.replace(`?range=${newRange}`);
+    }
+    const projectedScore = simulationResult?.projectedScore ?? null;
+
+    // Compute a stable projected date (30 days from when simulation was activated)
+    const simulationDate = useMemo(() => {
+        if (!simulationResult) return null;
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().split('T')[0];
+    }, [simulationResult]);
 
     if (loading) {
         return (
@@ -65,16 +102,16 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
         );
     }
 
-    // Optional: filter history based on dates if provided
-    const filteredHistory = data.history.filter(h => {
-        if (startDate && h.date < startDate) return false;
-        if (endDate && h.date > endDate) return false;
-        return true;
-    });
-
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-8">
             <div className="max-w-6xl mx-auto space-y-8">
+                {/* Stale-data banner */}
+                {connectionFailed && (
+                    <div className="w-full bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium px-4 py-2 rounded-lg">
+                        Live updates unavailable — data may be stale
+                    </div>
+                )}
+
                 {/* Navigation & Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
@@ -84,7 +121,7 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
                         >
                             <ArrowLeft className="w-4 h-4" /> Back to Assessment
                         </Link>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 flex-wrap">
                             Risk Report
                             <span className={`text-[10px] px-2 py-0.5 rounded-full border ${data.grade === 'A' ? 'bg-green-100 text-green-700 border-green-200' :
                                 data.grade === 'B' ? 'bg-teal-100 text-teal-700 border-teal-200' :
@@ -93,6 +130,11 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
                                 }`}>
                                 MODERN ASSESSMENT
                             </span>
+                            {simulationResult && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full border bg-purple-100 text-purple-700 border-purple-200">
+                                    SIMULATION
+                                </span>
+                            )}
                         </h1>
                         <p className="font-mono text-sm text-gray-600 bg-white border border-gray-100 px-3 py-1 rounded-lg inline-block break-all">
                             {walletAddress}
@@ -112,7 +154,7 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
                     {/* Main Score & Breakdown */}
                     <div className="lg:col-span-2 space-y-8">
                         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center gap-12">
-                            <ScoreGauge score={data.score} grade={data.grade} size={240} />
+                            <ScoreGauge score={data.score} grade={data.grade} size={240} projectedScore={projectedScore} />
                             <div className="flex-1 space-y-4 w-full">
                                 <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
                                     <div className="flex items-center gap-2 mb-2 text-blue-900 font-semibold">
@@ -145,12 +187,37 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-lg font-bold text-gray-900">Historical Trend</h3>
                                 <div className="flex gap-2">
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-[10px] font-bold text-gray-400">6M</span>
-                                    <span className="px-2 py-1 rounded text-[10px] font-bold text-gray-400 hover:bg-gray-100 cursor-pointer">1Y</span>
-                                    <span className="px-2 py-1 rounded text-[10px] font-bold text-gray-400 hover:bg-gray-100 cursor-pointer">ALL</span>
+                                    {(['6m', '1y', 'all'] as Range[]).map((r) => (
+                                        <button
+                                            key={r}
+                                            onClick={() => handleRangeChange(r)}
+                                            className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                                                range === r
+                                                    ? 'bg-blue-900 text-white'
+                                                    : 'text-gray-400 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            {r.toUpperCase()}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                            <ScoreHistoryChart history={filteredHistory} />
+                            {historyError && (
+                                <p className="text-sm text-red-600 mb-4">{historyError}</p>
+                            )}
+                            <ScoreHistoryChart
+                                    history={history}
+                                    loading={historyLoading}
+                                    simulationPoint={simulationResult && simulationDate ? {
+                                        date: simulationDate,
+                                        score: simulationResult.projectedScore,
+                                    } : null}
+                                />
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Loan Timeline</h3>
+                            <LoanTimeline walletAddress={walletAddress} />
                         </div>
                     </div>
 
@@ -166,41 +233,47 @@ export default function WalletRiskPage({ params }: { params: Promise<{ wallet: s
                             </div>
 
                             <div className="space-y-4">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Hypothetical Loan Amount (USDC)
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        value={loanSim}
-                                        onChange={(e) => setLoanSim(e.target.value)}
-                                        className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-600 focus:outline-none text-gray-900"
-                                        placeholder="0"
-                                    />
-                                    <span className="absolute right-4 top-3.5 text-xs font-bold text-gray-400">USDC</span>
-                                </div>
-                                <button
-                                    onClick={handleSimulate}
-                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-purple-600/10"
-                                >
-                                    Project Score Delta
-                                </button>
+                                <p className="text-sm text-gray-600">
+                                    Simulate the impact of a <span className="font-semibold">5,000 USDC</span> loan on your risk score.
+                                </p>
+                                {simulationResult ? (
+                                    <button
+                                        onClick={deactivateSimulation}
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-purple-600/10 flex items-center justify-center gap-2"
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-white inline-block" />
+                                        Stop Simulation
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={activateSimulation}
+                                        disabled={simulationLoading}
+                                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-purple-600/10"
+                                    >
+                                        {simulationLoading ? 'Simulating…' : 'Simulate 5,000 USDC Loan'}
+                                    </button>
+                                )}
+                                {simulationError && (
+                                    <p className="text-xs text-red-600">{simulationError}</p>
+                                )}
                             </div>
 
-                            {projectedScore !== null && (
+                            {simulationResult && (
                                 <div className="mt-6 p-4 bg-purple-50 rounded-xl border border-purple-100">
                                     <div className="flex justify-between items-end mb-1">
                                         <span className="text-xs text-purple-600 font-semibold uppercase tracking-wider">Projected Score</span>
-                                        <span className="text-2xl font-black text-purple-600">{projectedScore.toFixed(0)}</span>
+                                        <span className="text-2xl font-black text-purple-600">{simulationResult.projectedScore.toFixed(0)}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                                        <span className="font-bold text-red-600">-{(data.score - projectedScore).toFixed(0)} points</span>
-                                        <span>estimated impact</span>
+                                    <div className="flex items-center gap-1 mt-1">
+                                        <span className={`text-lg font-black ${simulationResult.scoreDelta < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {simulationResult.scoreDelta > 0 ? '+' : '−'}{Math.abs(simulationResult.scoreDelta).toFixed(0)} pts
+                                        </span>
+                                        <span className="text-xs text-gray-500">estimated impact</span>
                                     </div>
                                     <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-purple-500"
-                                            style={{ width: `${(projectedScore / 1000) * 100}%` }}
+                                            style={{ width: `${(simulationResult.projectedScore / 1000) * 100}%` }}
                                         />
                                     </div>
                                 </div>

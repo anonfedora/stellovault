@@ -20,6 +20,7 @@ pub enum ContractError {
     CollateralNotFound = 5,
     CollateralLocked = 6,
     DuplicateMetadata = 7,
+    NoPendingAdmin = 8,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -320,6 +321,58 @@ impl CollateralRegistry {
             .instance()
             .get(&symbol_short!("admin"))
             .unwrap()
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Set escrow manager address (admin only)
@@ -715,6 +768,45 @@ mod test {
         let admin = Address::generate(&env);
         let unauthorized = Address::generate(&env);
         let owner = Address::generate(&env);
+    fn test_propose_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+        let client = CollateralRegistryClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        assert!(client.get_pending_admin().is_none());
+
+        client.propose_admin(&new_admin);
+        assert_eq!(client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register_contract(None, CollateralRegistry);
+        let client = CollateralRegistryClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.propose_admin(&new_admin);
+        client.accept_admin();
+
+        assert_eq!(client.admin(), new_admin);
+        assert!(client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let env = Env::default();
+        // Do not mock any auths — admin.require_auth() will panic
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
         let contract_id = env.register_contract(None, CollateralRegistry);
 
         env.as_contract(&contract_id, || {
@@ -737,11 +829,14 @@ mod test {
             // Try to verify with non-admin (should fail due to auth)
             let result = CollateralRegistry::verify_collateral(env.clone(), collateral_id);
             assert_eq!(result, Err(ContractError::Unauthorized));
+            // propose_admin will call admin.require_auth() which panics without mocked auth
+            CollateralRegistry::propose_admin(env.clone(), new_admin).unwrap();
         });
     }
 
     #[test]
-    fn test_verify_collateral_not_found() {
+    #[should_panic(expected = "HostError: Error(Contract, #8)")]
+    fn test_accept_admin_no_pending() {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
@@ -754,5 +849,9 @@ mod test {
             let result = CollateralRegistry::verify_collateral(env.clone(), 999);
             assert_eq!(result, Err(ContractError::CollateralNotFound));
         });
+        let client = CollateralRegistryClient::new(&env, &contract_id);
+
+        client.initialize(&admin);
+        client.accept_admin();
     }
 }

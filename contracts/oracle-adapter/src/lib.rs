@@ -24,6 +24,7 @@ pub enum ContractError {
     InvalidEventType = 8,
     ConsensusNotMet = 9,
     InvalidThreshold = 10,
+    NoPendingAdmin = 11,
 }
 
 /// Event types for oracle confirmations
@@ -306,6 +307,55 @@ impl OracleAdapter {
     pub fn get_admin(env: Env) -> Result<Address, ContractError> {
         let contract_data = Self::get_contract_data(&env)?;
         Ok(contract_data.admin)
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        Self::check_admin(&env)?;
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        let contract_data = Self::get_contract_data(&env)?;
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (contract_data.admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        let mut contract_data = Self::get_contract_data(&env)?;
+        contract_data.admin = pending.clone();
+        env.storage()
+            .instance()
+            .set(&symbol_short!("data"), &contract_data);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Check if consensus threshold is met for an escrow.
@@ -1034,5 +1084,65 @@ mod test {
 
         // Threshold 1 should succeed
         assert!(client.check_consensus(&escrow_id, &1u32, &oracle_set));
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
+        let client = OracleAdapterClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+
+        client.initialize(&admin);
+        assert!(client.get_pending_admin().is_none());
+        client.propose_admin(&new_admin);
+        assert_eq!(client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
+        let client = OracleAdapterClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+
+        client.initialize(&admin);
+        client.propose_admin(&new_admin);
+        client.accept_admin();
+
+        assert_eq!(client.get_admin(), new_admin);
+        assert!(client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let contract_id = env.register(OracleAdapter, ());
+
+        env.as_contract(&contract_id, || {
+            OracleAdapter::initialize(env.clone(), admin).unwrap();
+            // No mocked auth — check_admin → admin.require_auth() panics
+            OracleAdapter::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #11)")]
+    fn test_accept_admin_no_pending() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register(OracleAdapter, ());
+        let client = OracleAdapterClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+
+        client.initialize(&admin);
+        client.accept_admin();
     }
 }

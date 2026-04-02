@@ -57,6 +57,16 @@ export const LoanStatus = {
 export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus]
 
 
+export const PaymentSessionStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED'
+} as const
+
+export type PaymentSessionStatus = (typeof PaymentSessionStatus)[keyof typeof PaymentSessionStatus]
+
+
 export const GovernanceStatus = {
   OPEN: 'OPEN',
   PASSED: 'PASSED',

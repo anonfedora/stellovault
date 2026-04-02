@@ -1,35 +1,35 @@
 // Stellar/Soroban utility functions for StelloVault
 
-import { Address, Contract, Networks, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Address, Contract, Networks } from "@stellar/stellar-sdk";
 
 // Network configurations
 export const NETWORKS = {
   testnet: {
     networkPassphrase: Networks.TESTNET,
-    horizonUrl: 'https://horizon-testnet.stellar.org',
-    soroban: 'https://soroban-testnet.stellar.org',
+    horizonUrl: "https://horizon-testnet.stellar.org",
+    soroban: "https://soroban-testnet.stellar.org",
   },
   mainnet: {
     networkPassphrase: Networks.PUBLIC,
-    horizonUrl: 'https://horizon.stellar.org',
-    soroban: 'https://soroban.stellar.org',
+    horizonUrl: "https://horizon.stellar.org",
+    soroban: "https://soroban.stellar.org",
   },
 };
 
 // Contract IDs (would be deployed contract addresses)
 export const CONTRACT_IDS = {
   testnet: {
-    stellovault: 'CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ', // placeholder
+    stellovault: "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ", // placeholder
   },
   mainnet: {
-    stellovault: '', // to be filled after deployment
+    stellovault: "", // to be filled after deployment
   },
 };
 
 // Helper function to format amounts (Stellar uses 7 decimal places)
 export const formatAmount = (amount: number | string): string => {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return (numAmount / 10000000).toLocaleString('en-US', {
+  const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+  return (numAmount / 10000000).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 7,
   });
@@ -52,34 +52,51 @@ export const isValidAddress = (address: string): boolean => {
 
 // Shorten address for display
 export const shortenAddress = (address: string, chars = 4): string => {
-  if (!address) return '';
+  if (!address) return "";
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
 };
 
 // Get explorer URL for transaction
-export const getExplorerUrl = (txHash: string, network: 'testnet' | 'mainnet' = 'testnet'): string => {
-  const baseUrl = network === 'testnet'
-    ? 'https://stellar.expert/explorer/testnet/tx/'
-    : 'https://stellar.expert/explorer/public/tx/';
+export const getExplorerUrl = (
+  txHash: string,
+  network: "testnet" | "mainnet" = "testnet",
+): string => {
+  const baseUrl =
+    network === "testnet"
+      ? "https://stellar.expert/explorer/testnet/tx/"
+      : "https://stellar.expert/explorer/public/tx/";
   return `${baseUrl}${txHash}`;
 };
 
 // Contract interaction helpers
-export const createContractInstance = (contractId: string, network: keyof typeof NETWORKS = 'testnet') => {
+export const createContractInstance = (contractId: string) => {
   // serverUrl lookup removed as Contract doesn't require it directly.
   return new Contract(contractId);
 };
 
 // Error handling for Soroban transactions
-export const handleContractError = (error: Error | { message?: string } | null | undefined): string => {
-  if (error && 'message' in error && error.message?.includes('insufficient balance')) {
-    return 'Insufficient balance for this transaction';
+export const handleContractError = (
+  error: Error | { message?: string } | null | undefined,
+): string => {
+  if (
+    error &&
+    "message" in error &&
+    error.message?.includes("insufficient balance")
+  ) {
+    return "Insufficient balance for this transaction";
   }
-  if (error && 'message' in error && error.message?.includes('unauthorized')) {
-    return 'You are not authorized to perform this action';
+  if (error && "message" in error && error.message?.includes("unauthorized")) {
+    return "You are not authorized to perform this action";
   }
-  if (error && 'message' in error && error.message?.includes('invalid amount')) {
-    return 'Invalid amount specified';
+  if (
+    error &&
+    "message" in error &&
+    error.message?.includes("invalid amount")
+  ) {
+    return "Invalid amount specified";
   }
-  return (error && 'message' in error && error.message) || 'An unexpected error occurred';
+  return (
+    (error && "message" in error && error.message) ||
+    "An unexpected error occurred"
+  );
 };
