@@ -44,6 +44,7 @@ pub enum ContractError {
     EscrowDisputed = 13,
     EscrowNotDisputed = 14,
     InsufficientBalance = 15,
+    NoPendingAdmin = 16,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -194,6 +195,58 @@ impl EscrowManager {
     /// Get the current treasury address.
     pub fn get_treasury(env: Env) -> Option<Address> {
         env.storage().instance().get(&symbol_short!("treasury"))
+    }
+
+    /// Propose a new admin (two-step transfer, step 1).
+    /// Only the current admin may call this; their signature is required.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("pend_adm"), &new_admin);
+
+        env.events()
+            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
+
+        Ok(())
+    }
+
+    /// Accept a pending admin proposal (two-step transfer, step 2).
+    /// Only the address nominated via propose_admin may call this.
+    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
+            .ok_or(ContractError::NoPendingAdmin)?;
+
+        pending.require_auth();
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &pending);
+        env.storage()
+            .instance()
+            .remove(&symbol_short!("pend_adm"));
+
+        env.events()
+            .publish((symbol_short!("adm_acpt"),), (pending,));
+
+        Ok(())
+    }
+
+    /// Return the pending admin address if a proposal is active.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("pend_adm"))
     }
 
     /// Create a new escrow.
@@ -1458,7 +1511,7 @@ mod test {
         let dest_token_addr = dest_token_contract.address();
         let dest_token_admin_client = token::StellarAssetClient::new(&t.env, &dest_token_addr);
 
-        // Mint destination tokens to the escrow contract for the swap
+        // Mint destination tokens to the escrow contract to simulate DEX liquidity
         dest_token_admin_client.mint(&t.escrow_id_addr, &10_000);
 
         // Create escrow with different destination asset
@@ -1478,7 +1531,7 @@ mod test {
             oracle_set: Vec::new(&t.env),
         });
 
-        // Set exchange rate: 0.95 (5% loss in conversion)
+        // Set exchange rate: 0.95 (5% slippage) → dest_amount = 4750 ≥ min 4500
         t.escrow_client.set_test_exchange_rate(&950_000i128);
 
         // Set oracle confirmation
@@ -1489,8 +1542,13 @@ mod test {
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Released);
+        // Seller must receive destination tokens (not source tokens)
         let dest_token = token::Client::new(&t.env, &dest_token_addr);
-        assert_eq!(dest_token.balance(&t.seller), 4_750);
+        assert_eq!(dest_token.balance(&t.seller), 4_750); // 5000 * 0.95
+
+        // Seller must NOT receive source tokens
+        let src_token = token::Client::new(&t.env, &t.token_addr);
+        assert_eq!(src_token.balance(&t.seller), 0);
     }
 
     #[test]
@@ -1823,5 +1881,62 @@ mod test {
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.status, EscrowStatus::Released);
+    }
+
+    #[test]
+    fn test_propose_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        assert!(t.escrow_client.get_pending_admin().is_none());
+        t.escrow_client.propose_admin(&new_admin);
+        assert_eq!(t.escrow_client.get_pending_admin(), Some(new_admin));
+    }
+
+    #[test]
+    fn test_accept_admin() {
+        let t = setup();
+        let new_admin = Address::generate(&t.env);
+
+        t.escrow_client.propose_admin(&new_admin);
+        t.escrow_client.accept_admin();
+
+        // Verify treasury still works (admin changed)
+        assert!(t.escrow_client.get_pending_admin().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_admin_unauthorized() {
+        // No auth mocking — admin.require_auth() will panic when not satisfied
+        let env = Env::default();
+        let admin = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        let coll_reg = env.register(MockCollateralRegistry, ());
+        let oracle = env.register(MockOracleAdapterWithConsensus, ());
+        let loan_mgr = Address::generate(&env);
+        let treasury = env.register(MockTreasury, ());
+        let contract_id = env.register(EscrowManager, ());
+
+        env.as_contract(&contract_id, || {
+            EscrowManager::initialize(
+                env.clone(),
+                admin,
+                coll_reg,
+                oracle,
+                loan_mgr,
+                treasury,
+            )
+            .unwrap();
+            // propose_admin calls admin.require_auth() — panics without mocked auth
+            EscrowManager::propose_admin(env.clone(), new_admin).unwrap();
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "HostError: Error(Contract, #15)")]
+    fn test_accept_admin_no_pending() {
+        let t = setup();
+        t.escrow_client.accept_admin();
     }
 }

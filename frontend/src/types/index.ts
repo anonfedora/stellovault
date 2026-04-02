@@ -1,4 +1,18 @@
 // TypeScript type definitions for StelloVault frontend
+import type { TransactionStatus } from './loan';
+// Re-export centralized types and runtime enums for consistency
+export type {
+  Repayment,
+  Loan,
+  LoanFormData,
+  PaymentTransaction,
+} from './loan';
+
+export { 
+  PaymentStatus,
+  LoanStatus,
+  TransactionStatus,
+} from "./loan";
 
 export interface User {
   id: string;
@@ -39,7 +53,7 @@ export interface Transaction {
   to: string;
   amount: number;
   timestamp: Date;
-  status: "pending" | "confirmed" | "failed";
+  status: TransactionStatus;
   txHash?: string;
 }
 
@@ -48,37 +62,4 @@ export interface DashboardStats {
   activeEscrows: number;
   completedTrades: number;
   totalUsers: number;
-}
-
-export type LoanStatus = "PENDING" | "ACTIVE" | "REPAID" | "DEFAULTED";
-
-export interface Repayment {
-  id: string;
-  loanId: string;
-  amount: number;
-  paidAt: Date;
-  txHash: string;
-}
-
-export interface Loan {
-  id: string;
-  borrower: string;
-  collateralTokenId: string;
-  collateralAssetType: "INVOICE" | "COMMODITY" | "RECEIVABLE";
-  collateralValue: number;
-  principal: number;
-  interestRate: number;
-  termMonths: number;
-  status: LoanStatus;
-  repayments: Repayment[];
-  createdAt: Date;
-  maturityDate: Date;
-  xdr?: string;
-}
-
-export interface LoanFormData {
-  selectedCollateralId: string;
-  principal: number;
-  termMonths: number;
-  interestRate: number;
 }

@@ -1,22 +1,24 @@
 //! Governance service for managing proposals, votes, and protocol parameters
 
 use crate::models::{
-    GovernanceProposal, GovernanceVote, GovernanceParameter, GovernanceAuditLog,
+    GovernanceProposal, GovernanceVote,
     GovernanceMetrics, GovernanceConfig, GovernanceParameterCache,
-    ProposalStatus, VoteOption, AuditActionType, AuditEntityType,
+    ProposalStatus, AuditActionType, AuditEntityType,
     ProposalCreationRequest, VoteSubmissionRequest
 };
 use sqlx::{PgPool, Error};
 use uuid::Uuid;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{Utc, Duration};
 
 /// Governance service for managing proposals, votes, and protocol parameters
 pub struct GovernanceService {
     pool: PgPool,
     parameter_cache: Arc<RwLock<GovernanceParameterCache>>,
+    #[allow(dead_code)]
     governance_contract_id: String,
+    #[allow(dead_code)]
     network_passphrase: String,
 }
 
@@ -384,10 +386,10 @@ impl GovernanceService {
     }
 
     /// Check if an action is allowed based on governance parameters
-    pub async fn check_governance_enforcement(&self, action: &str, parameters: serde_json::Value) -> Result<bool, Error> {
+    pub async fn check_governance_enforcement(&self, action: &str, _parameters: serde_json::Value) -> Result<bool, Error> {
         // This is a simplified implementation - in reality, this would check various
         // governance parameters and potentially call Soroban contracts
-        let config = self.get_governance_config().await?;
+        let _config = self.get_governance_config().await?;
 
         match action {
             "escrow_creation" => {
@@ -408,19 +410,19 @@ impl GovernanceService {
 
     // Helper methods
 
-    async fn get_voting_power(&self, voter_address: &str) -> Result<i64, Error> {
+    async fn get_voting_power(&self, _voter_address: &str) -> Result<i64, Error> {
         // Simplified - in real implementation, query staking contract or token balance
         // For now, return a default voting power
         Ok(100)
     }
 
-    async fn submit_vote_to_soroban(&self, request: &VoteSubmissionRequest, voting_power: i64) -> Result<Option<String>, Error> {
+    async fn submit_vote_to_soroban(&self, _request: &VoteSubmissionRequest, _voting_power: i64) -> Result<Option<String>, Error> {
         // TODO: Implement actual Soroban contract call
         // For now, simulate transaction hash
         Ok(Some(format!("tx_{}", Uuid::new_v4().simple())))
     }
 
-    async fn create_proposal_in_soroban(&self, request: &ProposalCreationRequest, proposer: &str) -> Result<String, Error> {
+    async fn create_proposal_in_soroban(&self, _request: &ProposalCreationRequest, _proposer: &str) -> Result<String, Error> {
         // TODO: Implement actual Soroban contract call
         // For now, generate a proposal ID
         Ok(format!("proposal_{}", Uuid::new_v4().simple()))

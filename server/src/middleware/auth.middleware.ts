@@ -3,11 +3,14 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma";
 import { env } from "../config/env";
 import { UnauthorizedError } from "../config/errors";
+import { UserRole, PermissionScope } from "../types/rbac";
 
 export interface JwtPayload {
     userId: string;
     jti: string;
     walletAddress: string;
+    role: UserRole;
+    permissions?: PermissionScope[];
 }
 
 // Extend Express Request to carry user info

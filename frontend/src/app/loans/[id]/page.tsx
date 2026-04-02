@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useLoans } from "@/hooks/useLoans";
 import { RepaymentSchedule } from "@/components/loans/RepaymentSchedule";
 import { Button } from "@/components/ui/Button";
-import { shortenAddress, getExplorerUrl } from "@/utils/stellar";
-import { ArrowLeft, Loader2, ExternalLink } from "lucide-react";
+import { shortenAddress } from "@/utils/stellar";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING:

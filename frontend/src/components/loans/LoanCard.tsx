@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { Loan } from "@/types";
 import { shortenAddress } from "@/utils/stellar";
-import { formatAmount } from "@/utils/stellar";
 
 // Status badge colour map
 const STATUS_STYLES: Record<string, string> = {

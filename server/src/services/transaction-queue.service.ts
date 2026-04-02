@@ -1,6 +1,7 @@
 import { Queue, Worker, Job, QueueEvents } from "bullmq";
 import { Redis } from "ioredis";
 import { env } from "../config/env";
+import { PaymentStatus, TransactionStatus } from "../types/loan";
 import contractService from "./contract.service";
 
 const REDIS_HOST = process.env.REDIS_HOST || "localhost";
@@ -246,7 +247,7 @@ export class TransactionQueueService {
      * Get transaction status by idempotency key
      */
     async getTransactionStatus(idempotencyKey: string): Promise<{
-        status: string;
+        status: TransactionStatus;
         result?: TransactionResult;
         job?: any;
     }> {
@@ -257,19 +258,38 @@ export class TransactionQueueService {
             const cachedResult = await this.checkIdempotency(idempotencyKey);
             if (cachedResult) {
                 return {
-                    status: cachedResult.success ? "completed" : "failed",
+                    status: cachedResult.success ? TransactionStatus.COMPLETED : TransactionStatus.FAILED,
                     result: cachedResult,
                 };
             }
 
-            return { status: "not_found" };
+            return { status: TransactionStatus.PENDING };
         }
 
         const state = await job.getState();
         const result = job.returnvalue;
 
+        // Map BullMQ states to our TransactionStatus enum
+        let status: TransactionStatus;
+        switch (state) {
+            case 'completed':
+                status = TransactionStatus.COMPLETED;
+                break;
+            case 'failed':
+                status = TransactionStatus.FAILED;
+                break;
+            case 'active':
+                status = TransactionStatus.PROCESSING;
+                break;
+            case 'waiting':
+                status = TransactionStatus.PENDING;
+                break;
+            default:
+                status = TransactionStatus.PENDING;
+        }
+
         return {
-            status: state,
+            status,
             result,
             job: {
                 id: job.id,
