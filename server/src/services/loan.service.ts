@@ -9,6 +9,7 @@ import { xdr } from "@stellar/stellar-sdk";
 import contractService from "./contract.service";
 import { prisma } from "./database.service";
 import websocketService from "./websocket.service";
+import notificationService, { NotificationType, NotificationChannel } from "./notification.service";
 import { env } from "../config/env";
 import Decimal from "decimal.js";
 import eventMonitoringService from "./event-monitoring.service";
@@ -415,6 +416,57 @@ export class LoanService {
           throw new NotFoundError("Loan not found");
         }
 
+            const outstandingAfter = outstandingBefore.minus(amount);
+            let nextStatus: LoanStatus = loan.status;
+            if (outstandingAfter.eq(ZERO)) {
+                nextStatus = "REPAID";
+            } else if (loan.status === "PENDING") {
+                nextStatus = "ACTIVE";
+            }
+
+            if (nextStatus !== loan.status) {
+                await tx.loan.update({
+                    where: { id: loanId },
+                    data: { status: nextStatus },
+                });
+                
+                websocketService.broadcastLoanUpdated(loanId, nextStatus);
+
+                // Send notification if loan is approved (moved to ACTIVE)
+                if (nextStatus === "ACTIVE") {
+                    await notificationService.sendNotification({
+                        userId: loan.borrowerId,
+                        type: NotificationType.LOAN_APPROVED,
+                        channel: NotificationChannel.BOTH,
+                        data: {
+                            loanId,
+                            amount: loan.amount.toString(),
+                            assetCode: loan.assetCode,
+                            interestRate: loan.interestRate.toString(),
+                            dueDate: loan.dueDate?.toISOString() || "N/A",
+                            dashboardUrl: `${process.env.FRONTEND_URL || "https://stellovault.com"}/loans/${loanId}`,
+                        },
+                    });
+                }
+            }
+
+            const updatedLoan = await tx.loan.findUnique({
+                where: { id: loanId },
+                include: { repayments: true, borrower: true, lender: true },
+            });
+            if (!updatedLoan) {
+                throw new NotFoundError("Loan not found");
+            }
+
+            return {
+                repayment,
+                outstandingBefore: outstandingBefore.toString(),
+                outstandingAfter: outstandingAfter.toString(),
+                fullyRepaid: outstandingAfter.eq(ZERO),
+                loan: updatedLoan,
+            };
+        }, { isolationLevel: "Serializable" });
+    }
         return {
           repayment,
           paymentSession: selectedPaymentSession,

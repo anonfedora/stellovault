@@ -24,6 +24,7 @@
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "@prisma/config": "^7.4.0",
+    "@sendgrid/mail": "^8.1.6",
     "@stellar/stellar-sdk": "^12.3.0",
     "bullmq": "^5.71.1",
     "cors": "^2.8.5",

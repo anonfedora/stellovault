@@ -25,9 +25,10 @@ model User {
   soldEscrows         Escrow[]             @relation("SellerEscrows")
   investments         Investment[]
   sessions            Session[]
-  borrowedLoans       Loan[]               @relation("BorrowerLoans")
-  lentLoans           Loan[]               @relation("LenderLoans")
-  governanceProposals GovernanceProposal[] @relation("ProposerProposals")
+  borrowedLoans       Loan[]                @relation("BorrowerLoans")
+  lentLoans           Loan[]                @relation("LenderLoans")
+  governanceProposals GovernanceProposal[]  @relation("ProposerProposals")
+  notificationPrefs   NotificationPreference?
   
   // RBAC relationships
   userPermissions     UserPermission[]
@@ -482,4 +483,28 @@ enum DisputeStatus {
   OPEN
   RESOLVED
   CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────
+
+model NotificationPreference {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  loanApproved          Boolean  @default(true)
+  loanRepaymentDue      Boolean  @default(true)
+  escrowExpiringSoon    Boolean  @default(true)
+  escrowReleased        Boolean  @default(true)
+  securityAlert         Boolean  @default(true)
+  collateralLocked      Boolean  @default(true)
+  oracleConfirmation    Boolean  @default(true)
+  governanceProposal    Boolean  @default(true)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
 }
