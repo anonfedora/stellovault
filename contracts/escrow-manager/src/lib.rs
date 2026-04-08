@@ -515,6 +515,17 @@ impl EscrowManager {
         env.events()
             .publish((symbol_short!("esc_rel"),), (escrow_id,));
 
+        // Emit FundsReleased event with detailed information
+        env.events().publish(
+            (symbol_short!("fnd_rel"),),
+            (
+                escrow_id,
+                escrow.seller.clone(),
+                escrow.amount,
+                escrow.asset.clone(),
+            ),
+        );
+
         Ok(())
     }
 
@@ -1180,6 +1191,18 @@ mod test {
             let locked: bool = t.env.storage().persistent().get(&1u64).unwrap();
             assert!(!locked);
         });
+
+        // Verify FundsReleased event was emitted
+        let events = t.env.events().all();
+        let funds_released_event = events.iter().find(|e| {
+            if let Ok(topics) = e.topics.get(0) {
+                if let Ok(symbol) = topics.try_into_val::<Symbol>(&t.env) {
+                    return symbol == symbol_short!("fnd_rel");
+                }
+            }
+            false
+        });
+        assert!(funds_released_event.is_some(), "FundsReleased event should be emitted");
     }
 
     #[test]
