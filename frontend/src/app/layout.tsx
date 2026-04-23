@@ -32,19 +32,19 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <TransactionStatusProvider>
-          {children}
-          <Toaster 
-            position="top-right"
-            expand={false}
-            richColors
-            closeButton
-            duration={5000}
-            visibleToasts={3}
-          />
-          <TransactionHistoryDrawer />
-        </TransactionStatusProvider>
-        <AppProviders>{children}</AppProviders>
-      </body>
+          <AppProviders>
+            {children}
+            <Toaster
+              position="top-right"
+              expand={false}
+              richColors
+              closeButton
+              duration={5000}
+              visibleToasts={3}
+            />
+            <TransactionHistoryDrawer />
+          </AppProviders>
+        </TransactionStatusProvider>      </body>
     </html>
   );
 }
