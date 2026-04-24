@@ -248,6 +248,17 @@ impl EscrowService {
                 tracing::info!("Escrow {} released", escrow_id);
                 Ok(())
             }
+            EscrowEvent::Refunded { escrow_id } => {
+                self.update_escrow_status(escrow_id, EscrowStatus::Refunded)
+                    .await?;
+
+                if let Some(escrow) = self.get_escrow_by_id(escrow_id).await? {
+                    self.unlock_collateral(&escrow.collateral_id).await?;
+                }
+
+                tracing::info!("Escrow {} refunded", escrow_id);
+                Ok(())
+            }
             EscrowEvent::Cancelled { escrow_id } => {
                 self.update_escrow_status(escrow_id, EscrowStatus::Cancelled)
                     .await?;

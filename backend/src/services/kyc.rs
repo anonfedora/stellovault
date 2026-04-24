@@ -114,18 +114,13 @@ impl KycService {
         &self,
         user_id: &Uuid,
     ) -> Result<KycVerificationResponse, ApiError> {
-        // Update user status to pending
-        sqlx::query!(
-            r#"
-            UPDATE users 
-            SET kyc_status = 'pending',
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            user_id
+        sqlx::query(
+            r#"UPDATE users SET kyc_status = 'pending'::kyc_status, updated_at = NOW() WHERE id = $1"#,
         )
+        .bind(user_id)
         .execute(&self.db)
-        .await?;
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(KycVerificationResponse {
             user_id: *user_id,
@@ -143,27 +138,20 @@ impl KycService {
         provider: Option<String>,
         reference_id: Option<String>,
     ) -> Result<KycVerificationResponse, ApiError> {
-        // Set expiry to 1 year from now
         let expiry = Utc::now() + Duration::days(365);
 
-        sqlx::query!(
-            r#"
-            UPDATE users 
-            SET kyc_status = 'verified',
-                kyc_expiry = $2,
-                kyc_provider = $3,
-                kyc_reference_id = $4,
-                kyc_verified_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            user_id,
-            expiry,
-            provider.as_deref(),
-            reference_id.as_deref()
+        sqlx::query(
+            r#"UPDATE users SET kyc_status = 'verified'::kyc_status, kyc_expiry = $2,
+               kyc_provider = $3, kyc_reference_id = $4, kyc_verified_at = NOW(), updated_at = NOW()
+               WHERE id = $1"#,
         )
+        .bind(user_id)
+        .bind(expiry)
+        .bind(provider.as_deref())
+        .bind(reference_id.as_deref())
         .execute(&self.db)
-        .await?;
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(KycVerificationResponse {
             user_id: *user_id,
@@ -179,17 +167,13 @@ impl KycService {
         user_id: &Uuid,
         reason: Option<String>,
     ) -> Result<KycVerificationResponse, ApiError> {
-        sqlx::query!(
-            r#"
-            UPDATE users 
-            SET kyc_status = 'rejected',
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            user_id
+        sqlx::query(
+            r#"UPDATE users SET kyc_status = 'rejected'::kyc_status, updated_at = NOW() WHERE id = $1"#,
         )
+        .bind(user_id)
         .execute(&self.db)
-        .await?;
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(KycVerificationResponse {
             user_id: *user_id,
@@ -201,64 +185,46 @@ impl KycService {
 
     /// Expire KYC verification
     pub async fn expire_verification(&self, user_id: &Uuid) -> Result<(), ApiError> {
-        sqlx::query!(
-            r#"
-            UPDATE users 
-            SET kyc_status = 'expired',
-                updated_at = NOW()
-            WHERE id = $1 AND kyc_status = 'verified'
-            "#,
-            user_id
+        sqlx::query(
+            r#"UPDATE users SET kyc_status = 'expired'::kyc_status, updated_at = NOW()
+               WHERE id = $1 AND kyc_status = 'verified'::kyc_status"#,
         )
+        .bind(user_id)
         .execute(&self.db)
-        .await?;
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
 
     /// Bulk expire all expired KYC verifications
     pub async fn expire_all_expired(&self) -> Result<u64, ApiError> {
-        let result = sqlx::query!(
-            r#"
-            UPDATE users 
-            SET kyc_status = 'expired'
-            WHERE kyc_status = 'verified' 
-              AND kyc_expiry IS NOT NULL 
-              AND kyc_expiry < NOW()
-            "#
+        let result = sqlx::query(
+            r#"UPDATE users SET kyc_status = 'expired'::kyc_status
+               WHERE kyc_status = 'verified'::kyc_status
+                 AND kyc_expiry IS NOT NULL AND kyc_expiry < NOW()"#,
         )
         .execute(&self.db)
-        .await?;
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(result.rows_affected())
     }
 
     // Helper method to get user
     async fn get_user(&self, user_id: &Uuid) -> Result<User, ApiError> {
-        sqlx::query_as!(
-            User,
-            r#"
-            SELECT 
-                id, 
-                primary_wallet_address, 
-                email, 
-                name, 
-                role as "role: _",
-                risk_score,
-                kyc_status as "kyc_status: _",
-                kyc_expiry,
-                kyc_provider,
-                kyc_verified_at,
-                kyc_reference_id,
-                created_at, 
-                updated_at
-            FROM users 
-            WHERE id = $1
-            "#,
-            user_id
+        sqlx::query_as::<_, User>(
+            r#"SELECT id, primary_wallet_address, email, name,
+                      role as "role: _", risk_score,
+                      kyc_status as "kyc_status: _", kyc_expiry,
+                      kyc_provider, kyc_verified_at, kyc_reference_id,
+                      created_at, updated_at
+               FROM users WHERE id = $1"#,
         )
+        .bind(user_id)
         .fetch_optional(&self.db)
-        .await?
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?
         .ok_or(ApiError::NotFound("User not found".to_string()))
     }
 }

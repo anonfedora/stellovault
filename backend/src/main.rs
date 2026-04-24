@@ -17,12 +17,13 @@ use stellovault_server::{
     collateral::{CollateralIndexer, CollateralService},
     config::Config,
     escrow::{timeout_detector, EscrowService},
+    governance_service::GovernanceService,
     indexer::IndexerService,
     loan_service::LoanService,
     middleware::{self, RateLimiter},
     oracle::OracleService,
     routes,
-    services::RiskEngine,
+    services::{KycService, RiskEngine},
     state::AppState,
     websocket::{self, WsState},
 };
@@ -130,6 +131,18 @@ async fn main() {
         db_pool.clone(),
     ));
 
+    // Initialize governance service
+    let governance_contract_id = std::env::var("GOVERNANCE_CONTRACT_ID")
+        .unwrap_or_else(|_| "GOVERNANCE_CONTRACT_ID".to_string());
+    let governance_service = Arc::new(GovernanceService::new(
+        db_pool.clone(),
+        governance_contract_id,
+        network_passphrase.clone(),
+    ));
+
+    // Initialize KYC service
+    let kyc_service = KycService::new(db_pool.clone());
+
     // Create shared app state
     let app_state = AppState::new(
         escrow_service.clone(),
@@ -138,6 +151,8 @@ async fn main() {
         auth_service.clone(),
         risk_engine.clone(),
         oracle_service.clone(),
+        governance_service.clone(),
+        kyc_service,
         ws_state.clone(),
         config.webhook_secret.clone(),
     );
@@ -209,6 +224,7 @@ async fn main() {
         .merge(routes::risk_routes())
         .merge(routes::loan_routes())
         .merge(routes::document_routes())
+        .merge(routes::governance_routes())
         .with_state(app_state)
         .layer(axum::middleware::from_fn(middleware::security_headers))
         .layer(axum::middleware::from_fn(middleware::request_tracing))

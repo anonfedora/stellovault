@@ -410,10 +410,134 @@ impl GovernanceService {
 
     // Helper methods
 
-    async fn get_voting_power(&self, _voter_address: &str) -> Result<i64, Error> {
-        // Simplified - in real implementation, query staking contract or token balance
-        // For now, return a default voting power
-        Ok(100)
+    /// Calculate quadratic voting power for an address on a specific proposal.
+    /// Quadratic voting: effective_votes = sqrt(token_balance).
+    /// This prevents whale dominance by making each additional vote progressively more expensive.
+    pub async fn calculate_voting_power(&self, address: &str, _proposal_id: Option<&str>) -> Result<i64, Error> {
+        // Query token balance from the database (staking/token holdings)
+        // In production this would call the Soroban staking contract
+        let raw_balance: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COALESCE(SUM(amount), 0)::BIGINT FROM collateral_tokens WHERE owner_address = $1 AND status = 'active'"#
+        )
+        .bind(address)
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten();
+
+        let balance = raw_balance.unwrap_or(1000); // default 1000 tokens for demo
+        // Quadratic voting: sqrt(balance), minimum 1
+        let quadratic_power = (balance as f64).sqrt().floor() as i64;
+        Ok(quadratic_power.max(1))
+    }
+
+    async fn get_voting_power(&self, voter_address: &str) -> Result<i64, Error> {
+        self.calculate_voting_power(voter_address, None).await
+    }
+
+    /// Execute a passed proposal after the timelock period has elapsed.
+    pub async fn execute_proposal(&self, proposal_id: &str, executor: &str) -> Result<GovernanceProposal, Error> {
+        let proposal = self.get_proposal(proposal_id).await?;
+        let proposal = match proposal {
+            Some(p) => p,
+            None => return Err(Error::RowNotFound),
+        };
+
+        // Must be in Succeeded status
+        if proposal.status != ProposalStatus::Succeeded {
+            return Err(Error::Protocol(format!(
+                "Proposal is not in succeeded state (current: {:?})",
+                proposal.status
+            )));
+        }
+
+        // Enforce timelock: execution_time must have passed
+        if let Some(exec_time) = proposal.execution_time {
+            if Utc::now() < exec_time {
+                return Err(Error::Protocol(format!(
+                    "Timelock not elapsed. Execution allowed after {}",
+                    exec_time
+                )));
+            }
+        }
+
+        // Mark as executed
+        let updated = sqlx::query_as::<_, GovernanceProposal>(
+            r#"
+            UPDATE governance_proposals
+            SET status = 'executed'::proposal_status, executed_at = NOW(), updated_at = NOW()
+            WHERE proposal_id = $1
+            RETURNING id, proposal_id, title, description, proposer, proposal_type as "proposal_type: _",
+                      status as "status: _", voting_start, voting_end, execution_time,
+                      for_votes, against_votes, abstain_votes, quorum_required, approval_threshold,
+                      executed_at, created_at, updated_at
+            "#
+        )
+        .bind(proposal_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        self.log_audit_event(
+            AuditActionType::ProposalExecuted,
+            AuditEntityType::Proposal,
+            proposal_id,
+            executor,
+            None,
+            Some(serde_json::json!({ "proposal_id": proposal_id, "executed_by": executor })),
+            None,
+        ).await?;
+
+        Ok(updated)
+    }
+
+    /// Tally votes and transition proposal to Succeeded or Failed.
+    pub async fn tally_votes(&self, proposal_id: &str) -> Result<GovernanceProposal, Error> {
+        let proposal = self.get_proposal(proposal_id).await?;
+        let proposal = match proposal {
+            Some(p) => p,
+            None => return Err(Error::RowNotFound),
+        };
+
+        // Only tally if voting period has ended
+        if Utc::now() < proposal.voting_end {
+            return Err(Error::Protocol("Voting period has not ended yet".to_string()));
+        }
+
+        if proposal.status != ProposalStatus::Active {
+            return Err(Error::Protocol("Proposal is not in active state".to_string()));
+        }
+
+        let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
+        let quorum_met = total_votes >= proposal.quorum_required;
+        let approval_ratio = if proposal.for_votes + proposal.against_votes > 0 {
+            proposal.for_votes as f64 / (proposal.for_votes + proposal.against_votes) as f64
+        } else {
+            0.0
+        };
+        let threshold_met = approval_ratio >= proposal.approval_threshold;
+
+        let new_status = if quorum_met && threshold_met {
+            ProposalStatus::Succeeded
+        } else {
+            ProposalStatus::Failed
+        };
+
+        let updated = sqlx::query_as::<_, GovernanceProposal>(
+            r#"
+            UPDATE governance_proposals
+            SET status = $2::proposal_status, updated_at = NOW()
+            WHERE proposal_id = $1
+            RETURNING id, proposal_id, title, description, proposer, proposal_type as "proposal_type: _",
+                      status as "status: _", voting_start, voting_end, execution_time,
+                      for_votes, against_votes, abstain_votes, quorum_required, approval_threshold,
+                      executed_at, created_at, updated_at
+            "#
+        )
+        .bind(proposal_id)
+        .bind(new_status)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated)
     }
 
     async fn submit_vote_to_soroban(&self, _request: &VoteSubmissionRequest, _voting_power: i64) -> Result<Option<String>, Error> {
