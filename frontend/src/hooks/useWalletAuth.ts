@@ -1,140 +1,194 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { isAllowed, setAllowed, getAddress, signMessage } from '@stellar/freighter-api';
 import { useRouter } from 'next/navigation';
 import { markQuickStartDone } from '@/utils/onboarding';
 
+export type WalletType = 'freighter' | 'walletconnect' | null;
+
 interface WalletAuth {
-    isConnected: boolean;
-    isConnecting: boolean;
-    publicKey: string | null;
-    connect: () => Promise<string | null>;
-    login: (key?: string) => Promise<void>;
-    logout: () => Promise<void>;
-    error: string | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  isCheckingSession: boolean;
+  publicKey: string | null;
+  walletType: WalletType;
+  connect: (type?: WalletType) => Promise<string | null>;
+  login: (key?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  error: string | null;
+  clearError: () => void;
+}
+
+async function silentRefresh(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/v1/auth/refresh', { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function useWalletAuth(): WalletAuth {
-    const [isConnected, setIsConnected] = useState(false);
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [publicKey, setPublicKey] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [walletType, setWalletType] = useState<WalletType>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-    useEffect(() => {
-        // Check if already allowed/connected on mount
-        async function checkConnection() {
-            try {
-                const result = await isAllowed();
-                if (result && result.isAllowed) {
-                    const { address, error: addressError } = await getAddress();
-                    if (address && !addressError) {
-                        setIsConnected(true);
-                        setPublicKey(address);
-                        markQuickStartDone("connectWallet");
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to check wallet connection:', err);
-            }
+  const clearError = useCallback(() => setError(null), []);
+
+  // Restore session on mount — check Freighter + cookie validity
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const result = await isAllowed();
+        if (result?.isAllowed) {
+          const { address, error: addrErr } = await getAddress();
+          if (address && !addrErr) {
+            setPublicKey(address);
+            setWalletType('freighter');
+            setIsConnected(true);
+            markQuickStartDone('connectWallet');
+          }
         }
-        checkConnection();
-    }, []);
+      } catch {
+        // Freighter not installed or unavailable — that's fine
+      } finally {
+        setIsCheckingSession(false);
+      }
+    }
+    restoreSession();
+  }, []);
 
-    const connect = async () => {
-        setIsConnecting(true);
-        setError(null);
-        let key: string | null = null;
-        try {
-            const result = await setAllowed();
-            if (result && result.isAllowed) {
-                const { address, error: addressError } = await getAddress();
-                if (address && !addressError) {
-                    setIsConnected(true);
-                    setPublicKey(address);
-                    markQuickStartDone("connectWallet");
-                    key = address;
-                }
-            } else {
-                setError('User refused connection');
-            }
-        } catch (err) {
-            setError('Failed to connect wallet');
-            console.error(err);
-        } finally {
-            setIsConnecting(false);
+  const connect = useCallback(async (type: WalletType = 'freighter'): Promise<string | null> => {
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      if (type === 'freighter') {
+        const result = await setAllowed();
+        if (!result?.isAllowed) {
+          setError('Connection refused. Please approve the request in Freighter.');
+          return null;
         }
-        return key;
-    };
-
-    const login = async (key?: string) => {
-        const pk = key || publicKey;
-        if (!pk) {
-            setError('Wallet not connected');
-            return;
+        const { address, error: addrErr } = await getAddress();
+        if (addrErr || !address) {
+          setError('Could not retrieve wallet address. Is Freighter unlocked?');
+          return null;
         }
-        setIsConnecting(true);
-        setError(null);
+        setPublicKey(address);
+        setWalletType('freighter');
+        setIsConnected(true);
+        markQuickStartDone('connectWallet');
+        return address;
+      }
 
-        try {
-            // 1. Get Challenge
-            const challengeRes = await fetch('/api/v1/auth/challenge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ publicKey: pk }),
-            });
+      // WalletConnect — placeholder
+      setError('WalletConnect is coming soon.');
+      return null;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes('freighter') || msg.toLowerCase().includes('extension')) {
+        setError('Freighter extension not found. Please install it first.');
+      } else {
+        setError('Failed to connect wallet. Please try again.');
+      }
+      return null;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, []);
 
-            if (!challengeRes.ok) throw new Error('Failed to get challenge');
-            const { nonce } = await challengeRes.json();
+  const login = useCallback(async (key?: string) => {
+    const pk = key ?? publicKey;
+    if (!pk) {
+      setError('No wallet connected.');
+      return;
+    }
 
-            // 2. Sign Message — pass address so Freighter uses the correct key
-            const result = await signMessage(nonce, { address: pk });
-            if (result.error) throw new Error(result.error);
+    setIsConnecting(true);
+    setError(null);
 
-            const signedMessageStr = typeof result.signedMessage === 'string'
-                ? result.signedMessage
-                : Buffer.from(result.signedMessage as Uint8Array).toString('base64');
-            const signerPublicKey = result.signerAddress;
+    try {
+      // 1. Request challenge
+      const challengeRes = await fetch('/api/v1/auth/challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicKey: pk }),
+      });
 
-            // 3. Verify
-            const verifyRes = await fetch('/api/v1/auth/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ publicKey: pk, signedMessage: signedMessageStr, signerPublicKey }),
-            });
+      if (!challengeRes.ok) {
+        const body = await challengeRes.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Failed to get authentication challenge.');
+      }
 
-            if (!verifyRes.ok) throw new Error('Verification failed');
+      const { nonce } = await challengeRes.json();
 
-            // Success - redirect
-            router.push('/dashboard');
+      // 2. Sign nonce with Freighter
+      const signResult = await signMessage(nonce, { address: pk });
+      if (signResult.error) {
+        throw new Error('Signing was rejected or failed. Please try again.');
+      }
 
-        } catch (err: unknown) {
-            setError((err as Error).message || 'Login failed');
-            console.error(err);
-        } finally {
-            setIsConnecting(false);
-        }
-    };
+      const signedMessage =
+        typeof signResult.signedMessage === 'string'
+          ? signResult.signedMessage
+          : Buffer.from(signResult.signedMessage as Uint8Array).toString('base64');
 
-    const logout = async () => {
-        try {
-            // Call API to clear cookies first
-            await fetch('/api/v1/auth/logout', { method: 'POST' });
-        } catch (err) {
-            console.error('Logout API call failed:', err);
-        }
+      // 3. Verify signature → sets httpOnly cookies
+      const verifyRes = await fetch('/api/v1/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: pk,
+          signedMessage,
+          signerPublicKey: signResult.signerAddress,
+        }),
+      });
 
-        setIsConnected(false);
-        setPublicKey(null);
-        router.push('/login');
-    };
+      if (!verifyRes.ok) {
+        const body = await verifyRes.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Signature verification failed.');
+      }
 
-    return {
-        isConnected,
-        isConnecting,
-        publicKey,
-        connect,
-        login,
-        logout,
-        error,
-    };
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(msg);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [publicKey, router]);
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // best-effort
+    }
+    setIsConnected(false);
+    setPublicKey(null);
+    setWalletType(null);
+    router.push('/login');
+  }, [router]);
+
+  // Silent token refresh — runs once after session check
+  useEffect(() => {
+    if (isCheckingSession) return;
+    silentRefresh().catch(() => {});
+  }, [isCheckingSession]);
+
+  return {
+    isConnected,
+    isConnecting,
+    isCheckingSession,
+    publicKey,
+    walletType,
+    connect,
+    login,
+    logout,
+    error,
+    clearError,
+  };
 }

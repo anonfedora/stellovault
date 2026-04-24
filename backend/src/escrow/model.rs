@@ -152,3 +152,46 @@ pub struct WebhookPayload {
     #[serde(rename = "timestamp")]
     pub _timestamp: DateTime<Utc>,
 }
+
+/// Request DTO for updating escrow status
+#[derive(Debug, Deserialize)]
+pub struct UpdateEscrowStatusRequest {
+    pub status: EscrowStatus,
+    pub reason: Option<String>,
+}
+
+/// Request DTO for releasing escrow funds
+#[derive(Debug, Deserialize)]
+pub struct ReleaseEscrowRequest {
+    pub release_code: String,
+    pub actor_id: Option<Uuid>,
+}
+
+/// Request DTO for disputing an escrow
+#[derive(Debug, Deserialize)]
+pub struct DisputeEscrowRequest {
+    pub reason: String,
+    pub actor_id: Option<Uuid>,
+    pub evidence: Option<serde_json::Value>,
+}
+
+/// Request DTO for funding an escrow
+#[derive(Debug, Deserialize)]
+pub struct FundEscrowRequest {
+    pub amount: i64,
+    pub tx_hash: Option<String>,
+}
+
+/// A single entry in the escrow history/audit trail
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct EscrowHistoryEntry {
+    pub id: Uuid,
+    pub escrow_id: Uuid,
+    pub action: String,
+    pub old_status: Option<EscrowStatus>,
+    pub new_status: Option<EscrowStatus>,
+    pub actor_id: Option<Uuid>,
+    pub metadata: Option<serde_json::Value>,
+    pub tx_hash: Option<String>,
+    pub created_at: DateTime<Utc>,
+}

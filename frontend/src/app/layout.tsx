@@ -34,17 +34,18 @@ export default function RootLayout({
         <TransactionStatusProvider>
           <AppProviders>
             {children}
-            <Toaster
-              position="top-right"
-              expand={false}
-              richColors
-              closeButton
-              duration={5000}
-              visibleToasts={3}
-            />
-            <TransactionHistoryDrawer />
           </AppProviders>
-        </TransactionStatusProvider>      </body>
+          <Toaster 
+            position="top-right"
+            expand={false}
+            richColors
+            closeButton
+            duration={5000}
+            visibleToasts={3}
+          />
+          <TransactionHistoryDrawer />
+        </TransactionStatusProvider>
+      </body>
     </html>
   );
 }

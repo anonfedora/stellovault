@@ -179,6 +179,11 @@ mod tests {
             name: Some("Test User".to_string()),
             role: UserRole::Buyer,
             risk_score: None,
+            kyc_status: crate::models::KycStatus::Unverified,
+            kyc_expiry: None,
+            kyc_provider: None,
+            kyc_verified_at: None,
+            kyc_reference_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

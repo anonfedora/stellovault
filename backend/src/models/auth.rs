@@ -5,6 +5,7 @@ use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::UserRole;
+use super::KycStatus;
 
 /// Wallet linked to a user
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]

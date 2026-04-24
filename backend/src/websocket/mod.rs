@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, RwLock};
-use tokio::time::{duration_since_epoch, Duration, Instant};
+use tokio::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::escrow::EscrowEvent as EscrowEventType;
@@ -47,6 +47,10 @@ impl From<EscrowEventType> for EscrowEvent {
                 escrow_id,
                 released_by: "contract".to_string() 
             },
+            EscrowEventType::Refunded { escrow_id } => EscrowEvent::Released {
+                escrow_id,
+                released_by: "refund".to_string(),
+            },
             EscrowEventType::Cancelled { escrow_id } => EscrowEvent::Cancelled { 
                 escrow_id, 
                 reason: "cancelled_by_party".to_string() 
@@ -60,6 +64,10 @@ impl From<EscrowEventType> for EscrowEvent {
                 escrow_id, 
                 old_status: "unknown".to_string(), 
                 new_status: format!("{:?}", status) 
+            },
+            EscrowEventType::Refunded { escrow_id } => EscrowEvent::Cancelled {
+                escrow_id,
+                reason: "refunded".to_string(),
             },
         }
     }
@@ -187,8 +195,8 @@ impl EventBuffer {
         let event_id = self.next_event_id;
         self.next_event_id += 1;
         
-        // Remove expired events
-        let cutoff = now.saturating_sub(self.max_duration);
+        // Remove expired events older than max_duration
+        let cutoff = now - self.max_duration;
         self.events.retain(|e| e.timestamp > cutoff);
         
         // Add new event
@@ -283,13 +291,6 @@ pub enum ServerMessage {
     Replay { events: Vec<WsEvent>, last_event_id: u64 },
     /// Welcome message with client info
     Welcome { client_id: String, reconnect_token: String },
-#[allow(dead_code)]
-enum ServerMessage {
-    Event { event: EscrowEvent },
-    Subscribed { escrow_ids: Vec<i64> },
-    Unsubscribed { escrow_ids: Vec<i64> },
-    Pong,
-    Error { message: String },
 }
 
 impl WsState {
@@ -551,7 +552,7 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                     let clients = state_clone.clients.read().await;
                     if let Some(client_info) = clients.get(&client_id_clone) {
                         // Check if event matches client's rooms
-                        if Self::should_send_event(&event, &client_info.subscribed_rooms) {
+                        if WsState::should_send_event(&event, &client_info.subscribed_rooms) {
                             let msg = ServerMessage::Event { event };
                             if let Ok(text) = serde_json::to_string(&msg) {
                                 if sender.send(Message::Text(text)).await.is_err() {
@@ -583,7 +584,7 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
             match msg {
                 Message::Text(text) => {
                     if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
-                        Self::handle_client_message(
+                        WsState::handle_client_message(
                             &state_recv,
                             &client_id_recv,
                             client_msg,
@@ -593,13 +594,21 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                         .await;
                     }
                 }
-                Message::Ping(data) => {
+                Message::Ping(_data) => {
                     // Respond to ping with pong
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let ping_ts = if data.len() >= 8 {
+                        let arr: [u8; 8] = data[..8].try_into().unwrap_or_default();
+                        u64::from_le_bytes(arr)
+                    } else {
+                        0
+                    };
                     let _ = internal_tx.send(ServerMessage::Pong {
-                        timestamp: u64::from_le_bytes(
-                            data.as_ref().try_into().unwrap_or_default()
-                        ),
-                        server_time: duration_since_epoch().await.0.as_secs(),
+                        timestamp: ping_ts,
+                        server_time: ts,
                     }).await;
                     state_recv.update_heartbeat(&client_id_recv).await;
                 }
@@ -675,9 +684,16 @@ impl WsState {
                 let _ = sender.send(ServerMessage::Unsubscribed { rooms }).await;
             }
             ClientMessage::Ping { timestamp } => {
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
                 let _ = sender.send(ServerMessage::Pong {
                     timestamp: timestamp.unwrap_or(0),
-                    server_time: duration_since_epoch().await.0.as_secs(),
+                    server_time: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
                 }).await;
                 state.update_heartbeat(client_id).await;
             }
@@ -727,9 +743,9 @@ pub async fn heartbeat_pruner(state: WsState, interval_secs: u64) {
             }
         }
         
-        for client_id in dead_clients {
+        for client_id in &dead_clients {
             tracing::warn!("Pruning dead client: {}", client_id);
-            state.unregister_client(&client_id).await;
+            state.unregister_client(client_id).await;
         }
         
         if !dead_clients.is_empty() {

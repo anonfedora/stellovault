@@ -8,8 +8,9 @@ use uuid::Uuid;
 
 use crate::collateral::CollateralService;
 use crate::escrow::{
-    CreateEscrowRequest, CreateEscrowResponse, Escrow, EscrowEvent, EscrowStatus,
-    EscrowWithCollateral, ListEscrowsQuery,
+    CreateEscrowRequest, CreateEscrowResponse, DisputeEscrowRequest, Escrow, EscrowEvent,
+    EscrowHistoryEntry, EscrowStatus, EscrowWithCollateral, FundEscrowRequest, ListEscrowsQuery,
+    ReleaseEscrowRequest,
 };
 use crate::models::{CollateralToken, TokenStatus};
 
@@ -248,6 +249,17 @@ impl EscrowService {
                 tracing::info!("Escrow {} released", escrow_id);
                 Ok(())
             }
+            EscrowEvent::Refunded { escrow_id } => {
+                self.update_escrow_status(escrow_id, EscrowStatus::Refunded)
+                    .await?;
+
+                if let Some(escrow) = self.get_escrow_by_id(escrow_id).await? {
+                    self.unlock_collateral(&escrow.collateral_id).await?;
+                }
+
+                tracing::info!("Escrow {} refunded", escrow_id);
+                Ok(())
+            }
             EscrowEvent::Cancelled { escrow_id } => {
                 self.update_escrow_status(escrow_id, EscrowStatus::Cancelled)
                     .await?;
@@ -309,6 +321,266 @@ impl EscrowService {
         }
 
         Ok(escrow_ids)
+    }
+
+    /// Fund an existing escrow
+    pub async fn fund_escrow(&self, id: &Uuid, request: FundEscrowRequest) -> Result<Escrow> {
+        let escrow = self
+            .get_escrow(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Escrow not found"))?;
+
+        if escrow.status != EscrowStatus::Pending {
+            anyhow::bail!(
+                "Escrow cannot be funded in status {:?}",
+                escrow.status
+            );
+        }
+
+        if request.amount <= 0 {
+            anyhow::bail!("Fund amount must be greater than 0");
+        }
+
+        let tx_hash = request
+            .tx_hash
+            .unwrap_or_else(|| format!("fund_{}", uuid::Uuid::new_v4().to_string().replace("-", "")));
+
+        let updated = sqlx::query_as::<_, Escrow>(
+            r#"
+            UPDATE escrows
+            SET status = $1, updated_at = $2
+            WHERE id = $3
+            RETURNING *
+            "#,
+        )
+        .bind(EscrowStatus::Active)
+        .bind(Utc::now())
+        .bind(id)
+        .fetch_one(&self.db_pool)
+        .await
+        .context("Failed to update escrow status to active")?;
+
+        self.record_history(
+            id,
+            "funded",
+            Some(EscrowStatus::Pending),
+            Some(EscrowStatus::Active),
+            None,
+            Some(serde_json::json!({ "amount": request.amount })),
+            Some(&tx_hash),
+        )
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Release funds from an escrow
+    pub async fn release_escrow(
+        &self,
+        id: &Uuid,
+        request: ReleaseEscrowRequest,
+    ) -> Result<Escrow> {
+        let escrow = self
+            .get_escrow(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Escrow not found"))?;
+
+        if escrow.status != EscrowStatus::Active {
+            anyhow::bail!(
+                "Escrow cannot be released in status {:?}",
+                escrow.status
+            );
+        }
+
+        // Validate release code (basic check — extend with real sig verification)
+        if request.release_code.is_empty() {
+            anyhow::bail!("Release code is required");
+        }
+
+        let tx_hash = format!("rel_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+
+        let updated = sqlx::query_as::<_, Escrow>(
+            r#"
+            UPDATE escrows
+            SET status = $1, updated_at = $2
+            WHERE id = $3
+            RETURNING *
+            "#,
+        )
+        .bind(EscrowStatus::Released)
+        .bind(Utc::now())
+        .bind(id)
+        .fetch_one(&self.db_pool)
+        .await
+        .context("Failed to release escrow")?;
+
+        // Unlock collateral
+        self.unlock_collateral(&escrow.collateral_id).await?;
+
+        self.record_history(
+            id,
+            "released",
+            Some(EscrowStatus::Active),
+            Some(EscrowStatus::Released),
+            request.actor_id,
+            None,
+            Some(&tx_hash),
+        )
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Raise a dispute on an escrow
+    pub async fn dispute_escrow(
+        &self,
+        id: &Uuid,
+        request: DisputeEscrowRequest,
+    ) -> Result<Escrow> {
+        let escrow = self
+            .get_escrow(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Escrow not found"))?;
+
+        if !matches!(escrow.status, EscrowStatus::Pending | EscrowStatus::Active) {
+            anyhow::bail!(
+                "Escrow cannot be disputed in status {:?}",
+                escrow.status
+            );
+        }
+
+        if request.reason.trim().is_empty() {
+            anyhow::bail!("Dispute reason is required");
+        }
+
+        let updated = sqlx::query_as::<_, Escrow>(
+            r#"
+            UPDATE escrows
+            SET status = $1, disputed = true, updated_at = $2
+            WHERE id = $3
+            RETURNING *
+            "#,
+        )
+        .bind(EscrowStatus::Disputed)
+        .bind(Utc::now())
+        .bind(id)
+        .fetch_one(&self.db_pool)
+        .await
+        .context("Failed to dispute escrow")?;
+
+        let metadata = serde_json::json!({
+            "reason": request.reason,
+            "evidence": request.evidence,
+        });
+
+        self.record_history(
+            id,
+            "disputed",
+            Some(escrow.status),
+            Some(EscrowStatus::Disputed),
+            request.actor_id,
+            Some(metadata),
+            None,
+        )
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Update escrow status (admin/oracle action)
+    pub async fn update_status(
+        &self,
+        id: &Uuid,
+        new_status: EscrowStatus,
+        reason: Option<String>,
+        actor_id: Option<uuid::Uuid>,
+    ) -> Result<Escrow> {
+        let escrow = self
+            .get_escrow(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Escrow not found"))?;
+
+        // Validate state machine transitions
+        let valid = match (escrow.status, new_status) {
+            (EscrowStatus::Pending, EscrowStatus::Active) => true,
+            (EscrowStatus::Pending, EscrowStatus::Cancelled) => true,
+            (EscrowStatus::Active, EscrowStatus::Released) => true,
+            (EscrowStatus::Active, EscrowStatus::Disputed) => true,
+            (EscrowStatus::Active, EscrowStatus::Cancelled) => true,
+            (EscrowStatus::Disputed, EscrowStatus::Released) => true,
+            (EscrowStatus::Disputed, EscrowStatus::Refunded) => true,
+            (EscrowStatus::Disputed, EscrowStatus::Cancelled) => true,
+            _ => false,
+        };
+
+        if !valid {
+            anyhow::bail!(
+                "Invalid status transition from {:?} to {:?}",
+                escrow.status,
+                new_status
+            );
+        }
+
+        let updated = sqlx::query_as::<_, Escrow>(
+            r#"
+            UPDATE escrows
+            SET status = $1, updated_at = $2
+            WHERE id = $3
+            RETURNING *
+            "#,
+        )
+        .bind(new_status)
+        .bind(Utc::now())
+        .bind(id)
+        .fetch_one(&self.db_pool)
+        .await
+        .context("Failed to update escrow status")?;
+
+        // Unlock collateral on terminal states
+        if matches!(
+            new_status,
+            EscrowStatus::Released | EscrowStatus::Refunded | EscrowStatus::Cancelled
+        ) {
+            self.unlock_collateral(&escrow.collateral_id).await?;
+        }
+
+        let metadata = reason.map(|r| serde_json::json!({ "reason": r }));
+        self.record_history(
+            id,
+            "status_updated",
+            Some(escrow.status),
+            Some(new_status),
+            actor_id,
+            metadata,
+            None,
+        )
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Get the full audit history for an escrow
+    pub async fn get_escrow_history(&self, id: &Uuid) -> Result<Vec<EscrowHistoryEntry>> {
+        // Ensure escrow exists
+        self.get_escrow(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Escrow not found"))?;
+
+        let history = sqlx::query_as::<_, EscrowHistoryEntry>(
+            r#"
+            SELECT id, escrow_id, action, old_status, new_status,
+                   actor_id, metadata, tx_hash, created_at
+            FROM escrow_history
+            WHERE escrow_id = $1
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.db_pool)
+        .await
+        .context("Failed to fetch escrow history")?;
+
+        Ok(history)
     }
 
     // ===== Private Helper Methods =====
@@ -428,6 +700,39 @@ impl EscrowService {
         self.collateral_service
             .update_lock_status(collateral_id, false)
             .await?;
+        Ok(())
+    }
+
+    /// Insert a row into escrow_history for auditing
+    async fn record_history(
+        &self,
+        escrow_id: &Uuid,
+        action: &str,
+        old_status: Option<EscrowStatus>,
+        new_status: Option<EscrowStatus>,
+        actor_id: Option<Uuid>,
+        metadata: Option<serde_json::Value>,
+        tx_hash: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO escrow_history
+                (id, escrow_id, action, old_status, new_status, actor_id, metadata, tx_hash, created_at)
+            VALUES
+                (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())
+            "#,
+        )
+        .bind(escrow_id)
+        .bind(action)
+        .bind(old_status)
+        .bind(new_status)
+        .bind(actor_id)
+        .bind(metadata)
+        .bind(tx_hash)
+        .execute(&self.db_pool)
+        .await
+        .context("Failed to record escrow history")?;
+
         Ok(())
     }
 }

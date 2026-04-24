@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::{EscrowEvent, EscrowService, EscrowStatus};
-use crate::websocket::WsState;
+use crate::websocket::{WsState, WsEvent, EscrowEvent as WsEscrowEvent};
 
 /// Soroban event from Horizon API
 #[derive(Debug, Deserialize, Clone)]
@@ -100,7 +100,7 @@ impl EventListener {
             .await?;
 
         // Broadcast to WebSocket clients
-        self.ws_state.broadcast_event(event).await;
+        self.ws_state.broadcast_event(WsEvent::Escrow(WsEscrowEvent::from(event))).await;
 
         Ok(())
     }
@@ -186,7 +186,7 @@ pub async fn timeout_detector(escrow_service: Arc<EscrowService>, ws_state: WsSt
         match escrow_service.detect_timeouts().await {
             Ok(timed_out_escrows) => {
                 for escrow_id in timed_out_escrows {
-                    let event = EscrowEvent::TimedOut { escrow_id };
+                    let event = WsEvent::Escrow(WsEscrowEvent::TimedOut { escrow_id });
                     ws_state.broadcast_event(event).await;
                     tracing::info!("Escrow {} timed out", escrow_id);
                 }
