@@ -37,7 +37,9 @@ export async function proxy(request: NextRequest) {
 
     // If trying to access protected route (dashboard) and not valid
     if (pathname.startsWith('/dashboard') && !isValid) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('from', pathname);
+        return NextResponse.redirect(loginUrl);
     }
 
     // If accessing login page while already valid
