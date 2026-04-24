@@ -9,9 +9,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::escrow::{
-    CreateEscrowRequest, CreateEscrowResponse, Escrow, EscrowEvent, ListEscrowsQuery,
-    WebhookPayload,
+    CreateEscrowRequest, CreateEscrowResponse, DisputeEscrowRequest, Escrow, EscrowEvent,
+    EscrowHistoryEntry, FundEscrowRequest, ListEscrowsQuery, ReleaseEscrowRequest,
+    UpdateEscrowStatusRequest, WebhookPayload,
 };
+use crate::websocket::WsEvent;
 use crate::loan::{CreateLoanRequest, ListLoansQuery, Loan, Repayment, RepaymentRequest};
 use crate::websocket::{WsEvent, EscrowEvent as WsEscrowEvent};
 use crate::models::{ApiResponse, User};
@@ -228,6 +230,180 @@ pub async fn webhook_escrow_update(
         data: Some(()),
         error: None,
     }))
+}
+
+/// Update escrow status (state machine transition)
+pub async fn update_escrow_status(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<UpdateEscrowStatusRequest>,
+) -> Result<Json<ApiResponse<Escrow>>, (StatusCode, Json<ApiResponse<Escrow>>)> {
+    match app_state
+        .escrow_service
+        .update_status(&id, request.status, request.reason, None)
+        .await
+    {
+        Ok(escrow) => {
+            app_state
+                .ws_state
+                .broadcast_event(WsEvent::Escrow(
+                    EscrowEvent::StatusUpdated {
+                        escrow_id: escrow.escrow_id,
+                        status: escrow.status,
+                    }
+                    .into(),
+                ))
+                .await;
+            Ok(Json(ApiResponse {
+                success: true,
+                data: Some(escrow),
+                error: None,
+            }))
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        )),
+    }
+}
+
+/// Fund an escrow (transition Pending -> Active)
+pub async fn fund_escrow(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<FundEscrowRequest>,
+) -> Result<Json<ApiResponse<Escrow>>, (StatusCode, Json<ApiResponse<Escrow>>)> {
+    match app_state.escrow_service.fund_escrow(&id, request).await {
+        Ok(escrow) => {
+            app_state
+                .ws_state
+                .broadcast_event(WsEvent::Escrow(
+                    EscrowEvent::Activated {
+                        escrow_id: escrow.escrow_id,
+                    }
+                    .into(),
+                ))
+                .await;
+            Ok(Json(ApiResponse {
+                success: true,
+                data: Some(escrow),
+                error: None,
+            }))
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        )),
+    }
+}
+
+/// Release funds from an escrow
+pub async fn release_escrow(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<ReleaseEscrowRequest>,
+) -> Result<Json<ApiResponse<Escrow>>, (StatusCode, Json<ApiResponse<Escrow>>)> {
+    match app_state.escrow_service.release_escrow(&id, request).await {
+        Ok(escrow) => {
+            app_state
+                .ws_state
+                .broadcast_event(WsEvent::Escrow(
+                    EscrowEvent::Released {
+                        escrow_id: escrow.escrow_id,
+                    }
+                    .into(),
+                ))
+                .await;
+            Ok(Json(ApiResponse {
+                success: true,
+                data: Some(escrow),
+                error: None,
+            }))
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        )),
+    }
+}
+
+/// Raise a dispute on an escrow
+pub async fn dispute_escrow(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<DisputeEscrowRequest>,
+) -> Result<Json<ApiResponse<Escrow>>, (StatusCode, Json<ApiResponse<Escrow>>)> {
+    match app_state.escrow_service.dispute_escrow(&id, request).await {
+        Ok(escrow) => {
+            app_state
+                .ws_state
+                .broadcast_event(WsEvent::Escrow(
+                    EscrowEvent::Disputed {
+                        escrow_id: escrow.escrow_id,
+                        reason: "Dispute raised via API".to_string(),
+                    }
+                    .into(),
+                ))
+                .await;
+            Ok(Json(ApiResponse {
+                success: true,
+                data: Some(escrow),
+                error: None,
+            }))
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        )),
+    }
+}
+
+/// Get escrow transaction history
+pub async fn get_escrow_history(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<
+    Json<ApiResponse<Vec<EscrowHistoryEntry>>>,
+    (StatusCode, Json<ApiResponse<Vec<EscrowHistoryEntry>>>),
+> {
+    match app_state.escrow_service.get_escrow_history(&id).await {
+        Ok(history) => Ok(Json(ApiResponse {
+            success: true,
+            data: Some(history),
+            error: None,
+        })),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            Err((
+                status,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(e.to_string()),
+                }),
+            ))
+        }
+    }
 }
 
 // ===== Collateral Handlers =====

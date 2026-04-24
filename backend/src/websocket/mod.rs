@@ -65,6 +65,10 @@ impl From<EscrowEventType> for EscrowEvent {
                 old_status: "unknown".to_string(), 
                 new_status: format!("{:?}", status) 
             },
+            EscrowEventType::Refunded { escrow_id } => EscrowEvent::Cancelled {
+                escrow_id,
+                reason: "refunded".to_string(),
+            },
         }
     }
 }
@@ -590,7 +594,7 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                         .await;
                     }
                 }
-                Message::Ping(data) => {
+                Message::Ping(_data) => {
                     // Respond to ping with pong
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -680,6 +684,10 @@ impl WsState {
                 let _ = sender.send(ServerMessage::Unsubscribed { rooms }).await;
             }
             ClientMessage::Ping { timestamp } => {
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
                 let _ = sender.send(ServerMessage::Pong {
                     timestamp: timestamp.unwrap_or(0),
                     server_time: std::time::SystemTime::now()
