@@ -32,7 +32,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <TransactionStatusProvider>
-          {children}
+          <AppProviders>
+            {children}
+          </AppProviders>
           <Toaster 
             position="top-right"
             expand={false}
@@ -43,7 +45,6 @@ export default function RootLayout({
           />
           <TransactionHistoryDrawer />
         </TransactionStatusProvider>
-        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
