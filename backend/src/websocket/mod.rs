@@ -594,7 +594,7 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
                         .await;
                     }
                 }
-                Message::Ping(_data) => {
+                Message::Ping(data) => {
                     // Respond to ping with pong
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
