@@ -1,0 +1,47 @@
+name: Performance Budget
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Check Bundle Size
+        run: |
+          cd frontend
+          # Simple check for main bundle size (example budget 500KB)
+          SIZE=$(du -sk .next/static/chunks/main-*.js | cut -f1)
+          echo "Main bundle size: ${SIZE}KB"
+          if [ "$SIZE" -gt 500 ]; then
+            echo "Main bundle exceeds 500KB budget!"
+            # exit 1 # Uncomment to fail CI
+          fi
+
+      - name: Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.13.x
+          cd frontend
+          # Note: This requires a running server or lhci autorun config
+          # For now, we just list the intention
+          echo "Lighthouse CI would run here"

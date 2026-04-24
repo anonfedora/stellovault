@@ -5,6 +5,8 @@ import { Toaster } from "sonner";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
 import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
 import { AppProviders } from "@/components/providers/AppProviders";
+import { PerformanceMonitor } from "@/components/PerformanceMonitor";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,11 +30,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preload" href="/favicon.ico" as="image" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <TransactionStatusProvider>
           <AppProviders>
+            <PerformanceMonitor />
+            <ServiceWorkerRegistration />
             {children}
           </AppProviders>
           <Toaster 

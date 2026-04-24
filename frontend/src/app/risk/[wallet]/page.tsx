@@ -5,7 +5,11 @@ import { useRiskScore } from '../../../hooks/useRiskScore';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import ScoreGauge from '../../../components/risk/ScoreGauge';
 import ScoreBreakdown from '../../../components/risk/ScoreBreakdown';
-import ScoreHistoryChart from '../../../components/risk/ScoreHistoryChart';
+import dynamic from 'next/dynamic';
+const ScoreHistoryChart = dynamic(() => import('../../../components/risk/ScoreHistoryChart'), {
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full mt-4 bg-gray-100 animate-pulse rounded-xl" />
+});
 import LoanTimeline from '../../../components/risk/LoanTimeline';
 import {
     ArrowLeft,
