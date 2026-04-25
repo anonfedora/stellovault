@@ -688,4 +688,3 @@ impl UpgradeSystem {
         env.ledger().timestamp()
     }
 }
-

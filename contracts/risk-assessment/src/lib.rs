@@ -452,9 +452,7 @@ impl RiskAssessment {
         env.storage()
             .instance()
             .set(&symbol_short!("admin"), &pending);
-        env.storage()
-            .instance()
-            .remove(&symbol_short!("pend_adm"));
+        env.storage().instance().remove(&symbol_short!("pend_adm"));
 
         env.events()
             .publish((symbol_short!("adm_acpt"),), (pending,));
@@ -464,9 +462,7 @@ impl RiskAssessment {
 
     /// Return the pending admin address if a proposal is active.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
+        env.storage().instance().get(&symbol_short!("pend_adm"))
     }
 
     /// Get governance address
@@ -2585,15 +2581,8 @@ mod test {
         let contract_id = env.register(RiskAssessment, ());
 
         env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin,
-                governance,
-                coll_reg,
-                loan_mgr,
-                vault,
-            )
-            .unwrap();
+            RiskAssessment::initialize(env.clone(), admin, governance, coll_reg, loan_mgr, vault)
+                .unwrap();
             // No mocked auth — admin.require_auth() panics
             RiskAssessment::propose_admin(env.clone(), new_admin).unwrap();
         });

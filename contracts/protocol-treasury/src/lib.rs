@@ -145,9 +145,7 @@ impl ProtocolTreasury {
         env.storage()
             .instance()
             .set(&symbol_short!("admin"), &pending);
-        env.storage()
-            .instance()
-            .remove(&symbol_short!("pend_adm"));
+        env.storage().instance().remove(&symbol_short!("pend_adm"));
 
         env.events()
             .publish((symbol_short!("adm_acpt"),), (pending,));
@@ -157,9 +155,7 @@ impl ProtocolTreasury {
 
     /// Return the pending admin address if a proposal is active.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
+        env.storage().instance().get(&symbol_short!("pend_adm"))
     }
 
     /// Query the current protocol fee in basis points.

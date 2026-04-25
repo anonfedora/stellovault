@@ -1,21 +1,11 @@
 use soroban_sdk::{contracttype, Address, Symbol};
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct Version {
     pub major: u32,
     pub minor: u32,
     pub patch: u32,
-}
-
-impl Default for Version {
-    fn default() -> Self {
-        Self {
-            major: 0,
-            minor: 0,
-            patch: 0,
-        }
-    }
 }
 
 #[contracttype]
