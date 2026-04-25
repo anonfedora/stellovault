@@ -12,8 +12,14 @@ function validateRequiredFields(fields: Record<string, unknown>, names: string[]
 
 export async function registerOracle(req: Request, res: Response, next: NextFunction) {
     try {
-        const { address } = req.body;
-        const oracle = await oracleService.registerOracle({ address });
+        const { address, oracleType, metadata, stakeAmount, assetCode } = req.body;
+        const oracle = await oracleService.registerOracle({
+            address,
+            oracleType,
+            metadata,
+            stakeAmount,
+            assetCode,
+        });
         res.status(201).json({ success: true, data: oracle });
     } catch (err) {
         next(err);
@@ -116,6 +122,105 @@ export async function flagDispute(req: Request, res: Response, next: NextFunctio
             disputerAddress,
         });
         res.status(201).json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function getOracleReputation(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const reputation = await oracleService.getOracleReputation(id);
+        res.json({ success: true, data: reputation });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function getOracleNetworkStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+        const status = await oracleService.getOracleNetworkStatus();
+        res.json({ success: true, data: status });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function distributeReward(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { oracleId, amount, reason, confirmationId } = req.body;
+        validateRequiredFields(
+            { oracleId, amount, reason },
+            ["oracleId", "amount", "reason"]
+        );
+        const reward = await oracleService.distributeReward(oracleId, amount, reason, confirmationId);
+        res.status(201).json({ success: true, data: reward });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function slashStake(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { oracleId, amount, reason } = req.body;
+        validateRequiredFields(
+            { oracleId, amount, reason },
+            ["oracleId", "amount", "reason"]
+        );
+        const result = await oracleService.slashStake(oracleId, amount, reason);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function resolveDispute(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { disputeId, resolution, outcome } = req.body;
+        validateRequiredFields(
+            { disputeId, resolution, outcome },
+            ["disputeId", "resolution", "outcome"]
+        );
+        const result = await oracleService.resolveDispute(disputeId, resolution, outcome);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function createThresholdSignature(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { escrowId, eventType, requiredSigs } = req.body;
+        validateRequiredFields(
+            { escrowId, eventType, requiredSigs },
+            ["escrowId", "eventType", "requiredSigs"]
+        );
+        const threshold = await oracleService.createThresholdSignature(escrowId, eventType, requiredSigs);
+        res.status(201).json({ success: true, data: threshold });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function addThresholdSignature(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { thresholdId, oracleAddress, signature } = req.body;
+        validateRequiredFields(
+            { thresholdId, oracleAddress, signature },
+            ["thresholdId", "oracleAddress", "signature"]
+        );
+        const threshold = await oracleService.addThresholdSignature(thresholdId, oracleAddress, signature);
+        res.json({ success: true, data: threshold });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function getThresholdSignature(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const threshold = await oracleService.getThresholdSignature(id);
+        res.json({ success: true, data: threshold });
     } catch (err) {
         next(err);
     }
