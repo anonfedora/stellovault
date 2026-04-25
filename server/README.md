@@ -99,6 +99,56 @@ Server starts on **http://localhost:3001**. Health check: `GET /health`
 
 ---
 
+## Webhook API (v1)
+
+Base path: `/api/v1/webhooks` (JWT required)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/webhooks` | Register webhook endpoint |
+| `GET` | `/api/v1/webhooks` | List user webhooks |
+| `PUT` | `/api/v1/webhooks/:id` | Update webhook config |
+| `DELETE` | `/api/v1/webhooks/:id` | Remove webhook |
+| `POST` | `/api/v1/webhooks/:id/test` | Queue test delivery |
+| `GET` | `/api/v1/webhooks/:id/logs` | Delivery logs |
+| `GET` | `/api/v1/webhooks/:id/metrics` | Delivery metrics/health |
+
+### Outbound payload format
+
+Headers:
+- `Content-Type: application/json`
+- `X-Webhook-Event: <event-name>`
+- `X-Webhook-Id: <uuid>`
+- `X-Webhook-Timestamp: <iso-date>`
+- `X-Webhook-Signature: sha256=<digest>` (when `authMethod = SIGNATURE`)
+
+Body (unencrypted):
+
+```json
+{
+  "event": "payment.received",
+  "timestamp": "2026-04-25T10:20:30.000Z",
+  "data": {
+    "loanId": "loan_123",
+    "repaymentId": "repay_456"
+  }
+}
+```
+
+Body (encrypted; `encryptionEnabled = true`):
+
+```json
+{
+  "encrypted": true,
+  "algorithm": "aes-256-gcm",
+  "iv": "<base64>",
+  "tag": "<base64>",
+  "payload": "<base64-ciphertext>"
+}
+```
+
+---
+
 ## Prisma Quick Reference
 
 | Command | Description |
