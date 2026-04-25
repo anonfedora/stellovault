@@ -362,7 +362,7 @@ pub enum CollateralType {
 pub struct LTVConfig {
     pub collateral_type: CollateralType,
     pub base_ltv_bps: u32, // Base LTV in basis points (e.g., 7500 = 75%)
-    pub max_ltv_bps: u32, // Maximum LTV in basis points
+    pub max_ltv_bps: u32,  // Maximum LTV in basis points
     pub credit_score_multiplier: u32, // Credit score impact (bps per 100 points)
 }
 
@@ -371,20 +371,20 @@ pub struct LTVConfig {
 #[derive(Clone, Debug)]
 pub struct CreditScoreModel {
     pub payment_history_weight: u32, // Weight of payment history (bps)
-    pub utilization_weight: u32, // Weight of credit utilization (bps)
-    pub length_weight: u32, // Weight of credit history length (bps)
-    pub diversity_weight: u32, // Weight of credit mix (bps)
-    pub new_credit_weight: u32, // Weight of new credit inquiries (bps)
+    pub utilization_weight: u32,     // Weight of credit utilization (bps)
+    pub length_weight: u32,          // Weight of credit history length (bps)
+    pub diversity_weight: u32,       // Weight of credit mix (bps)
+    pub new_credit_weight: u32,      // Weight of new credit inquiries (bps)
 }
 
 impl Default for CreditScoreModel {
     fn default() -> Self {
         Self {
             payment_history_weight: 3500, // 35%
-            utilization_weight: 3000, // 30%
-            length_weight: 1500, // 15%
-            diversity_weight: 1000, // 10%
-            new_credit_weight: 1000, // 10%
+            utilization_weight: 3000,     // 30%
+            length_weight: 1500,          // 15%
+            diversity_weight: 1000,       // 10%
+            new_credit_weight: 1000,      // 10%
         }
     }
 }
@@ -407,8 +407,8 @@ pub struct PortfolioRisk {
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrivacyLevel {
-    Public = 0, // Anyone can view
-    Private = 1, // Only owner can view
+    Public = 0,     // Anyone can view
+    Private = 1,    // Only owner can view
     Restricted = 2, // Owner + authorized contracts can view
 }
 
@@ -434,7 +434,9 @@ const EVT_AUC_EXP: Symbol = symbol_short!("auc_exp");
 const EVT_CREDIT_CALC: Symbol = symbol_short!("cr_calc");
 const EVT_CREDIT_UPD: Symbol = symbol_short!("cr_upd");
 const EVT_REPAY_TRACK: Symbol = symbol_short!("rep_trk");
+#[allow(dead_code)]
 const EVT_LTV_CALC: Symbol = symbol_short!("ltv_calc");
+#[allow(dead_code)]
 const EVT_RATE_CALC: Symbol = symbol_short!("rate_calc");
 const EVT_PORTFOLIO: Symbol = symbol_short!("portf");
 
@@ -520,63 +522,69 @@ impl RiskAssessment {
         // Set default LTV configurations for each collateral type
         let invoice_ltv = LTVConfig {
             collateral_type: CollateralType::Invoice,
-            base_ltv_bps: 7500, // 75%
-            max_ltv_bps: 8500, // 85%
+            base_ltv_bps: 7500,          // 75%
+            max_ltv_bps: 8500,           // 85%
             credit_score_multiplier: 50, // 5 bps per 1 credit score point
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::Invoice), &invoice_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::Invoice),
+            &invoice_ltv,
+        );
 
         let commodity_ltv = LTVConfig {
             collateral_type: CollateralType::Commodity,
             base_ltv_bps: 7000, // 70%
-            max_ltv_bps: 8000, // 80%
+            max_ltv_bps: 8000,  // 80%
             credit_score_multiplier: 40,
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::Commodity), &commodity_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::Commodity),
+            &commodity_ltv,
+        );
 
         let realestate_ltv = LTVConfig {
             collateral_type: CollateralType::RealEstate,
             base_ltv_bps: 6500, // 65%
-            max_ltv_bps: 7500, // 75%
+            max_ltv_bps: 7500,  // 75%
             credit_score_multiplier: 30,
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::RealEstate), &realestate_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::RealEstate),
+            &realestate_ltv,
+        );
 
         let inventory_ltv = LTVConfig {
             collateral_type: CollateralType::Inventory,
             base_ltv_bps: 6000, // 60%
-            max_ltv_bps: 7000, // 70%
+            max_ltv_bps: 7000,  // 70%
             credit_score_multiplier: 35,
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::Inventory), &inventory_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::Inventory),
+            &inventory_ltv,
+        );
 
         let equipment_ltv = LTVConfig {
             collateral_type: CollateralType::Equipment,
             base_ltv_bps: 5500, // 55%
-            max_ltv_bps: 6500, // 65%
+            max_ltv_bps: 6500,  // 65%
             credit_score_multiplier: 30,
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::Equipment), &equipment_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::Equipment),
+            &equipment_ltv,
+        );
 
         let other_ltv = LTVConfig {
             collateral_type: CollateralType::Other,
             base_ltv_bps: 5000, // 50%
-            max_ltv_bps: 6000, // 60%
+            max_ltv_bps: 6000,  // 60%
             credit_score_multiplier: 25,
         };
-        env.storage()
-            .instance()
-            .set(&(symbol_short!("ltv_cfg"), CollateralType::Other), &other_ltv);
+        env.storage().instance().set(
+            &(symbol_short!("ltv_cfg"), CollateralType::Other),
+            &other_ltv,
+        );
 
         // Emit initialization event
         env.events()
@@ -1316,21 +1324,15 @@ impl RiskAssessment {
         let new_credit_score = Self::calculate_new_credit_score(&credit_data);
 
         // Weighted calculation
-        let weighted_score = (payment_score * model.payment_history_weight as u32
-            + utilization_score * model.utilization_weight as u32
-            + length_score * model.length_weight as u32
-            + diversity_score * model.diversity_weight as u32
-            + new_credit_score * model.new_credit_weight as u32)
+        let weighted_score = (payment_score * model.payment_history_weight
+            + utilization_score * model.utilization_weight
+            + length_score * model.length_weight
+            + diversity_score * model.diversity_weight
+            + new_credit_score * model.new_credit_weight)
             / 10000;
 
         // Ensure score is within valid range (300-850)
-        let final_score = if weighted_score < 300 {
-            300
-        } else if weighted_score > 850 {
-            850
-        } else {
-            weighted_score
-        };
+        let final_score = weighted_score.clamp(300, 850);
 
         // Update credit score data
         credit_data.score = final_score;
@@ -1356,19 +1358,6 @@ impl RiskAssessment {
         wallet_address: Address,
         new_data: CreditScore,
     ) -> Result<(), ContractError> {
-        // Verify caller is authorized (admin or governance)
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("admin"))
-            .ok_or(ContractError::Unauthorized)?;
-
-        let governance: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("gov"))
-            .ok_or(ContractError::Unauthorized)?;
-
         // Verify caller is authorized (admin or governance)
         // In Soroban, we check authorization through require_auth()
         // For this function, we'll skip caller check as it's called by admin/governance
@@ -1409,13 +1398,6 @@ impl RiskAssessment {
         loan_id: u64,
         payment_data: RepaymentRecord,
     ) -> Result<(), ContractError> {
-        // Verify caller is authorized (loan management contract)
-        let loan_mgr: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("loan_mgr"))
-            .ok_or(ContractError::Unauthorized)?;
-
         // Verify caller is authorized (loan management contract)
         // In Soroban, we check authorization through require_auth()
         // For this function, we'll skip caller check as it's called by loan_mgr
@@ -1496,12 +1478,12 @@ impl RiskAssessment {
     ) -> Result<u32, ContractError> {
         // Base rates by collateral type (higher risk = higher base rate)
         let base_rate = match collateral_type {
-            CollateralType::Invoice => 300, // 3%
-            CollateralType::Commodity => 400, // 4%
+            CollateralType::Invoice => 300,    // 3%
+            CollateralType::Commodity => 400,  // 4%
             CollateralType::RealEstate => 250, // 2.5%
-            CollateralType::Inventory => 500, // 5%
-            CollateralType::Equipment => 450, // 4.5%
-            CollateralType::Other => 600, // 6%
+            CollateralType::Inventory => 500,  // 5%
+            CollateralType::Equipment => 450,  // 4.5%
+            CollateralType::Other => 600,      // 6%
         };
 
         // Credit score adjustment (lower score = higher rate)
@@ -1514,16 +1496,10 @@ impl RiskAssessment {
             300
         };
 
-        let final_rate = (base_rate as i32 + score_adjustment) as u32;
+        let final_rate = base_rate + score_adjustment as u32;
 
         // Ensure rate is within reasonable bounds (1% - 15%)
-        Ok(if final_rate < 100 {
-            100
-        } else if final_rate > 1500 {
-            1500
-        } else {
-            final_rate
-        })
+        Ok(final_rate.clamp(100, 1500))
     }
 
     /// Assess portfolio risk for a lender
@@ -1533,7 +1509,10 @@ impl RiskAssessment {
     ///
     /// # Returns
     /// Portfolio risk assessment
-    pub fn assess_portfolio_risk(env: Env, lender_address: Address) -> Result<PortfolioRisk, ContractError> {
+    pub fn assess_portfolio_risk(
+        env: Env,
+        lender_address: Address,
+    ) -> Result<PortfolioRisk, ContractError> {
         // Get existing portfolio data or create new
         let mut portfolio = Self::get_portfolio_risk_internal(env.clone(), lender_address.clone());
 
@@ -1541,7 +1520,8 @@ impl RiskAssessment {
         let weighted_risk = Self::calculate_weighted_risk(env.clone(), lender_address.clone());
 
         // Calculate diversification score
-        let diversification = Self::calculate_portfolio_diversification_score(env.clone(), lender_address.clone());
+        let diversification =
+            Self::calculate_portfolio_diversification_score(env.clone(), lender_address.clone());
 
         portfolio.weighted_risk_score = weighted_risk;
         portfolio.diversification_score = diversification;
@@ -1551,14 +1531,19 @@ impl RiskAssessment {
         env.storage().persistent().set(&portfolio_key, &portfolio);
 
         // Emit event
-        env.events()
-            .publish((EVT_PORTFOLIO,), (lender_address, weighted_risk, diversification));
+        env.events().publish(
+            (EVT_PORTFOLIO,),
+            (lender_address, weighted_risk, diversification),
+        );
 
         Ok(portfolio)
     }
 
     /// Get portfolio risk assessment
-    pub fn get_portfolio_risk(env: Env, lender_address: Address) -> Result<PortfolioRisk, ContractError> {
+    pub fn get_portfolio_risk(
+        env: Env,
+        lender_address: Address,
+    ) -> Result<PortfolioRisk, ContractError> {
         let portfolio_key = (symbol_short!("portfolio"), lender_address);
         env.storage()
             .persistent()
@@ -1687,7 +1672,10 @@ impl RiskAssessment {
     }
 
     /// Get LTV configuration for a collateral type
-    pub fn get_ltv_config(env: Env, collateral_type: CollateralType) -> Result<LTVConfig, ContractError> {
+    pub fn get_ltv_config(
+        env: Env,
+        collateral_type: CollateralType,
+    ) -> Result<LTVConfig, ContractError> {
         env.storage()
             .instance()
             .get(&(symbol_short!("ltv_cfg"), collateral_type))
@@ -1729,14 +1717,14 @@ impl RiskAssessment {
         }
 
         let on_time_ratio = (credit_data.on_time_payments * 10000) / total_payments;
-        
+
         // Map on-time ratio to score (0-850)
         // 100% on-time = 850, 0% on-time = 300
         let score = 300 + (on_time_ratio * 55) / 100;
-        
+
         // Penalize defaults heavily
         let default_penalty = credit_data.defaults * 50;
-        
+
         if score > default_penalty {
             score - default_penalty
         } else {
@@ -1760,8 +1748,12 @@ impl RiskAssessment {
         // Lower utilization = higher score
         // 0% utilization = 850, 100% utilization = 300
         let score = 850 - (utilization_ratio * 55) / 100;
-        
-        if score < 300 { 300 } else { score as u32 }
+
+        if score < 300 {
+            300
+        } else {
+            score as u32
+        }
     }
 
     /// Calculate length of credit history score (0-850)
@@ -1769,9 +1761,13 @@ impl RiskAssessment {
         // Simplified: use account age or first loan timestamp
         // In production, this would track the first loan date
         let credit_key = (symbol_short!("credit"), wallet_address);
-        if let Some(credit_data) = env.storage().persistent().get::<_, CreditScore>(&credit_key) {
+        if let Some(credit_data) = env
+            .storage()
+            .persistent()
+            .get::<_, CreditScore>(&credit_key)
+        {
             let age_days = (env.ledger().timestamp() - credit_data.last_updated) / 86400;
-            
+
             // Map age to score (0-850)
             // 0 days = 300, 365+ days = 850
             if age_days >= 365 {
@@ -1799,7 +1795,11 @@ impl RiskAssessment {
             300 + (credit_data.total_loans * 55) / 10
         };
 
-        if diversity > 850 { 850 } else { diversity }
+        if diversity > 850 {
+            850
+        } else {
+            diversity
+        }
     }
 
     /// Calculate new credit impact score (0-850)
@@ -1841,7 +1841,7 @@ impl RiskAssessment {
     fn calculate_weighted_risk(env: Env, lender_address: Address) -> u32 {
         // Simplified: based on default rate and average LTV
         let portfolio = Self::get_portfolio_risk_internal(env, lender_address);
-        
+
         if portfolio.active_loans == 0 {
             return 500;
         }
@@ -1855,15 +1855,19 @@ impl RiskAssessment {
         // Higher default rate + higher LTV = higher risk score
         let ltv_risk = portfolio.average_ltv / 10; // Scale LTV to 0-1000
         let risk_score = 500 + default_rate + ltv_risk;
-        
-        if risk_score > 850 { 850 } else { risk_score }
+
+        if risk_score > 850 {
+            850
+        } else {
+            risk_score
+        }
     }
 
     /// Calculate diversification score for a portfolio
     fn calculate_portfolio_diversification_score(env: Env, lender_address: Address) -> u32 {
         // Simplified: based on number of active loans
         let portfolio = Self::get_portfolio_risk_internal(env, lender_address);
-        
+
         // More loans = better diversification
         if portfolio.active_loans >= 20 {
             850
@@ -3395,7 +3399,8 @@ mod test {
             .unwrap();
 
             let wallet = Address::generate(&env);
-            let score = RiskAssessment::calculate_credit_score(env.clone(), wallet.clone()).unwrap();
+            let score =
+                RiskAssessment::calculate_credit_score(env.clone(), wallet.clone()).unwrap();
 
             // New user should get default score around 500
             assert!(score >= 300 && score <= 850);
@@ -3441,7 +3446,13 @@ mod test {
 
             env.mock_all_auths();
 
-            RiskAssessment::track_repayment_history(env.clone(), borrower.clone(), loan_id, payment_data).unwrap();
+            RiskAssessment::track_repayment_history(
+                env.clone(),
+                borrower.clone(),
+                loan_id,
+                payment_data,
+            )
+            .unwrap();
 
             // Verify credit data was updated
             let credit_data = RiskAssessment::get_credit_score(env.clone(), borrower).unwrap();
@@ -3486,7 +3497,13 @@ mod test {
 
             env.mock_all_auths();
 
-            RiskAssessment::track_repayment_history(env.clone(), borrower.clone(), loan_id, payment_data).unwrap();
+            RiskAssessment::track_repayment_history(
+                env.clone(),
+                borrower.clone(),
+                loan_id,
+                payment_data,
+            )
+            .unwrap();
 
             let credit_data = RiskAssessment::get_credit_score(env.clone(), borrower).unwrap();
             assert_eq!(credit_data.on_time_payments, 0);
@@ -3513,11 +3530,13 @@ mod test {
             .unwrap();
 
             // Test with high credit score (800)
-            let ltv = RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Invoice, 800).unwrap();
+            let ltv =
+                RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Invoice, 800).unwrap();
             assert!(ltv >= 7500 && ltv <= 8500); // Base 75% + adjustment
 
             // Test with low credit score (400)
-            let ltv_low = RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Invoice, 400).unwrap();
+            let ltv_low =
+                RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Invoice, 400).unwrap();
             assert!(ltv_low < ltv); // Lower score = lower LTV
         });
     }
@@ -3540,7 +3559,8 @@ mod test {
             )
             .unwrap();
 
-            let ltv = RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Commodity, 700).unwrap();
+            let ltv =
+                RiskAssessment::get_ltv_limit(env.clone(), CollateralType::Commodity, 700).unwrap();
             assert!(ltv >= 7000 && ltv <= 8000); // Base 70%
         });
     }
@@ -3564,13 +3584,17 @@ mod test {
             .unwrap();
 
             // High credit score should get lower rate
-            let rate_high = RiskAssessment::calculate_interest_rate(env.clone(), 800, CollateralType::Invoice).unwrap();
-            
+            let rate_high =
+                RiskAssessment::calculate_interest_rate(env.clone(), 800, CollateralType::Invoice)
+                    .unwrap();
+
             // Low credit score should get higher rate
-            let rate_low = RiskAssessment::calculate_interest_rate(env.clone(), 400, CollateralType::Invoice).unwrap();
-            
+            let rate_low =
+                RiskAssessment::calculate_interest_rate(env.clone(), 400, CollateralType::Invoice)
+                    .unwrap();
+
             assert!(rate_low > rate_high);
-            
+
             // Rates should be within bounds (1% - 15%)
             assert!(rate_high >= 100 && rate_high <= 1500);
             assert!(rate_low >= 100 && rate_low <= 1500);
@@ -3597,9 +3621,24 @@ mod test {
 
             let credit_score = 600;
 
-            let rate_invoice = RiskAssessment::calculate_interest_rate(env.clone(), credit_score, CollateralType::Invoice).unwrap();
-            let rate_realestate = RiskAssessment::calculate_interest_rate(env.clone(), credit_score, CollateralType::RealEstate).unwrap();
-            let rate_other = RiskAssessment::calculate_interest_rate(env.clone(), credit_score, CollateralType::Other).unwrap();
+            let rate_invoice = RiskAssessment::calculate_interest_rate(
+                env.clone(),
+                credit_score,
+                CollateralType::Invoice,
+            )
+            .unwrap();
+            let rate_realestate = RiskAssessment::calculate_interest_rate(
+                env.clone(),
+                credit_score,
+                CollateralType::RealEstate,
+            )
+            .unwrap();
+            let rate_other = RiskAssessment::calculate_interest_rate(
+                env.clone(),
+                credit_score,
+                CollateralType::Other,
+            )
+            .unwrap();
 
             // Real estate should have lowest rate, Other highest
             assert!(rate_realestate < rate_invoice);
@@ -3626,11 +3665,14 @@ mod test {
             .unwrap();
 
             let lender = Address::generate(&env);
-            let portfolio = RiskAssessment::assess_portfolio_risk(env.clone(), lender.clone()).unwrap();
+            let portfolio =
+                RiskAssessment::assess_portfolio_risk(env.clone(), lender.clone()).unwrap();
 
             assert_eq!(portfolio.lender_address, lender);
             assert!(portfolio.weighted_risk_score >= 300 && portfolio.weighted_risk_score <= 850);
-            assert!(portfolio.diversification_score >= 300 && portfolio.diversification_score <= 850);
+            assert!(
+                portfolio.diversification_score >= 300 && portfolio.diversification_score <= 850
+            );
         });
     }
 
@@ -3653,9 +3695,10 @@ mod test {
             .unwrap();
 
             let wallet = Address::generate(&env);
-            
-            RiskAssessment::set_privacy_level(env.clone(), wallet.clone(), PrivacyLevel::Private).unwrap();
-            
+
+            RiskAssessment::set_privacy_level(env.clone(), wallet.clone(), PrivacyLevel::Private)
+                .unwrap();
+
             let privacy = RiskAssessment::get_privacy_level(env.clone(), wallet);
             assert_eq!(privacy, PrivacyLevel::Private);
         });
@@ -3683,11 +3726,15 @@ mod test {
             let base_fee_bps = 100; // 1%
 
             // High credit score should pay lower fee
-            let fee_high = RiskAssessment::calculate_risk_fee(env.clone(), 800, loan_amount, base_fee_bps).unwrap();
-            
+            let fee_high =
+                RiskAssessment::calculate_risk_fee(env.clone(), 800, loan_amount, base_fee_bps)
+                    .unwrap();
+
             // Low credit score should pay higher fee
-            let fee_low = RiskAssessment::calculate_risk_fee(env.clone(), 400, loan_amount, base_fee_bps).unwrap();
-            
+            let fee_low =
+                RiskAssessment::calculate_risk_fee(env.clone(), 400, loan_amount, base_fee_bps)
+                    .unwrap();
+
             assert!(fee_low > fee_high);
         });
     }
@@ -3787,7 +3834,8 @@ mod test {
             env.mock_all_auths();
             RiskAssessment::update_ltv_config(env.clone(), new_config.clone()).unwrap();
 
-            let stored_config = RiskAssessment::get_ltv_config(env.clone(), CollateralType::Invoice).unwrap();
+            let stored_config =
+                RiskAssessment::get_ltv_config(env.clone(), CollateralType::Invoice).unwrap();
             assert_eq!(stored_config.base_ltv_bps, 8000);
         });
     }
@@ -3825,7 +3873,8 @@ mod test {
 
             // Admin can update
             env.mock_all_auths();
-            RiskAssessment::update_risk_metrics(env.clone(), wallet.clone(), new_data.clone()).unwrap();
+            RiskAssessment::update_risk_metrics(env.clone(), wallet.clone(), new_data.clone())
+                .unwrap();
 
             let stored = RiskAssessment::get_credit_score(env.clone(), wallet).unwrap();
             assert_eq!(stored.score, 750);
