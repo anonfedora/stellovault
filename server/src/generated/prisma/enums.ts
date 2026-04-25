@@ -9,9 +9,21 @@
 * 🟢 You can import this file directly.
 */
 
+export const PaymentStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
+} as const
+
+export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
+
 export const Role = {
-  USER: 'USER',
-  MERCHANT: 'MERCHANT',
+  BUYER: 'BUYER',
+  SELLER: 'SELLER',
+  LENDER: 'LENDER',
+  AUDITOR: 'AUDITOR',
   ADMIN: 'ADMIN'
 } as const
 

@@ -28,6 +28,26 @@ export type User = Prisma.UserModel
  */
 export type Wallet = Prisma.WalletModel
 /**
+ * Model Permission
+ * 
+ */
+export type Permission = Prisma.PermissionModel
+/**
+ * Model UserRoleModel
+ * 
+ */
+export type UserRoleModel = Prisma.UserRoleModelModel
+/**
+ * Model RolePermission
+ * 
+ */
+export type RolePermission = Prisma.RolePermissionModel
+/**
+ * Model UserPermission
+ * 
+ */
+export type UserPermission = Prisma.UserPermissionModel
+/**
  * Model Session
  * 
  */
@@ -62,6 +82,11 @@ export type Repayment = Prisma.RepaymentModel
  * 
  */
 export type PaymentSession = Prisma.PaymentSessionModel
+/**
+ * Model Payment
+ * 
+ */
+export type Payment = Prisma.PaymentModel
 /**
  * Model Investment
  * 

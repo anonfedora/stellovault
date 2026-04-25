@@ -53,6 +53,10 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   User: 'User',
   Wallet: 'Wallet',
+  Permission: 'Permission',
+  UserRoleModel: 'UserRoleModel',
+  RolePermission: 'RolePermission',
+  UserPermission: 'UserPermission',
   Session: 'Session',
   WalletChallenge: 'WalletChallenge',
   Escrow: 'Escrow',
@@ -60,6 +64,7 @@ export const ModelName = {
   Loan: 'Loan',
   Repayment: 'Repayment',
   PaymentSession: 'PaymentSession',
+  Payment: 'Payment',
   Investment: 'Investment',
   OracleEvent: 'OracleEvent',
   Oracle: 'Oracle',
@@ -95,7 +100,8 @@ export const UserScalarFieldEnum = {
   name: 'name',
   role: 'role',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  roleId: 'roleId'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -113,6 +119,48 @@ export const WalletScalarFieldEnum = {
 } as const
 
 export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof WalletScalarFieldEnum]
+
+
+export const PermissionScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  scope: 'scope',
+  description: 'description',
+  createdAt: 'createdAt'
+} as const
+
+export type PermissionScalarFieldEnum = (typeof PermissionScalarFieldEnum)[keyof typeof PermissionScalarFieldEnum]
+
+
+export const UserRoleModelScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  createdAt: 'createdAt'
+} as const
+
+export type UserRoleModelScalarFieldEnum = (typeof UserRoleModelScalarFieldEnum)[keyof typeof UserRoleModelScalarFieldEnum]
+
+
+export const RolePermissionScalarFieldEnum = {
+  id: 'id',
+  roleId: 'roleId',
+  permissionId: 'permissionId',
+  createdAt: 'createdAt'
+} as const
+
+export type RolePermissionScalarFieldEnum = (typeof RolePermissionScalarFieldEnum)[keyof typeof RolePermissionScalarFieldEnum]
+
+
+export const UserPermissionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  permissionId: 'permissionId',
+  grantedBy: 'grantedBy',
+  createdAt: 'createdAt'
+} as const
+
+export type UserPermissionScalarFieldEnum = (typeof UserPermissionScalarFieldEnum)[keyof typeof UserPermissionScalarFieldEnum]
 
 
 export const SessionScalarFieldEnum = {
@@ -217,6 +265,20 @@ export const PaymentSessionScalarFieldEnum = {
 } as const
 
 export type PaymentSessionScalarFieldEnum = (typeof PaymentSessionScalarFieldEnum)[keyof typeof PaymentSessionScalarFieldEnum]
+
+
+export const PaymentScalarFieldEnum = {
+  id: 'id',
+  loanId: 'loanId',
+  amount: 'amount',
+  status: 'status',
+  txHash: 'txHash',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  completedAt: 'completedAt'
+} as const
+
+export type PaymentScalarFieldEnum = (typeof PaymentScalarFieldEnum)[keyof typeof PaymentScalarFieldEnum]
 
 
 export const InvestmentScalarFieldEnum = {
