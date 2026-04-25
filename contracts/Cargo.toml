@@ -10,6 +10,7 @@ members = [
     "protocol-treasury",
     "reputation-registry",
     "risk-assessment",
+    "upgrade-system",
 ]
 resolver = "2"
 exclude = ["fuzz"]
