@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -44,6 +44,7 @@ function validate(data: FormData): Record<string, string> {
 export function ProposalForm() {
   const router = useRouter();
   const { createProposal } = useGovernance();
+  const [createdAt] = useState(() => Date.now());
   const [step, setStep] = useState<0 | 1>(0);
   const [formData, setFormData] = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,12 +78,7 @@ export function ProposalForm() {
     }
   };
 
-  const [currentTime, setCurrentTime] = useState(Date.now());
-  const expiresAt = new Date(currentTime + 86400000 * formData.duration);
-
-  useEffect(() => {
-    setCurrentTime(Date.now());
-  }, [formData.duration]);
+  const expiresAt = new Date(createdAt + 86400000 * formData.duration);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">

@@ -213,7 +213,7 @@ export type OracleRewardGroupByOutputType = {
   _max: OracleRewardMaxAggregateOutputType | null
 }
 
-export type GetOracleRewardGroupByPayload<T extends OracleRewardGroupByArgs> = Prisma.PrismaPromise<
+type GetOracleRewardGroupByPayload<T extends OracleRewardGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OracleRewardGroupByOutputType, T['by']> &
       {
@@ -1275,11 +1275,6 @@ export type OracleRewardFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` OracleRewards.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OracleRewards.
-   */
   distinct?: Prisma.OracleRewardScalarFieldEnum | Prisma.OracleRewardScalarFieldEnum[]
 }
 

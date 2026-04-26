@@ -220,7 +220,7 @@ export type ThresholdSignatureGroupByOutputType = {
   _max: ThresholdSignatureMaxAggregateOutputType | null
 }
 
-export type GetThresholdSignatureGroupByPayload<T extends ThresholdSignatureGroupByArgs> = Prisma.PrismaPromise<
+type GetThresholdSignatureGroupByPayload<T extends ThresholdSignatureGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ThresholdSignatureGroupByOutputType, T['by']> &
       {
@@ -1114,11 +1114,6 @@ export type ThresholdSignatureFindManyArgs<ExtArgs extends runtime.Types.Extensi
    * Skip the first `n` ThresholdSignatures.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ThresholdSignatures.
-   */
   distinct?: Prisma.ThresholdSignatureScalarFieldEnum | Prisma.ThresholdSignatureScalarFieldEnum[]
 }
 

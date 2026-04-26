@@ -228,7 +228,7 @@ export type OracleStakeGroupByOutputType = {
   _max: OracleStakeMaxAggregateOutputType | null
 }
 
-export type GetOracleStakeGroupByPayload<T extends OracleStakeGroupByArgs> = Prisma.PrismaPromise<
+type GetOracleStakeGroupByPayload<T extends OracleStakeGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OracleStakeGroupByOutputType, T['by']> &
       {
@@ -1256,11 +1256,6 @@ export type OracleStakeFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` OracleStakes.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OracleStakes.
-   */
   distinct?: Prisma.OracleStakeScalarFieldEnum | Prisma.OracleStakeScalarFieldEnum[]
 }
 
