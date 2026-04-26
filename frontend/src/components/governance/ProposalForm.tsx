@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -77,12 +77,6 @@ export function ProposalForm() {
     }
   };
 
-  const [currentTime, setCurrentTime] = useState(Date.now());
-  const expiresAt = new Date(currentTime + 86400000 * formData.duration);
-
-  useEffect(() => {
-    setCurrentTime(Date.now());
-  }, [formData.duration]);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">
@@ -287,7 +281,7 @@ export function ProposalForm() {
                   <div className="px-6 py-4 flex justify-between">
                     <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Duration</span>
                     <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {formData.duration} days (expires {expiresAt.toLocaleDateString()})
+                      {formData.duration} days
                     </span>
                   </div>
                   <div className="px-6 py-4">
