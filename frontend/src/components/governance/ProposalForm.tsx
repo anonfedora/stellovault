@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGovernance } from "@/hooks/useGovernance";
@@ -77,7 +77,12 @@ export function ProposalForm() {
     }
   };
 
-  const expiresAt = new Date(Date.now() + 86400000 * formData.duration);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const expiresAt = new Date(currentTime + 86400000 * formData.duration);
+
+  useEffect(() => {
+    setCurrentTime(Date.now());
+  }, [formData.duration]);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">

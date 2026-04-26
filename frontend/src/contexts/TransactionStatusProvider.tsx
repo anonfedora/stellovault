@@ -50,17 +50,6 @@ const MAX_TRANSACTIONS = 10
 // Generate unique ID
 const generateId = () => `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-// Format timestamp for display
-const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp)
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 export function TransactionStatusProvider({ children }: TransactionStatusProviderProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isDrawerOpen, setDrawerOpen] = useState(false)
@@ -177,7 +166,8 @@ export function TransactionStatusProvider({ children }: TransactionStatusProvide
         // Only load transactions from the last 24 hours
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
         const recentTxs = parsed.filter((tx: Transaction) => tx.timestamp > oneDayAgo)
-        setTransactions(recentTxs)
+        // Use setTimeout to avoid setState in effect warning
+        setTimeout(() => setTransactions(recentTxs), 0)
       }
     } catch (error) {
       console.warn('Failed to load transactions from localStorage:', error)

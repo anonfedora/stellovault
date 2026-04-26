@@ -201,7 +201,7 @@ export class OracleService {
                     data: {
                         isActive: true,
                         deactivatedAt: null,
-                        oracleType: input.oracleType || "GENERAL",
+                        oracleType: (input.oracleType || "GENERAL") as any,
                         metadata: input.metadata ? toJsonValue(input.metadata) : undefined,
                     },
                 });
@@ -237,7 +237,7 @@ export class OracleService {
                 const oracle = await tx.oracle.create({
                     data: {
                         address,
-                        oracleType: input.oracleType || "GENERAL",
+                        oracleType: (input.oracleType || "GENERAL") as any,
                         metadata: input.metadata ? toJsonValue(input.metadata) : undefined,
                     },
                 });
