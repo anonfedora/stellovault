@@ -138,6 +138,26 @@ export type OracleConfirmation = Prisma.OracleConfirmationModel
  */
 export type Dispute = Prisma.DisputeModel
 /**
+ * Model OracleReputation
+ * 
+ */
+export type OracleReputation = Prisma.OracleReputationModel
+/**
+ * Model OracleStake
+ * 
+ */
+export type OracleStake = Prisma.OracleStakeModel
+/**
+ * Model OracleReward
+ * 
+ */
+export type OracleReward = Prisma.OracleRewardModel
+/**
+ * Model ThresholdSignature
+ * 
+ */
+export type ThresholdSignature = Prisma.ThresholdSignatureModel
+/**
  * Model GovernanceProposal
  * 
  */

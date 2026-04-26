@@ -71,6 +71,10 @@ export const ModelName = {
   OracleRateLimit: 'OracleRateLimit',
   OracleConfirmation: 'OracleConfirmation',
   Dispute: 'Dispute',
+  OracleReputation: 'OracleReputation',
+  OracleStake: 'OracleStake',
+  OracleReward: 'OracleReward',
+  ThresholdSignature: 'ThresholdSignature',
   GovernanceProposal: 'GovernanceProposal',
   GovernanceVote: 'GovernanceVote',
   GovernanceAuditLog: 'GovernanceAuditLog',
@@ -311,7 +315,13 @@ export const OracleScalarFieldEnum = {
   isActive: 'isActive',
   registeredAt: 'registeredAt',
   deactivatedAt: 'deactivatedAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  oracleType: 'oracleType',
+  metadata: 'metadata',
+  totalConfirmations: 'totalConfirmations',
+  successfulConfirmations: 'successfulConfirmations',
+  failedConfirmations: 'failedConfirmations',
+  lastActiveAt: 'lastActiveAt'
 } as const
 
 export type OracleScalarFieldEnum = (typeof OracleScalarFieldEnum)[keyof typeof OracleScalarFieldEnum]
@@ -335,7 +345,9 @@ export const OracleConfirmationScalarFieldEnum = {
   eventType: 'eventType',
   signature: 'signature',
   payload: 'payload',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  status: 'status',
+  validated: 'validated'
 } as const
 
 export type OracleConfirmationScalarFieldEnum = (typeof OracleConfirmationScalarFieldEnum)[keyof typeof OracleConfirmationScalarFieldEnum]
@@ -348,10 +360,72 @@ export const DisputeScalarFieldEnum = {
   reason: 'reason',
   status: 'status',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  resolution: 'resolution',
+  resolvedAt: 'resolvedAt'
 } as const
 
 export type DisputeScalarFieldEnum = (typeof DisputeScalarFieldEnum)[keyof typeof DisputeScalarFieldEnum]
+
+
+export const OracleReputationScalarFieldEnum = {
+  id: 'id',
+  oracleId: 'oracleId',
+  score: 'score',
+  accuracy: 'accuracy',
+  reliability: 'reliability',
+  responsiveness: 'responsiveness',
+  totalVotes: 'totalVotes',
+  positiveVotes: 'positiveVotes',
+  negativeVotes: 'negativeVotes',
+  lastUpdated: 'lastUpdated'
+} as const
+
+export type OracleReputationScalarFieldEnum = (typeof OracleReputationScalarFieldEnum)[keyof typeof OracleReputationScalarFieldEnum]
+
+
+export const OracleStakeScalarFieldEnum = {
+  id: 'id',
+  oracleId: 'oracleId',
+  amount: 'amount',
+  assetCode: 'assetCode',
+  stakedAt: 'stakedAt',
+  lockedUntil: 'lockedUntil',
+  slashedAmount: 'slashedAmount',
+  rewardAmount: 'rewardAmount',
+  lastRewardAt: 'lastRewardAt'
+} as const
+
+export type OracleStakeScalarFieldEnum = (typeof OracleStakeScalarFieldEnum)[keyof typeof OracleStakeScalarFieldEnum]
+
+
+export const OracleRewardScalarFieldEnum = {
+  id: 'id',
+  oracleId: 'oracleId',
+  amount: 'amount',
+  assetCode: 'assetCode',
+  reason: 'reason',
+  confirmationId: 'confirmationId',
+  createdAt: 'createdAt',
+  distributedAt: 'distributedAt'
+} as const
+
+export type OracleRewardScalarFieldEnum = (typeof OracleRewardScalarFieldEnum)[keyof typeof OracleRewardScalarFieldEnum]
+
+
+export const ThresholdSignatureScalarFieldEnum = {
+  id: 'id',
+  escrowId: 'escrowId',
+  eventType: 'eventType',
+  requiredSigs: 'requiredSigs',
+  collectedSigs: 'collectedSigs',
+  signatures: 'signatures',
+  status: 'status',
+  createdAt: 'createdAt',
+  completedAt: 'completedAt'
+} as const
+
+export type ThresholdSignatureScalarFieldEnum = (typeof ThresholdSignatureScalarFieldEnum)[keyof typeof ThresholdSignatureScalarFieldEnum]
 
 
 export const GovernanceProposalScalarFieldEnum = {
@@ -426,19 +500,19 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
-
-
 export const NullableJsonNullValueInput = {
   DbNull: DbNull,
   JsonNull: JsonNull
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

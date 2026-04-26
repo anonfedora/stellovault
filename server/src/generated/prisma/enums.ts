@@ -96,3 +96,43 @@ export const DisputeStatus = {
 } as const
 
 export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
+
+
+export const OracleType = {
+  GENERAL: 'GENERAL',
+  PRICE: 'PRICE',
+  WEATHER: 'WEATHER',
+  SHIPPING: 'SHIPPING',
+  QUALITY: 'QUALITY'
+} as const
+
+export type OracleType = (typeof OracleType)[keyof typeof OracleType]
+
+
+export const ConfirmationStatus = {
+  PENDING: 'PENDING',
+  VALIDATED: 'VALIDATED',
+  REJECTED: 'REJECTED',
+  DISPUTED: 'DISPUTED'
+} as const
+
+export type ConfirmationStatus = (typeof ConfirmationStatus)[keyof typeof ConfirmationStatus]
+
+
+export const RewardReason = {
+  CONFIRMATION: 'CONFIRMATION',
+  ACCURACY_BONUS: 'ACCURACY_BONUS',
+  RELIABILITY_BONUS: 'RELIABILITY_BONUS',
+  PARTICIPATION: 'PARTICIPATION'
+} as const
+
+export type RewardReason = (typeof RewardReason)[keyof typeof RewardReason]
+
+
+export const SignatureStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
+} as const
+
+export type SignatureStatus = (typeof SignatureStatus)[keyof typeof SignatureStatus]
