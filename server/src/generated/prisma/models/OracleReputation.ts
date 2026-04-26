@@ -251,7 +251,7 @@ export type OracleReputationGroupByOutputType = {
   _max: OracleReputationMaxAggregateOutputType | null
 }
 
-export type GetOracleReputationGroupByPayload<T extends OracleReputationGroupByArgs> = Prisma.PrismaPromise<
+type GetOracleReputationGroupByPayload<T extends OracleReputationGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OracleReputationGroupByOutputType, T['by']> &
       {
@@ -1312,11 +1312,6 @@ export type OracleReputationFindManyArgs<ExtArgs extends runtime.Types.Extension
    * Skip the first `n` OracleReputations.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OracleReputations.
-   */
   distinct?: Prisma.OracleReputationScalarFieldEnum | Prisma.OracleReputationScalarFieldEnum[]
 }
 
