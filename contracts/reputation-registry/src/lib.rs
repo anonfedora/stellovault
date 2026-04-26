@@ -95,15 +95,25 @@ impl ReputationRegistry {
             return Err(ContractError::AlreadyInitialized);
         }
 
-        env.storage().instance().set(&symbol_short!("admin"), &admin);
-        env.storage().instance().set(&symbol_short!("esc_mgr"), &escrow_manager);
-        env.storage().instance().set(&symbol_short!("loan_mgr"), &loan_management);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("admin"), &admin);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("esc_mgr"), &escrow_manager);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("loan_mgr"), &loan_management);
 
         Ok(())
     }
 
     fn get_or_create_profile(env: &Env, user: &Address) -> ReputationProfile {
-        if let Some(profile) = env.storage().persistent().get::<Address, ReputationProfile>(user) {
+        if let Some(profile) = env
+            .storage()
+            .persistent()
+            .get::<Address, ReputationProfile>(user)
+        {
             profile
         } else {
             let profile = ReputationProfile {
@@ -130,45 +140,51 @@ impl ReputationRegistry {
         behavior_data: BehaviorData,
     ) -> Result<(), ContractError> {
         Self::require_authorized_caller(&env, &caller)?;
-        
+
         let mut profile = Self::get_or_create_profile(&env, &user_address);
-        
+
         match behavior_data.action_type {
             ActionType::Trade => {
                 if behavior_data.outcome == Outcome::Success {
                     profile.successful_trades += 1;
-                    profile.total_volume = profile.total_volume.saturating_add(behavior_data.volume);
+                    profile.total_volume =
+                        profile.total_volume.saturating_add(behavior_data.volume);
                 }
             }
-            ActionType::Repayment => {
-                match behavior_data.outcome {
-                    Outcome::Early => {
-                        profile.early_repayments += 1;
-                        profile.on_time_repayments += 1;
-                    }
-                    Outcome::OnTime => profile.on_time_repayments += 1,
-                    Outcome::Late => profile.late_repayments += 1,
-                    Outcome::Default => profile.defaults += 1,
-                    _ => {}
+            ActionType::Repayment => match behavior_data.outcome {
+                Outcome::Early => {
+                    profile.early_repayments += 1;
+                    profile.on_time_repayments += 1;
                 }
-            }
+                Outcome::OnTime => profile.on_time_repayments += 1,
+                Outcome::Late => profile.late_repayments += 1,
+                Outcome::Default => profile.defaults += 1,
+                _ => {}
+            },
             ActionType::Dispute => {
                 if behavior_data.outcome == Outcome::Lost {
                     profile.disputes_lost += 1;
                 }
             }
         }
-        
+
         profile.last_updated = env.ledger().timestamp();
         env.storage().persistent().set(&user_address, &profile);
-        
+
         // Use a composite key or a specialized history symbol for the user history.
-        let mut user_history: Vec<BehaviorData> = env.storage().persistent().get(&(symbol_short!("hist"), user_address.clone())).unwrap_or_else(|| Vec::new(&env));
+        let mut user_history: Vec<BehaviorData> = env
+            .storage()
+            .persistent()
+            .get(&(symbol_short!("hist"), user_address.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
         user_history.push_back(behavior_data.clone());
         if user_history.len() > 100 {
             user_history.pop_front();
         }
-        env.storage().persistent().set(&(symbol_short!("hist"), user_address.clone()), &user_history);
+        env.storage().persistent().set(
+            &(symbol_short!("hist"), user_address.clone()),
+            &user_history,
+        );
 
         Ok(())
     }
@@ -180,12 +196,17 @@ impl ReputationRegistry {
         action_type: ActionType,
         outcome: Outcome,
     ) -> Result<(), ContractError> {
-        Self::record_behavior(env.clone(), caller, user_address, BehaviorData {
-            action_type,
-            outcome,
-            volume: 0,
-            timestamp: env.ledger().timestamp()
-        })
+        Self::record_behavior(
+            env.clone(),
+            caller,
+            user_address,
+            BehaviorData {
+                action_type,
+                outcome,
+                volume: 0,
+                timestamp: env.ledger().timestamp(),
+            },
+        )
     }
 
     pub fn calculate_reputation_score(env: Env, user_address: Address) -> u32 {
@@ -210,8 +231,11 @@ impl ReputationRegistry {
 
     pub fn get_trust_metrics(env: Env, user_address: Address) -> TrustMetrics {
         let profile = Self::get_or_create_profile(&env, &user_address);
-        let total_repayments = profile.early_repayments + profile.on_time_repayments + profile.late_repayments + profile.defaults;
-        
+        let total_repayments = profile.early_repayments
+            + profile.on_time_repayments
+            + profile.late_repayments
+            + profile.defaults;
+
         let repayment_score = if total_repayments > 0 {
             let good_repayments = profile.early_repayments + profile.on_time_repayments;
             (good_repayments * 1000 / total_repayments)
@@ -229,7 +253,11 @@ impl ReputationRegistry {
         TrustMetrics {
             successful_trades: profile.successful_trades,
             total_volume: profile.total_volume,
-            default_rate: if total_repayments > 0 { (profile.defaults * 10000 / total_repayments) } else { 0 },
+            default_rate: if total_repayments > 0 {
+                (profile.defaults * 10000 / total_repayments)
+            } else {
+                0
+            },
             dispute_rate,
             repayment_score,
             behavior_score: Self::calculate_reputation_score(env, user_address),
@@ -237,10 +265,18 @@ impl ReputationRegistry {
     }
 
     pub fn reputation_history(env: Env, user_address: Address, period: u64) -> Vec<BehaviorData> {
-        let user_history: Vec<BehaviorData> = env.storage().persistent().get(&(symbol_short!("hist"), user_address.clone())).unwrap_or_else(|| Vec::new(&env));
+        let user_history: Vec<BehaviorData> = env
+            .storage()
+            .persistent()
+            .get(&(symbol_short!("hist"), user_address.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
         let current_time = env.ledger().timestamp();
-        let cutoff_time = if current_time > period { current_time - period } else { 0 };
-        
+        let cutoff_time = if current_time > period {
+            current_time - period
+        } else {
+            0
+        };
+
         let mut filtered_history = Vec::new(&env);
         for item in user_history.iter() {
             if item.timestamp >= cutoff_time {
@@ -251,9 +287,17 @@ impl ReputationRegistry {
     }
 
     fn require_authorized_caller(env: &Env, caller: &Address) -> Result<(), ContractError> {
-        let escrow_mgr: Address = env.storage().instance().get(&symbol_short!("esc_mgr")).ok_or(ContractError::Unauthorized)?;
-        let loan_mgr: Address = env.storage().instance().get(&symbol_short!("loan_mgr")).ok_or(ContractError::Unauthorized)?;
-        
+        let escrow_mgr: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("esc_mgr"))
+            .ok_or(ContractError::Unauthorized)?;
+        let loan_mgr: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("loan_mgr"))
+            .ok_or(ContractError::Unauthorized)?;
+
         if caller == &escrow_mgr || caller == &loan_mgr {
             caller.require_auth();
             Ok(())
@@ -411,7 +455,7 @@ mod test {
 
         let history = t.client.reputation_history(&t.user, &1000);
         assert_eq!(history.len(), 1);
-        
+
         let metrics = t.client.get_trust_metrics(&t.user);
         assert_eq!(metrics.successful_trades, 1);
         assert_eq!(metrics.total_volume, 1000);
@@ -421,8 +465,18 @@ mod test {
     fn test_update_reputation_and_score() {
         let t = setup();
 
-        t.client.update_reputation(&t.escrow_mgr, &t.user, &ActionType::Trade, &Outcome::Success);
-        t.client.update_reputation(&t.escrow_mgr, &t.user, &ActionType::Repayment, &Outcome::Early);
+        t.client.update_reputation(
+            &t.escrow_mgr,
+            &t.user,
+            &ActionType::Trade,
+            &Outcome::Success,
+        );
+        t.client.update_reputation(
+            &t.escrow_mgr,
+            &t.user,
+            &ActionType::Repayment,
+            &Outcome::Early,
+        );
 
         let score = t.client.calculate_reputation_score(&t.user);
         assert!(score > 500);
