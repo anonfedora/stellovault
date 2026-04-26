@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:dashboard": "node scripts/run-dashboard-tests.mjs"
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
