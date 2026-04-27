@@ -18,10 +18,12 @@ import governanceRoutes from "./routes/governance.routes";
 import riskRoutes from "./routes/risk.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import paymentRoutes from "./routes/payment.routes";
+import monitoringRoutes from "./routes/monitoring.routes";
 
 import collateralService from "./services/collateral.service";
 import metricsService from "./services/metrics.service";
 import { prisma } from "./services/database.service";
+import eventMonitoringService from "./services/event-monitoring.service";
 
 // Middleware
 import {
@@ -92,6 +94,7 @@ app.use(`${api}/governance`, governanceRoutes);
 app.use(`${api}/risk`, riskRoutes);
 app.use(`${api}/analytics`, analyticsRoutes);
 app.use(`${api}/v1/analytics`, analyticsRoutes);
+app.use(`${api}/monitoring`, monitoringRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
@@ -99,10 +102,12 @@ app.use(errorMiddleware);
 export function startBackgroundJobs() {
   collateralService.startIndexer();
   metricsService.startBackgroundMonitoring();
+  eventMonitoringService.start();
 }
 
 export function stopBackgroundJobs() {
   collateralService.stopIndexer();
+  eventMonitoringService.stop();
 }
 
 export default app;

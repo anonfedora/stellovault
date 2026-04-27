@@ -587,3 +587,119 @@ enum SignatureStatus {
   COMPLETED
   FAILED
 }
+
+// ─────────────────────────────────────────────
+// Event Monitoring & Health Metrics
+// ─────────────────────────────────────────────
+
+model EventLog {
+  id        String   @id @default(uuid())
+  type      String
+  payload   Json
+  timestamp DateTime @default(now())
+  severity  String   @default("info") // info, warning, error, critical
+
+  @@index([type])
+  @@index([timestamp])
+  @@index([severity])
+}
+
+model HealthMetric {
+  id        String   @id @default(uuid())
+  name      String
+  value     Float
+  unit      String
+  timestamp DateTime @default(now())
+
+  @@index([name])
+  @@index([timestamp])
+}
+
+model ContractEvent {
+  id            String   @id @default(uuid())
+  contractId    String
+  eventType     String
+  topics        String[]
+  data          Json
+  transactionId String
+  ledger        Int
+  timestamp     DateTime @default(now())
+
+  @@index([contractId])
+  @@index([eventType])
+  @@index([transactionId])
+  @@index([timestamp])
+}
+
+model StellarTransaction {
+  id            String   @id
+  ledger        Int
+  timestamp     DateTime
+  sourceAccount String
+  operations    Json
+  memo          String?
+  fee           Int
+  successful    Boolean
+
+  @@index([ledger])
+  @@index([sourceAccount])
+  @@index([timestamp])
+  @@index([successful])
+}
+
+model Alert {
+  id          String   @id @default(uuid())
+  ruleId      String
+  ruleName    String
+  eventType   String
+  severity    String   // info, warning, error, critical
+  payload     Json
+  triggeredAt DateTime @default(now())
+  resolvedAt  DateTime?
+  status      AlertStatus @default(ACTIVE)
+
+  @@index([ruleId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([triggeredAt])
+  @@index([status])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  alertId     String
+  channel     NotificationChannel
+  status      NotificationStatus @default(PENDING)
+  recipient   String
+  payload     Json
+  sentAt      DateTime?
+  failedAt    DateTime?
+  errorMessage String?
+  retryCount  Int              @default(0)
+  createdAt   DateTime         @default(now())
+
+  @@index([alertId])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum AlertStatus {
+  ACTIVE
+  RESOLVED
+  ACKNOWLEDGED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SLACK
+  SMS
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+}
