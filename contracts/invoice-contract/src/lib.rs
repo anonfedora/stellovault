@@ -15,21 +15,21 @@ extern crate alloc;
 
 use alloc::format;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
-    Vec, Map,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
+    Vec,
 };
 
+mod cross_border;
+mod fraud_detection;
 mod invoice;
 mod payment;
 mod verification;
-mod fraud_detection;
-mod cross_border;
 
+pub use cross_border::*;
+pub use fraud_detection::*;
 pub use invoice::*;
 pub use payment::*;
 pub use verification::*;
-pub use fraud_detection::*;
-pub use cross_border::*;
 
 /// Contract errors
 #[contracttype]
@@ -104,10 +104,8 @@ impl InvoiceContract {
             .instance()
             .set(&symbol_short!("fraud_thr"), &800u32); // 80% risk threshold
 
-        env.events().publish(
-            (symbol_short!("inv_init"),),
-            (admin.clone(), treasury),
-        );
+        env.events()
+            .publish((symbol_short!("inv_init"),), (admin.clone(), treasury));
 
         Ok(())
     }
@@ -180,9 +178,7 @@ impl InvoiceContract {
         env.storage().persistent().set(&storage_key, &invoice);
 
         // Store invoice number mapping
-        env.storage()
-            .persistent()
-            .set(&invoice_key, &invoice_id);
+        env.storage().persistent().set(&invoice_key, &invoice_id);
 
         // Update next ID
         env.storage()
@@ -262,10 +258,8 @@ impl InvoiceContract {
         env.storage().persistent().set(&storage_key, &invoice);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("inv_verif"),),
-            (invoice_id, fraud_score),
-        );
+        env.events()
+            .publish((symbol_short!("inv_verif"),), (invoice_id, fraud_score));
 
         Ok(true)
     }
@@ -409,13 +403,13 @@ impl InvoiceContract {
         };
 
         let payment_key = format_payment_record_key(invoice_id, env.ledger().timestamp());
-        env.storage().persistent().set(&payment_key, &payment_record);
+        env.storage()
+            .persistent()
+            .set(&payment_key, &payment_record);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("pay_proc"),),
-            (invoice_id, effective_amount),
-        );
+        env.events()
+            .publish((symbol_short!("pay_proc"),), (invoice_id, effective_amount));
 
         Ok(())
     }
@@ -553,10 +547,7 @@ impl InvoiceContract {
     ///
     /// # Arguments
     /// * `new_threshold` - New fraud threshold (basis points)
-    pub fn update_fraud_threshold(
-        env: Env,
-        new_threshold: u32,
-    ) -> Result<(), ContractError> {
+    pub fn update_fraud_threshold(env: Env, new_threshold: u32) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
             .instance()

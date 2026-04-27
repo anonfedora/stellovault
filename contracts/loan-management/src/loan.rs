@@ -31,12 +31,12 @@ pub struct Loan {
     pub borrower: Address,
     pub principal: i128,
     pub outstanding_balance: i128,
-    pub interest_rate: u32,           // basis points
+    pub interest_rate: u32, // basis points
     pub interest_type: InterestType,
     pub collateral_id: u64,
     pub collateral_value: i128,
-    pub ltv: u32,                     // Loan-to-Value ratio (basis points)
-    pub term: u64,                    // in seconds
+    pub ltv: u32,  // Loan-to-Value ratio (basis points)
+    pub term: u64, // in seconds
     pub start_date: u64,
     pub maturity_date: u64,
     pub status: LoanStatus,
@@ -44,7 +44,7 @@ pub struct Loan {
     pub total_repaid: i128,
     pub last_payment_date: u64,
     pub next_payment_date: u64,
-    pub grace_period: u64,            // in seconds
+    pub grace_period: u64, // in seconds
     pub default_date: u64,
     pub created_at: u64,
     pub updated_at: u64,
@@ -80,7 +80,7 @@ pub struct LoanPerformance {
     pub on_time_payments: u32,
     pub late_payments: u32,
     pub missed_payments: u32,
-    pub payment_history_score: u32,  // 0-10000
+    pub payment_history_score: u32, // 0-10000
     pub days_past_due: u64,
     pub last_updated: u64,
 }
@@ -202,11 +202,11 @@ pub enum CovenantStatus {
 #[contracttype]
 #[derive(Clone)]
 pub struct LoanFees {
-    pub origination_fee: u32,         // basis points
-    pub servicing_fee: u32,           // basis points
-    pub prepayment_penalty: u32,      // basis points
-    pub late_payment_fee: u32,        // basis points
-    pub default_fee: u32,             // basis points
+    pub origination_fee: u32,    // basis points
+    pub servicing_fee: u32,      // basis points
+    pub prepayment_penalty: u32, // basis points
+    pub late_payment_fee: u32,   // basis points
+    pub default_fee: u32,        // basis points
 }
 
 /// Loan pricing

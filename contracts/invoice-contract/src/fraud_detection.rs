@@ -1,7 +1,7 @@
 //! Fraud detection and prevention
 
+use crate::{ContractError, Invoice, VerificationData};
 use soroban_sdk::{contracttype, Address, Env, String};
-use crate::{Invoice, VerificationData, ContractError};
 
 /// Fraud detection result
 #[contracttype]

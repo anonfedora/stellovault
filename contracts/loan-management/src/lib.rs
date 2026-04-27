@@ -16,23 +16,23 @@ extern crate alloc;
 use alloc::format;
 use core::cmp;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
-    Vec, Map,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
+    Vec,
 };
 
-mod loan;
-mod interest;
-mod repayment;
-mod default_handling;
-mod restructuring;
 mod analytics;
+mod default_handling;
+mod interest;
+mod loan;
+mod repayment;
+mod restructuring;
 
-pub use loan::*;
-pub use interest::*;
-pub use repayment::*;
-pub use default_handling::*;
-pub use restructuring::*;
 pub use analytics::*;
+pub use default_handling::*;
+pub use interest::*;
+pub use loan::*;
+pub use repayment::*;
+pub use restructuring::*;
 
 /// Contract errors
 #[contracttype]
@@ -130,10 +130,8 @@ impl LoanContract {
             .instance()
             .set(&symbol_short!("max_term"), &31536000u64); // 1 year maximum
 
-        env.events().publish(
-            (symbol_short!("loan_init"),),
-            (admin.clone(), treasury),
-        );
+        env.events()
+            .publish((symbol_short!("loan_init"),), (admin.clone(), treasury));
 
         Ok(())
     }
@@ -235,7 +233,7 @@ impl LoanContract {
             total_repaid: 0,
             last_payment_date: env.ledger().timestamp(),
             next_payment_date: env.ledger().timestamp() + 86400 * 30, // 30 days
-            grace_period: 86400 * 5, // 5 days grace period
+            grace_period: 86400 * 5,                                  // 5 days grace period
             default_date: 0,
             created_at: env.ledger().timestamp(),
             updated_at: env.ledger().timestamp(),
@@ -267,11 +265,7 @@ impl LoanContract {
     ///
     /// # Returns
     /// Accrued interest amount
-    pub fn calculate_interest(
-        env: Env,
-        loan_id: u64,
-        period: u64,
-    ) -> Result<i128, ContractError> {
+    pub fn calculate_interest(env: Env, loan_id: u64, period: u64) -> Result<i128, ContractError> {
         // Get loan
         let storage_key = format_loan_storage_key(loan_id);
         let loan: Loan = env
@@ -503,10 +497,8 @@ impl LoanContract {
         env.storage().persistent().set(&storage_key, &loan);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("loan_rest"),),
-            (loan_id, loan.interest_rate),
-        );
+        env.events()
+            .publish((symbol_short!("loan_rest"),), (loan_id, loan.interest_rate));
 
         Ok(())
     }
@@ -646,10 +638,7 @@ fn format_loan_storage_key(loan_id: u64) -> String {
 }
 
 fn format_repayment_key(loan_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("repay_{}_{}", loan_id, timestamp),
-    )
+    String::from_slice(&Env::default(), &format!("repay_{}_{}", loan_id, timestamp))
 }
 
 fn calculate_simple_interest(

@@ -1378,7 +1378,10 @@ impl RiskAssessment {
     }
 
     /// Get credit score for a wallet address
-    pub fn get_credit_score(env: Env, wallet_address: Address) -> Result<CreditScore, ContractError> {
+    pub fn get_credit_score(
+        env: Env,
+        wallet_address: Address,
+    ) -> Result<CreditScore, ContractError> {
         let credit_key = (symbol_short!("credit"), wallet_address);
         env.storage()
             .persistent()
@@ -1423,8 +1426,10 @@ impl RiskAssessment {
         env.storage().persistent().set(&credit_key, &credit_data);
 
         // Emit event
-        env.events()
-            .publish((EVT_REPAY_TRACK,), (borrower, loan_id, payment_data.on_time));
+        env.events().publish(
+            (EVT_REPAY_TRACK,),
+            (borrower, loan_id, payment_data.on_time),
+        );
 
         Ok(())
     }
