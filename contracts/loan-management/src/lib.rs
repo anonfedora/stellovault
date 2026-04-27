@@ -11,6 +11,10 @@
 
 #![no_std]
 
+extern crate alloc;
+
+use alloc::format;
+use core::cmp;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
     Vec, Map,
@@ -107,10 +111,10 @@ impl LoanContract {
             .set(&symbol_short!("treasury"), &treasury);
         env.storage()
             .instance()
-            .set(&symbol_short!("collateral_reg"), &collateral_registry);
+            .set(&symbol_short!("col_reg"), &collateral_registry);
         env.storage()
             .instance()
-            .set(&symbol_short!("next_loan_id"), &1u64);
+            .set(&symbol_short!("nextloan"), &1u64);
 
         // Initialize default parameters
         env.storage()
@@ -209,7 +213,7 @@ impl LoanContract {
         let loan_id: u64 = env
             .storage()
             .instance()
-            .get(&symbol_short!("next_loan_id"))
+            .get(&symbol_short!("nextloan"))
             .unwrap_or(1u64);
 
         // Create loan record
@@ -244,11 +248,11 @@ impl LoanContract {
         // Update next loan ID
         env.storage()
             .instance()
-            .set(&symbol_short!("next_loan_id"), &(loan_id + 1));
+            .set(&symbol_short!("nextloan"), &(loan_id + 1));
 
         // Emit event
         env.events().publish(
-            (symbol_short!("loan_created"),),
+            (symbol_short!("loan_crea"),),
             (loan_id, borrower, principal, interest_rate),
         );
 
@@ -333,7 +337,8 @@ impl LoanContract {
 
         // Calculate current interest
         let time_since_last_payment = env.ledger().timestamp() - loan.last_payment_date;
-        let accrued_interest = self.calculate_interest(env.clone(), loan_id, time_since_last_payment)?;
+        let accrued_interest =
+            Self::calculate_interest(env.clone(), loan_id, time_since_last_payment)?;
 
         // Calculate total owed
         let total_owed = loan.outstanding_balance + accrued_interest;
@@ -348,7 +353,7 @@ impl LoanContract {
         } else {
             // Allocate to interest first, then principal
             if accrued_interest > 0 {
-                let interest_payment = std::cmp::min(amount, accrued_interest);
+                let interest_payment = cmp::min(amount, accrued_interest);
                 amount - interest_payment
             } else {
                 amount
@@ -386,7 +391,7 @@ impl LoanContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("repayment_made"),),
+            (symbol_short!("repaymade"),),
             (loan_id, amount, loan.outstanding_balance),
         );
 
@@ -427,7 +432,7 @@ impl LoanContract {
 
             // Emit event
             env.events().publish(
-                (symbol_short!("loan_defaulted"),),
+                (symbol_short!("loan_def"),),
                 (loan_id, loan.outstanding_balance),
             );
 
@@ -508,7 +513,7 @@ impl LoanContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("loan_restructured"),),
+            (symbol_short!("loan_rest"),),
             (loan_id, loan.interest_rate),
         );
 
@@ -573,7 +578,7 @@ impl LoanContract {
             0
         };
 
-        let remaining_interest = self.calculate_interest(env, loan_id, time_remaining)?;
+        let remaining_interest = Self::calculate_interest(env, loan_id, time_remaining)?;
 
         // Calculate penalty
         let penalty = (loan.outstanding_balance * prepayment_penalty_rate as i128) / 10000;
@@ -612,7 +617,7 @@ impl LoanContract {
             .set(&symbol_short!("max_ltv"), &max_ltv);
 
         env.events()
-            .publish((symbol_short!("ltv_updated"),), (min_ltv, max_ltv));
+            .publish((symbol_short!("ltv_updt"),), (min_ltv, max_ltv));
 
         Ok(())
     }
@@ -664,7 +669,7 @@ fn calculate_simple_interest(
     // Simple Interest = P * r * t
     // where P = principal, r = annual rate, t = time in years
     let interest = (principal as u128 * annual_rate as u128 * period as u128)
-        / (10000 * 365 * 86400) as u128;
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }
 
@@ -675,7 +680,8 @@ fn calculate_compound_interest(
 ) -> Result<i128, ContractError> {
     // Compound Interest = P * (1 + r)^t - P
     // Simplified calculation for on-chain efficiency
-    let rate_per_second = (annual_rate as u128 * period as u128) / (10000 * 365 * 86400) as u128;
+    let rate_per_second =
+        (annual_rate as u128 * period as u128) / (10000u128 * 365u128 * 86400u128);
     let interest = (principal as u128 * rate_per_second) / 10000;
     Ok(interest as i128)
 }
@@ -687,6 +693,6 @@ fn calculate_fixed_interest(
 ) -> Result<i128, ContractError> {
     // Fixed Interest = P * r * t (same as simple, but fixed for loan term)
     let interest = (principal as u128 * annual_rate as u128 * period as u128)
-        / (10000 * 365 * 86400) as u128;
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }

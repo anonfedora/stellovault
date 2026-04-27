@@ -1,6 +1,6 @@
 //! Interest calculation module
 
-use soroban_sdk::contracttype;
+use soroban_sdk::{contracttype, String};
 
 /// Interest calculation result
 #[contracttype]

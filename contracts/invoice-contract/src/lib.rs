@@ -11,6 +11,9 @@
 
 #![no_std]
 
+extern crate alloc;
+
+use alloc::format;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
     Vec, Map,
@@ -99,7 +102,7 @@ impl InvoiceContract {
         // Initialize fraud detection system
         env.storage()
             .instance()
-            .set(&symbol_short!("fraud_threshold"), &800u32); // 80% risk threshold
+            .set(&symbol_short!("fraud_thr"), &800u32); // 80% risk threshold
 
         env.events().publish(
             (symbol_short!("inv_init"),),
@@ -188,7 +191,7 @@ impl InvoiceContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("inv_tokenized"),),
+            (symbol_short!("inv_token"),),
             (invoice_id, issuer, invoice_data.amount),
         );
 
@@ -242,7 +245,7 @@ impl InvoiceContract {
         let fraud_threshold: u32 = env
             .storage()
             .instance()
-            .get(&symbol_short!("fraud_threshold"))
+            .get(&symbol_short!("fraud_thr"))
             .unwrap_or(800);
 
         if fraud_score > fraud_threshold {
@@ -260,7 +263,7 @@ impl InvoiceContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("inv_verified"),),
+            (symbol_short!("inv_verif"),),
             (invoice_id, fraud_score),
         );
 
@@ -410,7 +413,7 @@ impl InvoiceContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("payment_processed"),),
+            (symbol_short!("pay_proc"),),
             (invoice_id, effective_amount),
         );
 
@@ -493,7 +496,7 @@ impl InvoiceContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("inv_transferred"),),
+            (symbol_short!("inv_xfer"),),
             (invoice_id, previous_owner, new_owner),
         );
 
@@ -568,10 +571,10 @@ impl InvoiceContract {
 
         env.storage()
             .instance()
-            .set(&symbol_short!("fraud_threshold"), &new_threshold);
+            .set(&symbol_short!("fraud_thr"), &new_threshold);
 
         env.events()
-            .publish((symbol_short!("fraud_threshold_updated"),), (new_threshold,));
+            .publish((symbol_short!("frthr_upd"),), (new_threshold,));
 
         Ok(())
     }
@@ -586,7 +589,7 @@ fn format_invoice_storage_key(invoice_id: u64) -> String {
 
 fn format_invoice_key(invoice_number: &String) -> String {
     // In production, use proper key formatting
-    String::from_slice(&Env::default(), &format!("inv_num_{}", invoice_number))
+    String::from_slice(&Env::default(), &format!("inv_num_{:?}", invoice_number))
 }
 
 fn format_payment_terms_key(invoice_id: u64) -> String {

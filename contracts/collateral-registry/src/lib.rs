@@ -11,6 +11,9 @@
 
 #![no_std]
 
+extern crate alloc;
+
+use alloc::format;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
     Vec, Map,
@@ -104,7 +107,7 @@ impl CollateralRegistry {
             .set(&symbol_short!("next_id"), &1u64);
 
         env.events().publish(
-            (symbol_short!("registry_init"),),
+            (symbol_short!("reg_init"),),
             (admin.clone(), oracle),
         );
 
@@ -166,7 +169,7 @@ impl CollateralRegistry {
             status: CollateralStatus::Active,
             locked: false,
             locked_by_escrow: 0,
-            verification_status: VerificationStatus::Pending,
+            verification_status: collateral::VerificationStatus::Pending,
             verified_by: None,
             verified_at: 0,
             created_at: env.ledger().timestamp(),
@@ -196,7 +199,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_registered"),),
+            (symbol_short!("col_regd"),),
             (collateral_id, owner, initial_valuation),
         );
 
@@ -272,7 +275,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("valuation_updated"),),
+            (symbol_short!("val_updt"),),
             (collateral_id, new_valuation),
         );
 
@@ -343,7 +346,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_transferred"),),
+            (symbol_short!("col_xfer"),),
             (collateral_id, previous_owner, new_owner),
         );
 
@@ -400,7 +403,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_locked"),),
+            (symbol_short!("col_lock"),),
             (collateral_id, escrow_id),
         );
 
@@ -442,7 +445,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_unlocked"),),
+            (symbol_short!("col_unlk"),),
             (collateral_id, escrow_id),
         );
 
@@ -484,7 +487,7 @@ impl CollateralRegistry {
         }
 
         // Update verification status
-        collateral.verification_status = VerificationStatus::Verified;
+        collateral.verification_status = collateral::VerificationStatus::Verified;
         collateral.verified_by = Some(admin.clone());
         collateral.verified_at = env.ledger().timestamp();
         collateral.updated_at = env.ledger().timestamp();
@@ -507,7 +510,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_verified"),),
+            (symbol_short!("col_verf"),),
             (collateral_id, admin),
         );
 
@@ -611,7 +614,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_classified"),),
+            (symbol_short!("col_class"),),
             (collateral_id, admin),
         );
 
@@ -650,7 +653,7 @@ fn format_asset_hash_key(asset_hash: &BytesN<32>) -> String {
 fn format_owner_collateral_key(owner: &Address, collateral_id: u64) -> String {
     String::from_slice(
         &Env::default(),
-        &format!("owner_{}_{}", owner, collateral_id),
+        &format!("owner_{:?}_{}", owner, collateral_id),
     )
 }
 

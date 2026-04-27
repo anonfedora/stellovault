@@ -8,7 +8,7 @@ use soroban_sdk::{contracttype, Address, String};
 pub struct AssetClassification {
     pub collateral_id: u64,
     pub primary_class: AssetClass,
-    pub secondary_class: Option<AssetClass>,
+    pub secondary_class: AssetClass,
     pub risk_rating: RiskRating,
     pub liquidity_score: u32,
     pub classified_by: Address,

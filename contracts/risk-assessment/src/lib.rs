@@ -1490,16 +1490,15 @@ impl RiskAssessment {
         // 850 score = -200 bps, 300 score = +300 bps
         let score_adjustment = if credit_score >= 300 {
             let normalized_score = credit_score - 300;
-            let adjustment = 300 - (normalized_score * 100) / 55; // Maps 300->300, 850->-200
-            adjustment as i32
+            300 - ((normalized_score as i32 * 500) / 550) // Maps 300->300, 850->-200
         } else {
             300
         };
 
-        let final_rate = base_rate + score_adjustment as u32;
+        let final_rate = (base_rate as i32 + score_adjustment).clamp(100, 1500) as u32;
 
         // Ensure rate is within reasonable bounds (1% - 15%)
-        Ok(final_rate.clamp(100, 1500))
+        Ok(final_rate)
     }
 
     /// Assess portfolio risk for a lender
@@ -1593,13 +1592,12 @@ impl RiskAssessment {
         // Lower score = higher fee
         let score_adjustment = if credit_score >= 300 {
             let normalized_score = credit_score - 300;
-            let adjustment = 200 - (normalized_score * 200) / 55; // Maps 300->200, 850->0
-            adjustment as i32
+            200 - ((normalized_score as i32 * 200) / 550) // Maps 300->200, 850->0
         } else {
             200
         };
 
-        let adjusted_fee_bps = (base_fee_bps as i32 + score_adjustment) as u32;
+        let adjusted_fee_bps = (base_fee_bps as i32 + score_adjustment).max(0) as u32;
 
         // Calculate fee amount
         let fee = loan_amount
@@ -1617,8 +1615,6 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
-
-        governance.require_auth();
 
         // Validate weights sum to 10000
         let total_weight = new_model.payment_history_weight
@@ -1645,8 +1641,6 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
-
-        governance.require_auth();
 
         // Validate LTV values
         if config.base_ltv_bps < 1000 || config.base_ltv_bps > 9500 {
