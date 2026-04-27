@@ -837,24 +837,6 @@ impl RiskAssessment {
         Ok(risk_score)
     }
 
-    /// Set borrower risk factor (for testing purposes only)
-    #[cfg(any(test, feature = "testutils"))]
-    pub fn set_borrower_risk_factor(
-        env: Env,
-        borrower: Address,
-        risk_factor: u32,
-    ) -> Result<(), ContractError> {
-        if risk_factor > 3 {
-            return Err(ContractError::InvalidHealthFactor);
-        }
-
-        let borrower_risk_key = (symbol_short!("bwr_risk"), borrower);
-        env.storage()
-            .persistent()
-            .set(&borrower_risk_key, &risk_factor);
-        Ok(())
-    }
-
     // ========================================================================
     // Liquidation Engine
     // ========================================================================
@@ -1960,24 +1942,6 @@ impl RiskAssessment {
         Ok((loan, collateral, escrow))
     }
 
-    /// Set test data for a position (for testing only)
-    #[cfg(any(test, feature = "testutils"))]
-    pub fn set_test_position(
-        env: Env,
-        position_id: u64,
-        loan: Loan,
-        collateral: Collateral,
-        escrow: TradeEscrow,
-    ) {
-        let loan_key = (symbol_short!("test_loan"), position_id);
-        let coll_key = (symbol_short!("test_coll"), position_id);
-        let escrow_key = (symbol_short!("test_escr"), position_id);
-
-        env.storage().persistent().set(&loan_key, &loan);
-        env.storage().persistent().set(&coll_key, &collateral);
-        env.storage().persistent().set(&escrow_key, &escrow);
-    }
-
     // ========================================================================
     // Dutch Auction — Governance Config
     // ========================================================================
@@ -2261,6 +2225,43 @@ impl RiskAssessment {
         env.storage()
             .persistent()
             .get(&(symbol_short!("auction"), loan_id))
+    }
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl RiskAssessment {
+    /// Set borrower risk factor (for testing purposes only)
+    pub fn set_borrower_risk_factor(
+        env: Env,
+        borrower: Address,
+        risk_factor: u32,
+    ) -> Result<(), ContractError> {
+        if risk_factor > 3 {
+            return Err(ContractError::InvalidHealthFactor);
+        }
+
+        let borrower_risk_key = (symbol_short!("bwr_risk"), borrower);
+        env.storage()
+            .persistent()
+            .set(&borrower_risk_key, &risk_factor);
+        Ok(())
+    }
+
+    /// Set test data for a position (for testing only)
+    pub fn set_test_position(
+        env: Env,
+        position_id: u64,
+        loan: Loan,
+        collateral: Collateral,
+        escrow: TradeEscrow,
+    ) {
+        let loan_key = (symbol_short!("test_loan"), position_id);
+        let coll_key = (symbol_short!("test_coll"), position_id);
+        let escrow_key = (symbol_short!("test_escr"), position_id);
+
+        env.storage().persistent().set(&loan_key, &loan);
+        env.storage().persistent().set(&coll_key, &collateral);
+        env.storage().persistent().set(&escrow_key, &escrow);
     }
 }
 
