@@ -347,22 +347,13 @@ impl LoanContract {
             return Err(ContractError::RepaymentExceedsBalance);
         }
 
-        // Apply repayment
-        let principal_payment = if amount >= loan.outstanding_balance {
-            loan.outstanding_balance
-        } else {
-            // Allocate to interest first, then principal
-            if accrued_interest > 0 {
-                let interest_payment = cmp::min(amount, accrued_interest);
-                amount - interest_payment
-            } else {
-                amount
-            }
-        };
+        // Apply repayment: interest first, then principal.
+        let interest_payment = cmp::min(amount, accrued_interest);
+        let principal_payment = amount - interest_payment;
 
         loan.outstanding_balance -= principal_payment;
         loan.total_repaid += amount;
-        loan.total_interest_paid += accrued_interest;
+        loan.total_interest_paid += interest_payment;
         loan.last_payment_date = env.ledger().timestamp();
         loan.updated_at = env.ledger().timestamp();
 
@@ -382,7 +373,7 @@ impl LoanContract {
             payer: payer.clone(),
             amount,
             principal_payment,
-            interest_payment: accrued_interest,
+            interest_payment,
             timestamp: env.ledger().timestamp(),
         };
 
@@ -678,11 +669,9 @@ fn calculate_compound_interest(
     annual_rate: u32,
     period: u64,
 ) -> Result<i128, ContractError> {
-    // Compound Interest = P * (1 + r)^t - P
-    // Simplified calculation for on-chain efficiency
-    let rate_per_second =
-        (annual_rate as u128 * period as u128) / (10000u128 * 365u128 * 86400u128);
-    let interest = (principal as u128 * rate_per_second) / 10000;
+    // Approximation for compound accrual over short intervals.
+    let interest = (principal as u128 * annual_rate as u128 * period as u128)
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }
 

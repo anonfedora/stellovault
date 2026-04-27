@@ -1615,6 +1615,7 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
+        governance.require_auth();
 
         // Validate weights sum to 10000
         let total_weight = new_model.payment_history_weight
@@ -1641,6 +1642,7 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
+        governance.require_auth();
 
         // Validate LTV values
         if config.base_ltv_bps < 1000 || config.base_ltv_bps > 9500 {
@@ -3737,101 +3739,63 @@ mod test {
     fn test_update_credit_model() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let new_model = CreditScoreModel {
+            payment_history_weight: 4000,
+            utilization_weight: 3000,
+            length_weight: 1000,
+            diversity_weight: 1000,
+            new_credit_weight: 1000,
+        };
 
-            let new_model = CreditScoreModel {
-                payment_history_weight: 4000,
-                utilization_weight: 3000,
-                length_weight: 1000,
-                diversity_weight: 1000,
-                new_credit_weight: 1000,
-            };
+        client.update_credit_model(&new_model);
 
-            // Governance can update
-            env.mock_all_auths();
-            RiskAssessment::update_credit_model(env.clone(), new_model.clone()).unwrap();
-
-            let stored_model = RiskAssessment::get_credit_model(env.clone());
-            assert_eq!(stored_model.payment_history_weight, 4000);
-        });
+        let stored_model = client.get_credit_model();
+        assert_eq!(stored_model.payment_history_weight, 4000);
     }
 
     #[test]
+    #[should_panic]
     fn test_update_credit_model_invalid_weights() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let invalid_model = CreditScoreModel {
+            payment_history_weight: 5000,
+            utilization_weight: 3000,
+            length_weight: 1000,
+            diversity_weight: 1000,
+            new_credit_weight: 1000,
+        }; // Sum = 11000, not 10000
 
-            let invalid_model = CreditScoreModel {
-                payment_history_weight: 5000,
-                utilization_weight: 3000,
-                length_weight: 1000,
-                diversity_weight: 1000,
-                new_credit_weight: 1000,
-            }; // Sum = 11000, not 10000
-
-            env.mock_all_auths();
-            let result = RiskAssessment::update_credit_model(env.clone(), invalid_model);
-            assert_eq!(result, Err(ContractError::InvalidThreshold));
-        });
+        client.update_credit_model(&invalid_model);
     }
 
     #[test]
     fn test_update_ltv_config() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let new_config = LTVConfig {
+            collateral_type: CollateralType::Invoice,
+            base_ltv_bps: 8000,
+            max_ltv_bps: 9000,
+            credit_score_multiplier: 60,
+        };
 
-            let new_config = LTVConfig {
-                collateral_type: CollateralType::Invoice,
-                base_ltv_bps: 8000,
-                max_ltv_bps: 9000,
-                credit_score_multiplier: 60,
-            };
+        client.update_ltv_config(&new_config);
 
-            env.mock_all_auths();
-            RiskAssessment::update_ltv_config(env.clone(), new_config.clone()).unwrap();
-
-            let stored_config =
-                RiskAssessment::get_ltv_config(env.clone(), CollateralType::Invoice).unwrap();
-            assert_eq!(stored_config.base_ltv_bps, 8000);
-        });
+        let stored_config = client.get_ltv_config(&CollateralType::Invoice);
+        assert_eq!(stored_config.base_ltv_bps, 8000);
     }
 
     #[test]

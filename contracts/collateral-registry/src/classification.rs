@@ -8,6 +8,8 @@ use soroban_sdk::{contracttype, Address, String};
 pub struct AssetClassification {
     pub collateral_id: u64,
     pub primary_class: AssetClass,
+    // `Unspecified` preserves "no secondary class" semantics without changing
+    // the stored shape of this struct.
     pub secondary_class: AssetClass,
     pub risk_rating: RiskRating,
     pub liquidity_score: u32,
@@ -28,6 +30,7 @@ pub enum AssetClass {
     Vehicles = 6,
     Intellectual = 7,
     Other = 8,
+    Unspecified = 255,
 }
 
 /// Risk rating enumeration
