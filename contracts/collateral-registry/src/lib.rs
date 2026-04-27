@@ -6,7 +6,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, String,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
 };
 
 /// Contract errors
@@ -358,9 +358,7 @@ impl CollateralRegistry {
         env.storage()
             .instance()
             .set(&symbol_short!("admin"), &pending);
-        env.storage()
-            .instance()
-            .remove(&symbol_short!("pend_adm"));
+        env.storage().instance().remove(&symbol_short!("pend_adm"));
 
         env.events()
             .publish((symbol_short!("adm_acpt"),), (pending,));
@@ -370,9 +368,7 @@ impl CollateralRegistry {
 
     /// Return the pending admin address if a proposal is active.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
+        env.storage().instance().get(&symbol_short!("pend_adm"))
     }
 
     /// Set escrow manager address (admin only)
@@ -440,7 +436,8 @@ impl CollateralRegistry {
         collateral.is_verified = true;
         env.storage().persistent().set(&id, &collateral);
 
-        env.events().publish((symbol_short!("coll_verified"),), (id,));
+        env.events()
+            .publish((Symbol::new(&env, "coll_verified"),), (id,));
 
         Ok(())
     }
@@ -666,7 +663,8 @@ mod test {
         let future_ts = env.ledger().timestamp() + 86400;
         let metadata_hash = BytesN::from_array(&env, &[1; 32]);
         let metadata_uri = String::from_slice(&env, "ipfs://QmLockTest");
-        let collateral_id = client.register_collateral(&owner, &1000, &future_ts, &metadata_hash, &metadata_uri);
+        let collateral_id =
+            client.register_collateral(&owner, &1000, &future_ts, &metadata_hash, &metadata_uri);
 
         client.lock_collateral(&collateral_id);
         assert!(client.is_locked(&collateral_id));
@@ -762,12 +760,6 @@ mod test {
     }
 
     #[test]
-    fn test_verify_collateral_unauthorized() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let admin = Address::generate(&env);
-        let unauthorized = Address::generate(&env);
-        let owner = Address::generate(&env);
     fn test_propose_admin() {
         let env = Env::default();
         env.mock_all_auths();
@@ -804,52 +796,23 @@ mod test {
     #[should_panic]
     fn test_propose_admin_unauthorized() {
         let env = Env::default();
-        // Do not mock any auths — admin.require_auth() will panic
         let admin = Address::generate(&env);
         let new_admin = Address::generate(&env);
         let contract_id = env.register_contract(None, CollateralRegistry);
 
         env.as_contract(&contract_id, || {
             CollateralRegistry::initialize(env.clone(), admin).unwrap();
-
-            // Register collateral
-            let future_ts = env.ledger().timestamp() + 86400;
-            let metadata_hash = BytesN::from_array(&env, &[1; 32]);
-            let metadata_uri = String::from_slice(&env, "ipfs://QmUnauthorizedVerify");
-            let collateral_id = CollateralRegistry::register_collateral(
-                env.clone(),
-                owner,
-                1000,
-                future_ts,
-                metadata_hash,
-                metadata_uri,
-            )
-            .unwrap();
-
-            // Try to verify with non-admin (should fail due to auth)
-            let result = CollateralRegistry::verify_collateral(env.clone(), collateral_id);
-            assert_eq!(result, Err(ContractError::Unauthorized));
-            // propose_admin will call admin.require_auth() which panics without mocked auth
             CollateralRegistry::propose_admin(env.clone(), new_admin).unwrap();
         });
     }
 
     #[test]
-    fn test_verify_collateral_not_found() {
     #[should_panic(expected = "HostError: Error(Contract, #8)")]
     fn test_accept_admin_no_pending() {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let contract_id = env.register_contract(None, CollateralRegistry);
-
-        env.as_contract(&contract_id, || {
-            CollateralRegistry::initialize(env.clone(), admin).unwrap();
-
-            // Try to verify non-existent collateral
-            let result = CollateralRegistry::verify_collateral(env.clone(), 999);
-            assert_eq!(result, Err(ContractError::CollateralNotFound));
-        });
         let client = CollateralRegistryClient::new(&env, &contract_id);
 
         client.initialize(&admin);

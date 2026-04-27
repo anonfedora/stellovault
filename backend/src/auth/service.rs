@@ -340,6 +340,11 @@ impl AuthService {
             name: None,
             role: UserRole::Buyer,
             risk_score: None,
+            kyc_status: crate::models::KycStatus::Unverified,
+            kyc_expiry: None,
+            kyc_provider: None,
+            kyc_verified_at: None,
+            kyc_reference_id: None,
             created_at: now,
             updated_at: now,
         })

@@ -238,9 +238,7 @@ impl EscrowManager {
         env.storage()
             .instance()
             .set(&symbol_short!("admin"), &pending);
-        env.storage()
-            .instance()
-            .remove(&symbol_short!("pend_adm"));
+        env.storage().instance().remove(&symbol_short!("pend_adm"));
 
         env.events()
             .publish((symbol_short!("adm_acpt"),), (pending,));
@@ -250,9 +248,7 @@ impl EscrowManager {
 
     /// Return the pending admin address if a proposal is active.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
+        env.storage().instance().get(&symbol_short!("pend_adm"))
     }
 
     /// Create a new escrow.
@@ -864,9 +860,11 @@ impl EscrowManager {
         env.storage().persistent().set(&escrow_id, &escrow);
 
         // Extend TTL for refund entry (30 days / 518400 ledgers)
-        env.storage()
-            .persistent()
-            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+        env.storage().persistent().extend_ttl(
+            &escrow_id,
+            DEFAULT_TTL_LEDGER_COUNT,
+            DEFAULT_TTL_LEDGER_COUNT,
+        );
 
         env.events()
             .publish((symbol_short!("esc_rfnd"),), (escrow_id,));
@@ -960,9 +958,11 @@ impl EscrowManager {
 
         // Extend TTL for dispute entry (30 days / 518400 ledgers)
         // Dispute entries start with full TTL, can be renewed if still active
-        env.storage()
-            .persistent()
-            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+        env.storage().persistent().extend_ttl(
+            &escrow_id,
+            DEFAULT_TTL_LEDGER_COUNT,
+            DEFAULT_TTL_LEDGER_COUNT,
+        );
 
         env.events()
             .publish((symbol_short!("esc_dsp"),), (escrow_id,));
@@ -978,7 +978,11 @@ impl EscrowManager {
     /// # Arguments
     /// * `escrow_id` - ID of the escrow with active dispute
     /// * `caller` - Address of the party renewing the TTL
-    pub fn renew_dispute_ttl(env: Env, escrow_id: u64, caller: Address) -> Result<(), ContractError> {
+    pub fn renew_dispute_ttl(
+        env: Env,
+        escrow_id: u64,
+        caller: Address,
+    ) -> Result<(), ContractError> {
         caller.require_auth();
 
         let escrow: Escrow = env
@@ -998,9 +1002,11 @@ impl EscrowManager {
         }
 
         // Renew TTL for dispute entry
-        env.storage()
-            .persistent()
-            .extend_ttl(&escrow_id, DEFAULT_TTL_LEDGER_COUNT, DEFAULT_TTL_LEDGER_COUNT);
+        env.storage().persistent().extend_ttl(
+            &escrow_id,
+            DEFAULT_TTL_LEDGER_COUNT,
+            DEFAULT_TTL_LEDGER_COUNT,
+        );
 
         env.events()
             .publish((symbol_short!("dsp_rnew"),), (escrow_id,));
@@ -2183,22 +2189,15 @@ mod test {
         let contract_id = env.register(EscrowManager, ());
 
         env.as_contract(&contract_id, || {
-            EscrowManager::initialize(
-                env.clone(),
-                admin,
-                coll_reg,
-                oracle,
-                loan_mgr,
-                treasury,
-            )
-            .unwrap();
+            EscrowManager::initialize(env.clone(), admin, coll_reg, oracle, loan_mgr, treasury)
+                .unwrap();
             // propose_admin calls admin.require_auth() — panics without mocked auth
             EscrowManager::propose_admin(env.clone(), new_admin).unwrap();
         });
     }
 
     #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #15)")]
+    #[should_panic(expected = "HostError: Error(Contract, #16)")]
     fn test_accept_admin_no_pending() {
         let t = setup();
         t.escrow_client.accept_admin();

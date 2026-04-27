@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::auth::AuthService;
 use crate::collateral::CollateralService;
 use crate::escrow::EscrowService;
+use crate::governance_service::GovernanceService;
 use crate::loan_service::LoanService;
 use crate::oracle::OracleService;
 use crate::services::{KycService, RiskEngine};
@@ -21,6 +22,7 @@ pub struct AppState {
     pub auth_service: Arc<AuthService>,
     pub risk_engine: Arc<RiskEngine>,
     pub oracle_service: Arc<OracleService>,
+    pub governance_service: Arc<GovernanceService>,
     pub kyc_service: KycService,
     pub ws_state: WsState,
     pub webhook_secret: Option<String>,
@@ -34,6 +36,7 @@ impl AppState {
         auth_service: Arc<AuthService>,
         risk_engine: Arc<RiskEngine>,
         oracle_service: Arc<OracleService>,
+        governance_service: Arc<GovernanceService>,
         kyc_service: KycService,
         ws_state: WsState,
         webhook_secret: Option<String>,
@@ -45,6 +48,7 @@ impl AppState {
             auth_service,
             risk_engine,
             oracle_service,
+            governance_service,
             kyc_service,
             ws_state,
             webhook_secret,
@@ -97,5 +101,11 @@ impl FromRef<AppState> for Arc<OracleService> {
 impl FromRef<AppState> for KycService {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.kyc_service.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<GovernanceService> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.governance_service.clone()
     }
 }

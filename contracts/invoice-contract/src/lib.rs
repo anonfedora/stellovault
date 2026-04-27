@@ -65,7 +65,9 @@ impl InvoiceContract {
             is_paid: false,
         };
 
-        env.storage().persistent().set(&DataKey::Invoice(id), &invoice);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Invoice(id), &invoice);
         env.storage().instance().set(&DataKey::Counter, &id);
 
         id
@@ -86,7 +88,9 @@ impl InvoiceContract {
         invoice.payer.require_auth();
         invoice.is_paid = true;
 
-        env.storage().persistent().set(&DataKey::Invoice(id), &invoice);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Invoice(id), &invoice);
 
         Ok(())
     }
