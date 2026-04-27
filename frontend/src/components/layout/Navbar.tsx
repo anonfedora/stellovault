@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
 import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
+import { useTranslation } from '@/components/i18n/LanguageProvider'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -14,6 +15,7 @@ export function Navbar() {
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { pendingCount } = useTransactionStatus()
+  const { t } = useTranslation()
 
   const handleWalletConnect = async () => {
     const mockAddress = 'G' + Math.random().toString(16).slice(2, 54).toUpperCase()
