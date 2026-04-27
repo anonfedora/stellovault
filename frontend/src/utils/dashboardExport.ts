@@ -23,7 +23,12 @@ export function rowsToCsv(rows: ExportableRow[]): string {
 
   const escape = (value: ExportableRow[string]): string => {
     if (value === null || value === undefined) return "";
-    const str = String(value);
+    let str = String(value);
+    // Mitigate CSV/formula injection (Excel, Sheets, LibreOffice) by prefixing
+    // values that start with a formula-trigger char with a single quote.
+    if (/^[=+\-@\t\r]/.test(str)) {
+      str = `'${str}`;
+    }
     if (/[",\n\r]/.test(str)) {
       return `"${str.replace(/"/g, '""')}"`;
     }
@@ -34,7 +39,8 @@ export function rowsToCsv(rows: ExportableRow[]): string {
   for (const row of rows) {
     lines.push(headers.map((h) => escape(row[h])).join(","));
   }
-  return lines.join("\n");
+  // RFC 4180 specifies CRLF as the record separator.
+  return lines.join("\r\n");
 }
 
 /**
@@ -77,7 +83,9 @@ export function downloadFile(
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  // Delay revoking the URL so the browser has time to start the download
+  // (notably Safari iOS, which can race with synchronous revocation).
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

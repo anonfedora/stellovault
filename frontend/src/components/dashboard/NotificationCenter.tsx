@@ -108,7 +108,7 @@ export const NotificationCenter = ({
                       className="text-xs text-gray-400 dark:text-gray-500 shrink-0"
                       dateTime={notification.createdAt}
                     >
-                      {new Date(notification.createdAt).toLocaleString("en-US", {
+                      {new Date(notification.createdAt).toLocaleString(undefined, {
                         month: "short",
                         day: "numeric",
                         hour: "2-digit",

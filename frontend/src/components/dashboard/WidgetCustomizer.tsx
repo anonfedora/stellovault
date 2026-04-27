@@ -25,7 +25,7 @@ export const WidgetCustomizer = ({
 
   useEffect(() => {
     if (!open) return;
-    const handler = (event: MouseEvent) => {
+    const onPointerDown = (event: PointerEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
@@ -33,12 +33,22 @@ export const WidgetCustomizer = ({
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   const toggle = (id: string) => {
-    onChange({ ...visibleWidgets, [id]: !visibleWidgets[id] });
+    // Match the visibility rule used by the checkbox so a missing entry
+    // (treated as visible) flips to hidden on the first click.
+    const current = visibleWidgets[id] !== false;
+    onChange({ ...visibleWidgets, [id]: !current });
   };
 
   return (

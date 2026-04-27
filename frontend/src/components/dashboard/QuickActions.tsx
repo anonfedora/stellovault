@@ -80,7 +80,7 @@ export const QuickActions = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {actions.map(({ label, href, description, Icon, external }) => (
           <Link
-            key={label}
+            key={href}
             href={href}
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}

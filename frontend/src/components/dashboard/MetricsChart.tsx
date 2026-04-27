@@ -120,16 +120,20 @@ export const MetricsChart = ({ data, loading = false }: MetricsChartProps) => {
                   <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="var(--chart-grid)"
+              />
               <XAxis
                 dataKey="date"
                 tickFormatter={tickFormatter}
-                tick={{ fontSize: 12, fill: "#6b7280" }}
+                tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#6b7280" }}
+                tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v: number) =>
@@ -138,9 +142,10 @@ export const MetricsChart = ({ data, loading = false }: MetricsChartProps) => {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: "var(--chart-tooltip-bg)",
+                  border: "1px solid var(--chart-tooltip-border)",
                   borderRadius: 8,
+                  color: "var(--foreground)",
                 }}
                 labelFormatter={(label) => tickFormatter(String(label))}
                 formatter={(value, name) => [

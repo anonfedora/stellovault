@@ -49,6 +49,10 @@ export function ProposalForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Capture mount time once so the rendered "expires" date is stable across
+  // re-renders without calling Date.now() during render. Date.now() is only
+  // invoked once via the lazy initializer.
+  const [now] = useState<number>(() => Date.now());
 
   const set = (field: keyof FormData, value: string | number) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -77,7 +81,7 @@ export function ProposalForm() {
     }
   };
 
-  const expiresAt = new Date(Date.now() + 86400000 * formData.duration);
+  const expiresAt = new Date(now + 86400000 * formData.duration);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">

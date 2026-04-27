@@ -366,7 +366,12 @@ export function useDashboard(
   const [connected, setConnected] = useState(false);
 
   const txContext = useTransactionStatus();
-  const eventQueue = useRef<DashboardRealtimeEvent[]>([]);
+  // Bumped on each manual refresh so the WebSocket effect can reset its
+  // backoff counter without resubscribing.
+  const [reconnectResetToken, setReconnectResetToken] = useState(0);
+  // Set by the WebSocket effect; called when the reset token changes so manual
+  // refreshes can clear the failure counter without tearing down the socket.
+  const connectionResetRef = useRef<(() => void) | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -376,6 +381,7 @@ export function useDashboard(
       await new Promise((resolve) => setTimeout(resolve, 350));
       setLoans(MOCK_LOANS);
       setLastUpdated(new Date());
+      setReconnectResetToken((token) => token + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
@@ -395,8 +401,9 @@ export function useDashboard(
     return () => clearInterval(id);
   }, [refresh, refreshIntervalMs]);
 
-  // WebSocket connection for real-time updates. Mirrors the reconnect behaviour
-  // of useWebSocket so consumers get the same backoff guarantees.
+  // WebSocket connection for real-time updates. The socket lifetime is tied
+  // only to `enableRealtime` and `walletAddress` so that data updates (loans,
+  // notifications, etc.) don't tear down and recreate the connection.
   useEffect(() => {
     if (!enableRealtime) return;
 
@@ -432,12 +439,11 @@ export function useDashboard(
         try {
           const data = JSON.parse(ev.data as string) as DashboardRealtimeEvent;
           if (data && typeof data.type === "string") {
-            eventQueue.current.push(data);
             setNotifications((prev) =>
               applyRealtimeEvent(
                 {
-                  portfolio: aggregatePortfolio(loans),
-                  loans,
+                  portfolio: {} as PortfolioSnapshot,
+                  loans: [],
                   activity: [],
                   notifications: prev,
                   metrics: [],
@@ -455,7 +461,9 @@ export function useDashboard(
         if (stopped) return;
         setConnected(false);
         failures += 1;
-        if (failures > 3) return;
+        // Unbounded retries with exponential backoff capped by
+        // computeReconnectDelay (max 30s); manual refresh() resets failures
+        // via the reset token effect below.
         timer = setTimeout(connect, computeReconnectDelay(failures));
       };
 
@@ -464,10 +472,17 @@ export function useDashboard(
       };
     };
 
+    // Expose a way for a sibling effect to reset the backoff counter when the
+    // user triggers a manual refresh.
+    connectionResetRef.current = () => {
+      failures = 0;
+    };
+
     connect();
 
     return () => {
       stopped = true;
+      connectionResetRef.current = null;
       if (timer) clearTimeout(timer);
       if (ws) {
         ws.onopen = null;
@@ -478,8 +493,14 @@ export function useDashboard(
       }
       setConnected(false);
     };
-    // walletAddress is included so that switching wallets resets the socket.
-  }, [enableRealtime, walletAddress, loans]);
+  }, [enableRealtime, walletAddress]);
+
+  // When refresh() is called, reset the WebSocket backoff so a new manual
+  // attempt schedules immediately rather than waiting through the existing
+  // delay.
+  useEffect(() => {
+    connectionResetRef.current?.();
+  }, [reconnectResetToken]);
 
   const portfolio = useMemo(() => aggregatePortfolio(loans), [loans]);
   const metrics = useMemo(() => buildMetricsSeries(loans), [loans]);

@@ -168,7 +168,9 @@ export function TransactionStatusProvider({ children }: TransactionStatusProvide
     setTransactions([])
   }, [])
 
-  // Load transactions from localStorage on mount
+  // Load transactions from localStorage on mount. localStorage is only
+  // available after hydration on the client, so a lazy useState initializer
+  // would always read empty during SSR and never re-read on the client.
   useEffect(() => {
     try {
       const stored = localStorage.getItem('stellovault_transactions')
@@ -177,6 +179,7 @@ export function TransactionStatusProvider({ children }: TransactionStatusProvide
         // Only load transactions from the last 24 hours
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
         const recentTxs = parsed.filter((tx: Transaction) => tx.timestamp > oneDayAgo)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTransactions(recentTxs)
       }
     } catch (error) {
