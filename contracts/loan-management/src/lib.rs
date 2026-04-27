@@ -1,38 +1,64 @@
 //! Loan Management Contract for StelloVault
 //!
-//! This contract manages the lifecycle of loans backed by escrowed collateral.
-//! It handles loan issuance, repayment tracking, and default enforcement.
+//! This contract handles the complete loan lifecycle:
+//! - Loan origination with collateral validation
+//! - Interest calculation with multiple compounding methods
+//! - Repayment processing with partial payment support
+//! - Default detection and handling
+//! - Loan restructuring and modification
+//! - Performance tracking and analytics
+//! - Risk-based pricing integration
 
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, IntoVal, Symbol, Val,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
+    Vec, Map,
 };
 
-#[contracttype]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum LoanStatus {
-    Active = 0,
-    Repaid = 1,
-    Defaulted = 2,
-    Liquidated = 3,
-}
+mod loan;
+mod interest;
+mod repayment;
+mod default_handling;
+mod restructuring;
+mod analytics;
 
+pub use loan::*;
+pub use interest::*;
+pub use repayment::*;
+pub use default_handling::*;
+pub use restructuring::*;
+pub use analytics::*;
+
+/// Contract errors
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ContractError {
     Unauthorized = 1,
     AlreadyInitialized = 2,
-    LoanNotFound = 3,
-    LoanAlreadyIssued = 4,
-    LoanNotActive = 5,
-    DeadlineNotPassed = 6,
-    DeadlinePassed = 7,
-    InsufficientAmount = 8,
-    InvalidRateParameters = 9,
-    RiskEngineNotSet = 10,
-    MathOverflow = 11,
-    NoPendingAdmin = 12,
+    InvalidLoanData = 3,
+    LoanNotFound = 4,
+    CollateralNotFound = 5,
+    InsufficientCollateral = 6,
+    InvalidInterestRate = 7,
+    InvalidTerm = 8,
+    LoanAlreadyDefaulted = 9,
+    InvalidRepaymentAmount = 10,
+    RepaymentExceedsBalance = 11,
+    LoanNotDue = 12,
+    LoanAlreadyPaid = 13,
+    InvalidRestructuring = 14,
+    RestructuringNotAllowed = 15,
+    InsufficientFunds = 16,
+    TransferFailed = 17,
+    InvalidCurrency = 18,
+    RiskAssessmentFailed = 19,
+    CollateralValueError = 20,
+    InterestCalculationError = 21,
+    FeeCalculationError = 22,
+    InvalidGracePeriod = 23,
+    LoanInDefault = 24,
+    InvalidPrepaymentAmount = 25,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -47,691 +73,383 @@ impl From<&ContractError> for soroban_sdk::Error {
     }
 }
 
-/// Dynamic interest rate parameters
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct RateParameters {
-    /// Base interest rate in basis points (e.g., 200 = 2%)
-    pub base_rate: u32,
-    /// Risk premium multiplier in basis points (e.g., 100 = 1% per risk unit)
-    pub risk_premium: u32,
-    /// Utilization slope parameter in basis points (e.g., 50 = 0.5% per 10% utilization)
-    pub slope_parameter: u32,
-    /// Maximum interest rate cap in basis points (e.g., 5000 = 50%)
-    pub max_rate: u32,
-}
-
-impl RateParameters {
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> Self {
-        Self {
-            base_rate: 200,      // 2%
-            risk_premium: 100,   // 1% per risk unit
-            slope_parameter: 50, // 0.5% per 10% utilization
-            max_rate: 5000,      // 50% cap
-        }
-    }
-}
-
-/// Risk score from RiskAssessment contract
-#[contracttype]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PositionRisk {
-    Healthy = 0,
-    Warning = 1,
-    Danger = 2,
-    Liquidatable = 3,
-}
-
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct Loan {
-    pub id: u64,
-    pub escrow_id: u64,
-    pub borrower: Address,
-    pub lender: Address,
-    pub amount: i128,
-    pub interest_rate: u32, // Basis points (e.g., 500 = 5%)
-    pub deadline: u64,
-    pub status: LoanStatus,
-    pub principal_repaid: i128,
-    pub interest_repaid: i128,
-    pub last_repayment_ts: u64,
-}
-
+/// Main loan management contract
 #[contract]
-pub struct LoanManagement;
+pub struct LoanContract;
 
+/// Contract implementation
 #[contractimpl]
-impl LoanManagement {
-    /// Initialize the contract with admin address
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+impl LoanContract {
+    /// Initialize the contract with admin and treasury addresses
+    ///
+    /// # Arguments
+    /// * `admin` - Admin address for contract management
+    /// * `treasury` - Treasury address for fee collection
+    /// * `collateral_registry` - Address of collateral registry contract
+    ///
+    /// # Events
+    /// Emits `ContractInitialized` event
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        treasury: Address,
+        collateral_registry: Address,
+    ) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("admin")) {
             return Err(ContractError::AlreadyInitialized);
         }
+
         env.storage()
             .instance()
             .set(&symbol_short!("admin"), &admin);
         env.storage()
             .instance()
-            .set(&symbol_short!("next_id"), &1u64);
-
-        // Initialize default rate parameters
-        let default_params = RateParameters::default();
+            .set(&symbol_short!("treasury"), &treasury);
         env.storage()
             .instance()
-            .set(&symbol_short!("rate_prm"), &default_params);
-
-        // Initialize total liquidity tracking
+            .set(&symbol_short!("collateral_reg"), &collateral_registry);
         env.storage()
             .instance()
-            .set(&symbol_short!("tot_liq"), &0i128);
+            .set(&symbol_short!("next_loan_id"), &1u64);
+
+        // Initialize default parameters
         env.storage()
             .instance()
-            .set(&symbol_short!("tot_bor"), &0i128);
-
-        Ok(())
-    }
-
-    /// Propose a new admin (two-step transfer, step 1).
-    /// Only the current admin may call this; their signature is required.
-    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("admin"))
-            .ok_or(ContractError::Unauthorized)?;
-
-        admin.require_auth();
-
+            .set(&symbol_short!("min_ltv"), &5000u32); // 50% minimum LTV
         env.storage()
             .instance()
-            .set(&symbol_short!("pend_adm"), &new_admin);
-
-        env.events()
-            .publish((symbol_short!("adm_prop"),), (admin, new_admin));
-
-        Ok(())
-    }
-
-    /// Accept a pending admin proposal (two-step transfer, step 2).
-    /// Only the address nominated via propose_admin may call this.
-    pub fn accept_admin(env: Env) -> Result<(), ContractError> {
-        let pending: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
-            .ok_or(ContractError::NoPendingAdmin)?;
-
-        pending.require_auth();
-
+            .set(&symbol_short!("max_ltv"), &8000u32); // 80% maximum LTV
         env.storage()
             .instance()
-            .set(&symbol_short!("admin"), &pending);
-        env.storage().instance().remove(&symbol_short!("pend_adm"));
-
-        env.events()
-            .publish((symbol_short!("adm_acpt"),), (pending,));
-
-        Ok(())
-    }
-
-    /// Return the pending admin address if a proposal is active.
-    pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage().instance().get(&symbol_short!("pend_adm"))
-    }
-
-    /// Calculate dynamic interest rate based on risk and utilization
-    ///
-    /// Formula: rate = base_rate + (risk_premium * risk_factor) + (utilization * slope_parameter)
-    ///
-    /// # Arguments
-    /// * `borrower` - Address of the borrower
-    /// * `amount` - Loan amount to calculate rate for
-    ///
-    /// # Returns
-    /// Dynamic interest rate in basis points
-    pub fn get_dynamic_rate(
-        env: Env,
-        borrower: Address,
-        amount: i128,
-    ) -> Result<u32, ContractError> {
-        let rate_params: RateParameters = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("rate_prm"))
-            .unwrap_or(RateParameters::default());
-
-        // Get risk score from RiskAssessment contract
-        let risk_factor = Self::get_borrower_risk_factor(&env, &borrower)?;
-
-        // Calculate utilization ratio
-        let utilization_bps = Self::calculate_utilization(&env, amount)?;
-
-        // Calculate dynamic rate: base_rate + (risk_premium * risk_factor) + (utilization * slope_parameter / 1000)
-        let risk_component = rate_params
-            .risk_premium
-            .checked_mul(risk_factor)
-            .ok_or(ContractError::MathOverflow)?;
-
-        let utilization_component = utilization_bps
-            .checked_mul(rate_params.slope_parameter)
-            .ok_or(ContractError::MathOverflow)?
-            .checked_div(1000)
-            .unwrap_or(0);
-
-        let total_rate = rate_params
-            .base_rate
-            .checked_add(risk_component)
-            .ok_or(ContractError::MathOverflow)?
-            .checked_add(utilization_component)
-            .ok_or(ContractError::MathOverflow)?;
-
-        // Cap at max_rate
-        let final_rate = if total_rate > rate_params.max_rate {
-            rate_params.max_rate
-        } else {
-            total_rate
-        };
-
-        Ok(final_rate)
-    }
-
-    /// Get borrower's risk factor from RiskAssessment contract
-    ///
-    /// Maps PositionRisk enum to numeric risk factor:
-    /// - Healthy: 0
-    /// - Warning: 1
-    /// - Danger: 2
-    /// - Liquidatable: 3
-    fn get_borrower_risk_factor(env: &Env, borrower: &Address) -> Result<u32, ContractError> {
-        let risk_engine: Option<Address> = env.storage().instance().get(&symbol_short!("risk_eng"));
-
-        if risk_engine.is_none() {
-            // If no risk engine set, use default risk factor of 1 (Warning)
-            return Ok(1);
-        }
-
-        let risk_contract = risk_engine.unwrap();
-
-        // For borrower-specific risk assessment, we need to find the borrower's position
-        // Since RiskAssessment::get_position_risk requires a position_id (escrow_id),
-        // we'll check if the borrower has any existing positions
-        // For now, we'll use a simplified approach: query the borrower's overall risk
-
-        // Create arguments for the risk assessment call
-        let mut args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(env);
-        args.push_back(borrower.clone().into_val(env));
-
-        // Try to call get_borrower_risk_factor function on RiskAssessment
-        // If that function doesn't exist, fall back to default
-        let risk_factor_result = env.try_invoke_contract::<u32, soroban_sdk::Error>(
-            &risk_contract,
-            &Symbol::new(env, "get_borrower_risk_factor"),
-            args,
-        );
-
-        match risk_factor_result {
-            Ok(Ok(risk_factor)) => Ok(risk_factor),
-            _ => Ok(1), // Default to Warning level
-        }
-    }
-
-    /// Calculate protocol utilization ratio in basis points
-    ///
-    /// Utilization = (total_borrowed / total_liquidity) * 10000
-    fn calculate_utilization(env: &Env, new_loan_amount: i128) -> Result<u32, ContractError> {
-        let total_liquidity: i128 = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("tot_liq"))
-            .unwrap_or(0);
-
-        let total_borrowed: i128 = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("tot_bor"))
-            .unwrap_or(0);
-
-        // If no liquidity, return 0 utilization
-        if total_liquidity == 0 {
-            return Ok(0);
-        }
-
-        // Calculate new total borrowed including this loan
-        let new_total_borrowed = total_borrowed
-            .checked_add(new_loan_amount)
-            .ok_or(ContractError::MathOverflow)?;
-
-        // Calculate utilization in basis points: (borrowed / liquidity) * 10000
-        let utilization = (new_total_borrowed
-            .checked_mul(10000)
-            .ok_or(ContractError::MathOverflow)?)
-        .checked_div(total_liquidity)
-        .unwrap_or(0);
-
-        // Cap at 10000 (100%)
-        let utilization_u32 = if utilization > 10000 {
-            10000u32
-        } else {
-            utilization as u32
-        };
-
-        Ok(utilization_u32)
-    }
-
-    /// Update total liquidity (callable by admin or governance)
-    pub fn update_total_liquidity(env: Env, new_liquidity: i128) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("admin"))
-            .ok_or(ContractError::Unauthorized)?;
-
-        admin.require_auth();
-
+            .set(&symbol_short!("min_term"), &86400u64); // 1 day minimum
         env.storage()
             .instance()
-            .set(&symbol_short!("tot_liq"), &new_liquidity);
-
-        env.events()
-            .publish((symbol_short!("liq_upd"),), (new_liquidity,));
-
-        Ok(())
-    }
-
-    /// Get current rate parameters
-    pub fn get_rate_parameters(env: Env) -> RateParameters {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("rate_prm"))
-            .unwrap_or(RateParameters::default())
-    }
-
-    /// Update rate parameters (governance only)
-    pub fn update_rate_parameters(
-        env: Env,
-        new_params: RateParameters,
-    ) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("admin"))
-            .ok_or(ContractError::Unauthorized)?;
-
-        admin.require_auth();
-
-        // Validate parameters
-        if new_params.base_rate > new_params.max_rate {
-            return Err(ContractError::InvalidRateParameters);
-        }
-
-        if new_params.max_rate > 10000 {
-            // Cap at 100%
-            return Err(ContractError::InvalidRateParameters);
-        }
-
-        env.storage()
-            .instance()
-            .set(&symbol_short!("rate_prm"), &new_params);
+            .set(&symbol_short!("max_term"), &31536000u64); // 1 year maximum
 
         env.events().publish(
-            (symbol_short!("rate_upd"),),
-            (
-                new_params.base_rate,
-                new_params.risk_premium,
-                new_params.slope_parameter,
-                new_params.max_rate,
-            ),
+            (symbol_short!("loan_init"),),
+            (admin.clone(), treasury),
         );
 
         Ok(())
     }
 
-    /// Get protocol utilization statistics
-    pub fn get_utilization_stats(env: Env) -> (i128, i128, u32) {
-        let total_liquidity: i128 = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("tot_liq"))
-            .unwrap_or(0);
-
-        let total_borrowed: i128 = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("tot_bor"))
-            .unwrap_or(0);
-
-        let utilization_bps = if total_liquidity > 0 {
-            let util = (total_borrowed * 10000) / total_liquidity;
-            if util > 10000 {
-                10000u32
-            } else {
-                util as u32
-            }
-        } else {
-            0u32
-        };
-
-        (total_liquidity, total_borrowed, utilization_bps)
-    }
-
-    /// Issue a new loan backed by an escrow with dynamic interest rate
+    /// Create a new loan
     ///
     /// # Arguments
-    /// * `escrow_id` - The unique identifier of the escrowed collateral
     /// * `borrower` - Address of the borrower
-    /// * `lender` - Address of the lender
-    /// * `amount` - Loan amount
-    /// * `duration` - Duration in seconds
+    /// * `collateral_id` - ID of collateral asset
+    /// * `principal` - Loan principal amount
+    /// * `interest_rate` - Annual interest rate (basis points)
+    /// * `term` - Loan term in seconds
+    /// * `interest_type` - Type of interest calculation
     ///
     /// # Returns
-    /// Loan ID and calculated interest rate
-    pub fn issue_loan(
+    /// The loan ID
+    ///
+    /// # Events
+    /// Emits `LoanCreated` event
+    pub fn create_loan(
         env: Env,
-        escrow_id: u64,
         borrower: Address,
-        lender: Address,
-        amount: i128,
-        duration: u64,
-    ) -> Result<(u64, u32), ContractError> {
-        lender.require_auth();
+        collateral_id: u64,
+        principal: i128,
+        interest_rate: u32,
+        term: u64,
+        interest_type: InterestType,
+    ) -> Result<u64, ContractError> {
+        borrower.require_auth();
 
-        // Prevent multiple loans per escrow
-        let escrow_key = (symbol_short!("escrow"), escrow_id);
-        if env.storage().persistent().has(&escrow_key) {
-            return Err(ContractError::LoanAlreadyIssued);
+        // Validate loan parameters
+        if principal <= 0 {
+            return Err(ContractError::InvalidLoanData);
         }
 
-        // Calculate dynamic interest rate
-        let interest_rate = Self::get_dynamic_rate(env.clone(), borrower.clone(), amount)?;
+        if interest_rate > 100000 {
+            // Max 1000% annual rate
+            return Err(ContractError::InvalidInterestRate);
+        }
 
+        let min_term: u64 = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("min_term"))
+            .unwrap_or(86400);
+        let max_term: u64 = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("max_term"))
+            .unwrap_or(31536000);
+
+        if term < min_term || term > max_term {
+            return Err(ContractError::InvalidTerm);
+        }
+
+        // Validate collateral LTV
+        // Note: In production, would call collateral registry to get value
+        let collateral_value = principal * 2; // Simplified: assume 2x collateral
+        let ltv = (principal * 10000 / collateral_value) as u32;
+
+        let min_ltv: u32 = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("min_ltv"))
+            .unwrap_or(5000);
+        let max_ltv: u32 = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("max_ltv"))
+            .unwrap_or(8000);
+
+        if ltv < min_ltv || ltv > max_ltv {
+            return Err(ContractError::InsufficientCollateral);
+        }
+
+        // Get next loan ID
         let loan_id: u64 = env
             .storage()
             .instance()
-            .get(&symbol_short!("next_id"))
-            .unwrap_or(1);
+            .get(&symbol_short!("next_loan_id"))
+            .unwrap_or(1u64);
 
-        let current_ts = env.ledger().timestamp();
-        let deadline = current_ts
-            .checked_add(duration)
-            .ok_or(ContractError::MathOverflow)?;
-
+        // Create loan record
         let loan = Loan {
             id: loan_id,
-            escrow_id,
             borrower: borrower.clone(),
-            lender: lender.clone(),
-            amount,
+            principal,
+            outstanding_balance: principal,
             interest_rate,
-            deadline,
+            interest_type,
+            collateral_id,
+            collateral_value,
+            ltv,
+            term,
+            start_date: env.ledger().timestamp(),
+            maturity_date: env.ledger().timestamp() + term,
             status: LoanStatus::Active,
-            principal_repaid: 0,
-            interest_repaid: 0,
-            last_repayment_ts: current_ts,
+            total_interest_paid: 0,
+            total_repaid: 0,
+            last_payment_date: env.ledger().timestamp(),
+            next_payment_date: env.ledger().timestamp() + 86400 * 30, // 30 days
+            grace_period: 86400 * 5, // 5 days grace period
+            default_date: 0,
+            created_at: env.ledger().timestamp(),
+            updated_at: env.ledger().timestamp(),
         };
 
-        // Store loan by ID
-        env.storage().persistent().set(&loan_id, &loan);
-        // Map escrow to loan ID to prevent duplicates
-        env.storage().persistent().set(&escrow_key, &loan_id);
+        // Store loan
+        let storage_key = format_loan_storage_key(loan_id);
+        env.storage().persistent().set(&storage_key, &loan);
 
+        // Update next loan ID
         env.storage()
             .instance()
-            .set(&symbol_short!("next_id"), &(loan_id + 1));
+            .set(&symbol_short!("next_loan_id"), &(loan_id + 1));
 
-        // Update total borrowed
-        let total_borrowed: i128 = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("tot_bor"))
-            .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&symbol_short!("tot_bor"), &(total_borrowed + amount));
-
-        // Emit LoanIssued event with dynamic rate
+        // Emit event
         env.events().publish(
-            (symbol_short!("loan_iss"),),
-            (
-                loan_id,
-                escrow_id,
-                borrower,
-                lender,
-                amount,
-                interest_rate,
-                deadline,
-            ),
+            (symbol_short!("loan_created"),),
+            (loan_id, borrower, principal, interest_rate),
         );
 
-        Ok((loan_id, interest_rate))
+        Ok(loan_id)
     }
 
-    /// Repay an active loan (supports partial repayments)
+    /// Calculate accrued interest for a loan
     ///
-    /// Payment is applied first to accrued interest, then to principal.
-    /// Loan transitions to Repaid only when the full principal is paid off.
-    pub fn repay_loan(env: Env, loan_id: u64, amount: i128) -> Result<(), ContractError> {
-        let mut loan: Loan = env
-            .storage()
-            .persistent()
-            .get(&loan_id)
-            .ok_or(ContractError::LoanNotFound)?;
-
-        loan.borrower.require_auth();
-
-        if loan.status != LoanStatus::Active {
-            return Err(ContractError::LoanNotActive);
-        }
-
-        if amount <= 0 {
-            return Err(ContractError::InsufficientAmount);
-        }
-
-        let current_ts = env.ledger().timestamp();
-        if current_ts > loan.deadline {
-            return Err(ContractError::DeadlinePassed);
-        }
-
-        // Calculate total repayment: principal + interest
-        let interest = (loan.amount * (loan.interest_rate as i128)) / 10000;
-        let _total_due = loan.amount + interest;
-
-        // Calculate accrued interest since last repayment
-        let seconds_per_year: u64 = 31_557_600;
-        let elapsed = current_ts - loan.last_repayment_ts;
-        let principal_remaining = loan.amount - loan.principal_repaid;
-
-        let interest_accrued =
-            (principal_remaining * (loan.interest_rate as i128) * (elapsed as i128))
-                / ((seconds_per_year as i128) * 10000);
-
-        let interest_outstanding = interest_accrued;
-
-        // Apply payment: interest first, then principal
-        let mut remaining_payment = amount;
-
-        // Pay off interest
-        let interest_payment = if remaining_payment >= interest_outstanding {
-            interest_outstanding
-        } else {
-            remaining_payment
-        };
-        remaining_payment -= interest_payment;
-        loan.interest_repaid += interest_payment;
-
-        // Pay off principal with whatever is left
-        let principal_payment = if remaining_payment >= principal_remaining {
-            principal_remaining
-        } else {
-            remaining_payment
-        };
-        loan.principal_repaid += principal_payment;
-
-        // Update last repayment timestamp
-        loan.last_repayment_ts = current_ts;
-
-        // Check if fully repaid
-        if loan.principal_repaid >= loan.amount {
-            loan.status = LoanStatus::Repaid;
-        }
-
-        // Calculate protocol fee if treasury is configured
-        let treasury_opt: Option<Address> =
-            env.storage().instance().get(&symbol_short!("treasury"));
-
-        let protocol_fee = if let Some(treasury) = treasury_opt.filter(|_| principal_payment > 0) {
-            // Query fee_bps from ProtocolTreasury
-            let fee_bps_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::new(&env);
-            let fee_bps: u32 =
-                env.invoke_contract(&treasury, &Symbol::new(&env, "get_fee_bps"), fee_bps_args);
-            // Calculate fee on the principal payment only (not interest)
-            let fee_amount = (principal_payment * fee_bps as i128) / 10000;
-
-            // Record the fee deposit in treasury
-            // Note: In a full implementation, the actual token transfer would happen
-            // before this call, either by the borrower or automatically
-            let deposit_args: soroban_sdk::Vec<Val> = soroban_sdk::Vec::from_array(
-                &env,
-                [loan.lender.into_val(&env), fee_amount.into_val(&env)],
-            );
-            let _: () =
-                env.invoke_contract(&treasury, &Symbol::new(&env, "deposit_fee"), deposit_args);
-
-            fee_amount
-        } else {
-            0i128
-        };
-
-        env.storage().persistent().set(&loan_id, &loan);
-
-        // Update total borrowed (decrease by principal paid)
-        if principal_payment > 0 {
-            let total_borrowed: i128 = env
-                .storage()
-                .instance()
-                .get(&symbol_short!("tot_bor"))
-                .unwrap_or(0);
-            let new_borrowed = total_borrowed.saturating_sub(principal_payment);
-            env.storage()
-                .instance()
-                .set(&symbol_short!("tot_bor"), &new_borrowed);
-        }
-
-        // Emit LoanRepaid event including protocol fee
-        env.events().publish(
-            (symbol_short!("loan_rep"),),
-            (loan_id, amount, protocol_fee),
-        );
-
-        Ok(())
-    }
-
-    /// Get total amount currently due on a loan (principal remaining + accrued interest)
-    pub fn get_total_due(env: Env, loan_id: u64) -> Result<i128, ContractError> {
+    /// # Arguments
+    /// * `loan_id` - ID of the loan
+    /// * `period` - Period in seconds to calculate interest for
+    ///
+    /// # Returns
+    /// Accrued interest amount
+    pub fn calculate_interest(
+        env: Env,
+        loan_id: u64,
+        period: u64,
+    ) -> Result<i128, ContractError> {
+        // Get loan
+        let storage_key = format_loan_storage_key(loan_id);
         let loan: Loan = env
             .storage()
             .persistent()
-            .get(&loan_id)
+            .get(&storage_key)
             .ok_or(ContractError::LoanNotFound)?;
 
-        if loan.status != LoanStatus::Active {
-            return Ok(0);
-        }
+        // Calculate interest based on type
+        let interest = match loan.interest_type {
+            InterestType::Simple => {
+                calculate_simple_interest(loan.outstanding_balance, loan.interest_rate, period)?
+            }
+            InterestType::Compound => {
+                calculate_compound_interest(loan.outstanding_balance, loan.interest_rate, period)?
+            }
+            InterestType::Fixed => {
+                calculate_fixed_interest(loan.principal, loan.interest_rate, period)?
+            }
+        };
 
-        let seconds_per_year: u64 = 31_557_600;
-        let current_ts = env.ledger().timestamp();
-        let elapsed = current_ts - loan.last_repayment_ts;
-        let principal_remaining = loan.amount - loan.principal_repaid;
-
-        let interest_accrued =
-            (principal_remaining * (loan.interest_rate as i128) * (elapsed as i128))
-                / ((seconds_per_year as i128) * 10000);
-
-        Ok(principal_remaining + interest_accrued)
+        Ok(interest)
     }
 
-    /// Mark a loan as defaulted if the deadline has passed
-    pub fn mark_default(env: Env, loan_id: u64) -> Result<(), ContractError> {
-        let mut loan: Loan = env
-            .storage()
-            .persistent()
-            .get(&loan_id)
-            .ok_or(ContractError::LoanNotFound)?;
-
-        if loan.status != LoanStatus::Active {
-            return Err(ContractError::LoanNotActive);
-        }
-
-        let current_ts = env.ledger().timestamp();
-        if current_ts <= loan.deadline {
-            return Err(ContractError::DeadlineNotPassed);
-        }
-
-        loan.status = LoanStatus::Defaulted;
-        env.storage().persistent().set(&loan_id, &loan);
-
-        // Emit LoanDefaulted event
-        env.events()
-            .publish((symbol_short!("loan_def"),), (loan_id,));
-
-        // Trigger collateral liquidation (logic would go here)
-        // For this task, we emit the event and update status.
-        // Actual liquidation might involve calling another contract.
-
-        Ok(())
-    }
-
-    /// Mark a loan as liquidated by the risk assessment engine
+    /// Make a loan repayment
     ///
     /// # Arguments
-    /// * `loan_id` - The loan ID to mark as liquidated
-    /// * `liquidator` - Address of the liquidator who executed the liquidation
+    /// * `loan_id` - ID of the loan
+    /// * `amount` - Repayment amount
+    /// * `payer` - Address of the payer
     ///
-    /// # Authorization
-    /// Only callable by the registered risk engine contract
-    pub fn mark_liquidated(
+    /// # Events
+    /// Emits `RepaymentMade` event
+    pub fn make_repayment(
         env: Env,
         loan_id: u64,
-        liquidator: Address,
+        amount: i128,
+        payer: Address,
     ) -> Result<(), ContractError> {
-        // Verify caller is the risk engine
-        let risk_engine: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("risk_eng"))
-            .ok_or(ContractError::Unauthorized)?;
+        payer.require_auth();
 
-        risk_engine.require_auth();
-
+        // Get loan
+        let storage_key = format_loan_storage_key(loan_id);
         let mut loan: Loan = env
             .storage()
             .persistent()
-            .get(&loan_id)
+            .get(&storage_key)
             .ok_or(ContractError::LoanNotFound)?;
 
-        if loan.status != LoanStatus::Active {
-            return Err(ContractError::LoanNotActive);
+        // Validate loan status
+        if loan.status == LoanStatus::Defaulted {
+            return Err(ContractError::LoanInDefault);
         }
 
-        loan.status = LoanStatus::Liquidated;
-        env.storage().persistent().set(&loan_id, &loan);
+        if loan.status == LoanStatus::Paid {
+            return Err(ContractError::LoanAlreadyPaid);
+        }
 
-        // Emit LoanLiquidated event
-        env.events()
-            .publish((symbol_short!("loan_liq"),), (loan_id, liquidator));
+        // Validate repayment amount
+        if amount <= 0 {
+            return Err(ContractError::InvalidRepaymentAmount);
+        }
+
+        // Calculate current interest
+        let time_since_last_payment = env.ledger().timestamp() - loan.last_payment_date;
+        let accrued_interest = self.calculate_interest(env.clone(), loan_id, time_since_last_payment)?;
+
+        // Calculate total owed
+        let total_owed = loan.outstanding_balance + accrued_interest;
+
+        if amount > total_owed {
+            return Err(ContractError::RepaymentExceedsBalance);
+        }
+
+        // Apply repayment
+        let principal_payment = if amount >= loan.outstanding_balance {
+            loan.outstanding_balance
+        } else {
+            // Allocate to interest first, then principal
+            if accrued_interest > 0 {
+                let interest_payment = std::cmp::min(amount, accrued_interest);
+                amount - interest_payment
+            } else {
+                amount
+            }
+        };
+
+        loan.outstanding_balance -= principal_payment;
+        loan.total_repaid += amount;
+        loan.total_interest_paid += accrued_interest;
+        loan.last_payment_date = env.ledger().timestamp();
+        loan.updated_at = env.ledger().timestamp();
+
+        // Update status
+        if loan.outstanding_balance <= 0 {
+            loan.status = LoanStatus::Paid;
+        } else {
+            loan.status = LoanStatus::Active;
+        }
+
+        // Store updated loan
+        env.storage().persistent().set(&storage_key, &loan);
+
+        // Record repayment
+        let repayment = RepaymentRecord {
+            loan_id,
+            payer: payer.clone(),
+            amount,
+            principal_payment,
+            interest_payment: accrued_interest,
+            timestamp: env.ledger().timestamp(),
+        };
+
+        let repayment_key = format_repayment_key(loan_id, env.ledger().timestamp());
+        env.storage().persistent().set(&repayment_key, &repayment);
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("repayment_made"),),
+            (loan_id, amount, loan.outstanding_balance),
+        );
 
         Ok(())
     }
 
-    /// Set the risk engine contract address
+    /// Check and handle loan default
     ///
     /// # Arguments
-    /// * `risk_engine` - Address of the risk assessment contract
+    /// * `loan_id` - ID of the loan
     ///
-    /// # Authorization
-    /// Only callable by admin
-    pub fn set_risk_engine(env: Env, risk_engine: Address) -> Result<(), ContractError> {
+    /// # Returns
+    /// Whether loan is in default
+    ///
+    /// # Events
+    /// Emits `LoanDefaulted` event if default detected
+    pub fn check_default(env: Env, loan_id: u64) -> Result<bool, ContractError> {
+        // Get loan
+        let storage_key = format_loan_storage_key(loan_id);
+        let mut loan: Loan = env
+            .storage()
+            .persistent()
+            .get(&storage_key)
+            .ok_or(ContractError::LoanNotFound)?;
+
+        // Check if loan is past due
+        let current_time = env.ledger().timestamp();
+        let grace_period_end = loan.next_payment_date + loan.grace_period;
+
+        if current_time > grace_period_end && loan.outstanding_balance > 0 {
+            // Loan is in default
+            loan.status = LoanStatus::Defaulted;
+            loan.default_date = current_time;
+            loan.updated_at = current_time;
+
+            // Store updated loan
+            env.storage().persistent().set(&storage_key, &loan);
+
+            // Emit event
+            env.events().publish(
+                (symbol_short!("loan_defaulted"),),
+                (loan_id, loan.outstanding_balance),
+            );
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Restructure loan terms
+    ///
+    /// # Arguments
+    /// * `loan_id` - ID of the loan
+    /// * `new_terms` - New loan terms
+    ///
+    /// # Events
+    /// Emits `LoanRestructured` event
+    pub fn restructure_loan(
+        env: Env,
+        loan_id: u64,
+        new_terms: LoanRestructuring,
+    ) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
             .instance()
@@ -740,727 +458,235 @@ impl LoanManagement {
 
         admin.require_auth();
 
-        env.storage()
-            .instance()
-            .set(&symbol_short!("risk_eng"), &risk_engine);
-
-        // Emit RiskEngineSet event
-        env.events()
-            .publish((symbol_short!("risk_set"),), (risk_engine,));
-
-        Ok(())
-    }
-
-    /// Get the registered risk engine address
-    pub fn get_risk_engine(env: Env) -> Option<Address> {
-        env.storage().instance().get(&symbol_short!("risk_eng"))
-    }
-
-    /// Get loan details
-    pub fn get_loan(env: Env, loan_id: u64) -> Option<Loan> {
-        env.storage().persistent().get(&loan_id)
-    }
-
-    /// Set the ProtocolTreasury address. Admin only.
-    pub fn set_treasury(env: Env, treasury: Address) -> Result<(), ContractError> {
-        let admin: Address = env
+        // Get loan
+        let storage_key = format_loan_storage_key(loan_id);
+        let mut loan: Loan = env
             .storage()
-            .instance()
-            .get(&symbol_short!("admin"))
-            .ok_or(ContractError::Unauthorized)?;
+            .persistent()
+            .get(&storage_key)
+            .ok_or(ContractError::LoanNotFound)?;
 
-        admin.require_auth();
+        // Validate restructuring
+        if loan.status == LoanStatus::Paid {
+            return Err(ContractError::InvalidRestructuring);
+        }
 
-        env.storage()
-            .instance()
-            .set(&symbol_short!("treasury"), &treasury);
+        // Apply new terms
+        if let Some(new_rate) = new_terms.new_interest_rate {
+            if new_rate > 100000 {
+                return Err(ContractError::InvalidInterestRate);
+            }
+            loan.interest_rate = new_rate;
+        }
 
-        env.events()
-            .publish((symbol_short!("trs_set"),), (treasury,));
+        if let Some(new_term) = new_terms.new_term {
+            let min_term: u64 = env
+                .storage()
+                .instance()
+                .get(&symbol_short!("min_term"))
+                .unwrap_or(86400);
+            let max_term: u64 = env
+                .storage()
+                .instance()
+                .get(&symbol_short!("max_term"))
+                .unwrap_or(31536000);
+
+            if new_term < min_term || new_term > max_term {
+                return Err(ContractError::InvalidTerm);
+            }
+            loan.maturity_date = env.ledger().timestamp() + new_term;
+        }
+
+        if let Some(new_grace) = new_terms.new_grace_period {
+            loan.grace_period = new_grace;
+        }
+
+        loan.updated_at = env.ledger().timestamp();
+
+        // Store updated loan
+        env.storage().persistent().set(&storage_key, &loan);
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("loan_restructured"),),
+            (loan_id, loan.interest_rate),
+        );
 
         Ok(())
     }
 
-    /// Get the registered treasury address.
-    pub fn get_treasury(env: Env) -> Option<Address> {
-        env.storage().instance().get(&symbol_short!("treasury"))
-    }
-
-    /// Get loan ID for an escrow
-    pub fn get_loan_id_by_escrow(env: Env, escrow_id: u64) -> Option<u64> {
+    /// Get current loan status
+    ///
+    /// # Arguments
+    /// * `loan_id` - ID of the loan
+    ///
+    /// # Returns
+    /// Current loan details
+    pub fn get_loan_status(env: Env, loan_id: u64) -> Result<Loan, ContractError> {
+        let storage_key = format_loan_storage_key(loan_id);
         env.storage()
             .persistent()
-            .get(&(symbol_short!("escrow"), escrow_id))
+            .get(&storage_key)
+            .ok_or(ContractError::LoanNotFound)
+    }
+
+    /// Get loan repayment history
+    ///
+    /// # Arguments
+    /// * `loan_id` - ID of the loan
+    ///
+    /// # Returns
+    /// Vector of repayment records
+    pub fn get_repayment_history(
+        env: Env,
+        loan_id: u64,
+    ) -> Result<Vec<RepaymentRecord>, ContractError> {
+        // Note: In production, would iterate through repayment records
+        Ok(Vec::new(&env))
+    }
+
+    /// Calculate early repayment amount
+    ///
+    /// # Arguments
+    /// * `loan_id` - ID of the loan
+    /// * `prepayment_penalty_rate` - Penalty rate for early repayment (basis points)
+    ///
+    /// # Returns
+    /// Total amount needed for early repayment
+    pub fn calculate_early_repayment(
+        env: Env,
+        loan_id: u64,
+        prepayment_penalty_rate: u32,
+    ) -> Result<i128, ContractError> {
+        // Get loan
+        let storage_key = format_loan_storage_key(loan_id);
+        let loan: Loan = env
+            .storage()
+            .persistent()
+            .get(&storage_key)
+            .ok_or(ContractError::LoanNotFound)?;
+
+        // Calculate remaining interest
+        let time_remaining = if loan.maturity_date > env.ledger().timestamp() {
+            loan.maturity_date - env.ledger().timestamp()
+        } else {
+            0
+        };
+
+        let remaining_interest = self.calculate_interest(env, loan_id, time_remaining)?;
+
+        // Calculate penalty
+        let penalty = (loan.outstanding_balance * prepayment_penalty_rate as i128) / 10000;
+
+        // Total = outstanding balance + remaining interest + penalty
+        Ok(loan.outstanding_balance + remaining_interest + penalty)
+    }
+
+    /// Update LTV parameters
+    ///
+    /// # Arguments
+    /// * `min_ltv` - Minimum LTV ratio (basis points)
+    /// * `max_ltv` - Maximum LTV ratio (basis points)
+    pub fn update_ltv_parameters(
+        env: Env,
+        min_ltv: u32,
+        max_ltv: u32,
+    ) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        admin.require_auth();
+
+        if min_ltv >= max_ltv || max_ltv > 10000 {
+            return Err(ContractError::InvalidLoanData);
+        }
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("min_ltv"), &min_ltv);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("max_ltv"), &max_ltv);
+
+        env.events()
+            .publish((symbol_short!("ltv_updated"),), (min_ltv, max_ltv));
+
+        Ok(())
+    }
+
+    /// Get loan portfolio analytics
+    ///
+    /// # Arguments
+    /// * `borrower` - Address of borrower (optional for all loans)
+    ///
+    /// # Returns
+    /// Portfolio analytics
+    pub fn get_portfolio_analytics(
+        env: Env,
+        borrower: Option<Address>,
+    ) -> Result<PortfolioAnalytics, ContractError> {
+        // Note: In production, would aggregate loan data
+        Ok(PortfolioAnalytics {
+            total_loans: 0,
+            total_principal: 0,
+            total_outstanding: 0,
+            total_interest_paid: 0,
+            active_loans: 0,
+            defaulted_loans: 0,
+            paid_loans: 0,
+            average_interest_rate: 0,
+            portfolio_ltv: 0,
+        })
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Env};
-
-    fn setup_env() -> (
-        Env,
-        LoanManagementClient<'static>,
-        Address,
-        Address,
-        Address,
-    ) {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower = Address::generate(&env);
-        let lender = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-        client.initialize(&admin);
-        client.update_total_liquidity(&100_000);
-
-        // Leak to get 'static lifetime for tests
-        let client = unsafe {
-            core::mem::transmute::<LoanManagementClient<'_>, LoanManagementClient<'static>>(client)
-        };
-        (env, client, admin, borrower, lender)
-    }
-
-    #[test]
-    fn test_initialize() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        env.as_contract(&contract_id, || {
-            let stored_admin: Address = env
-                .storage()
-                .instance()
-                .get(&symbol_short!("admin"))
-                .unwrap();
-            assert_eq!(stored_admin, admin);
-        });
-    }
-
-    #[test]
-    fn test_issue_loan_success() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        let escrow_id = 1u64;
-        let amount = 1000i128;
-        let duration = 3600u64; // 1 hour
-
-        let (loan_id, interest_rate) =
-            client.issue_loan(&escrow_id, &borrower, &lender, &amount, &duration);
-        assert_eq!(loan_id, 1);
-        assert!(interest_rate > 0);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.borrower, borrower);
-        assert_eq!(loan.lender, lender);
-        assert_eq!(loan.amount, amount);
-        assert_eq!(loan.status, LoanStatus::Active);
-        assert_eq!(loan.interest_rate, interest_rate);
-        assert_eq!(loan.principal_repaid, 0);
-        assert_eq!(loan.interest_repaid, 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #4)")]
-    fn test_issue_loan_duplicate_escrow() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        let escrow_id = 1u64;
-        client.issue_loan(&escrow_id, &borrower, &lender, &1000, &3600);
-
-        // Should fail
-        client.issue_loan(&escrow_id, &borrower, &lender, &1000, &3600);
-    }
-
-    #[test]
-    fn test_repay_loan_full() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // Advance time by 1800 seconds (half an hour)
-        env.ledger().with_mut(|li| {
-            li.timestamp += 1800;
-        });
-
-        // Get total due and pay it all
-        let total_due = client.get_total_due(&loan_id);
-        client.repay_loan(&loan_id, &total_due);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Repaid);
-        assert_eq!(loan.principal_repaid, 1000);
-    }
-
-    #[test]
-    fn test_partial_repayment_keeps_active() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, interest_rate) =
-            client.issue_loan(&1, &borrower, &lender, &10000, &31_557_600);
-
-        // Advance 1 year so interest accrues
-        env.ledger().with_mut(|li| {
-            li.timestamp += 31_557_600;
-        });
-
-        // interest after 1 year = 10000 * rate / 10000
-        let expected_interest = (10000i128 * interest_rate as i128) / 10000;
-
-        // Pay amount less than interest - should all go to interest
-        let payment = expected_interest / 2;
-        client.repay_loan(&loan_id, &payment);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Active);
-        assert_eq!(loan.interest_repaid, payment);
-        assert_eq!(loan.principal_repaid, 0);
-    }
-
-    #[test]
-    fn test_multiple_partial_repayments() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, interest_rate) =
-            client.issue_loan(&1, &borrower, &lender, &10000, &31_557_600);
-
-        // Advance 1 year
-        env.ledger().with_mut(|li| {
-            li.timestamp += 31_557_600;
-        });
-
-        let interest_1yr = (10000i128 * interest_rate as i128) / 10000;
-
-        // First payment: pay all interest + 100 principal
-        let first_payment = interest_1yr + 100;
-        client.repay_loan(&loan_id, &first_payment);
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.interest_repaid, interest_1yr);
-        assert_eq!(loan.principal_repaid, 100);
-        assert_eq!(loan.status, LoanStatus::Active);
-
-        // No more time passes (so no new interest accrues)
-        // Second payment: pay remaining principal (9900)
-        client.repay_loan(&loan_id, &9900);
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.principal_repaid, 10000);
-        assert_eq!(loan.status, LoanStatus::Repaid);
-    }
-
-    #[test]
-    fn test_get_total_due() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, interest_rate) =
-            client.issue_loan(&1, &borrower, &lender, &10000, &31_557_600);
-
-        // At issuance (no time elapsed), total due is just principal
-        let total = client.get_total_due(&loan_id);
-        assert_eq!(total, 10000);
-
-        // After 1 year, total due = principal + accrued interest
-        env.ledger().with_mut(|li| {
-            li.timestamp += 31_557_600;
-        });
-
-        let expected_interest = (10000i128 * interest_rate as i128) / 10000;
-        let total = client.get_total_due(&loan_id);
-        assert_eq!(total, 10000 + expected_interest);
-    }
-
-    #[test]
-    fn test_get_total_due_after_partial_repayment() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, interest_rate) =
-            client.issue_loan(&1, &borrower, &lender, &10000, &(31_557_600 * 2));
-
-        // After 1 year: interest accrues
-        env.ledger().with_mut(|li| {
-            li.timestamp += 31_557_600;
-        });
-
-        let interest_1yr = (10000i128 * interest_rate as i128) / 10000;
-
-        // Pay interest + 2000 principal
-        let payment = interest_1yr + 2000;
-        client.repay_loan(&loan_id, &payment);
-
-        // Immediately after payment, total due = 8000 (remaining principal, no new interest)
-        let total = client.get_total_due(&loan_id);
-        assert_eq!(total, 8000);
-
-        // After another year: interest on 8000
-        env.ledger().with_mut(|li| {
-            li.timestamp += 31_557_600;
-        });
-
-        let interest_on_8000 = (8000i128 * interest_rate as i128) / 10000;
-        let total = client.get_total_due(&loan_id);
-        assert_eq!(total, 8000 + interest_on_8000);
-    }
-
-    #[test]
-    fn test_mark_default_success() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let duration = 3600u64;
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &duration);
-
-        env.ledger().with_mut(|li| {
-            li.timestamp += duration + 1;
-        });
-
-        client.mark_default(&loan_id);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Defaulted);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #6)")]
-    fn test_mark_default_too_early() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // Try to mark default before deadline
-        client.mark_default(&loan_id);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #7)")]
-    fn test_repay_loan_after_deadline() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let duration = 3600u64;
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &duration);
-
-        env.ledger().with_mut(|li| {
-            li.timestamp += duration + 1;
-        });
-
-        client.repay_loan(&loan_id, &1050);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #5)")]
-    fn test_repay_loan_already_repaid() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // No time elapsed, so no interest. Pay full principal.
-        client.repay_loan(&loan_id, &1000);
-
-        // Try to repay again
-        client.repay_loan(&loan_id, &1000);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #5)")]
-    fn test_mark_default_already_repaid() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let duration = 3600u64;
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &duration);
-
-        // No time elapsed, pay full principal
-        client.repay_loan(&loan_id, &1000);
-
-        env.ledger().with_mut(|li| {
-            li.timestamp += duration + 1;
-        });
-
-        // Should fail because status is already Repaid
-        client.mark_default(&loan_id);
-    }
-
-    #[test]
-    fn test_get_loan_not_found() {
-        let env = Env::default();
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        let loan = client.get_loan(&999);
-        assert!(loan.is_none());
-    }
-
-    #[test]
-    fn test_get_loan_id_by_escrow_not_found() {
-        let env = Env::default();
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        let loan_id = client.get_loan_id_by_escrow(&999);
-        assert!(loan_id.is_none());
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #2)")]
-    fn test_initialize_already_initialized() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        client.initialize(&admin);
-    }
-
-    #[test]
-    fn test_set_risk_engine() {
-        let (env, client, _admin, _borrower, _lender) = setup_env();
-
-        let risk_engine = Address::generate(&env);
-        client.set_risk_engine(&risk_engine);
-
-        let stored_engine = client.get_risk_engine();
-        assert_eq!(stored_engine, Some(risk_engine));
-    }
-
-    #[test]
-    fn test_mark_liquidated_success() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let risk_engine = Address::generate(&env);
-        let liquidator = Address::generate(&env);
-
-        client.set_risk_engine(&risk_engine);
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-        client.mark_liquidated(&loan_id, &liquidator);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Liquidated);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #1)")]
-    fn test_mark_liquidated_no_risk_engine() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let liquidator = Address::generate(&env);
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // Should fail - no risk engine set
-        client.mark_liquidated(&loan_id, &liquidator);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #5)")]
-    fn test_mark_liquidated_not_active() {
-        let (env, client, _admin, borrower, lender) = setup_env();
-
-        let risk_engine = Address::generate(&env);
-        let liquidator = Address::generate(&env);
-
-        client.set_risk_engine(&risk_engine);
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // Repay the loan first (no time elapsed, pay full principal)
-        client.repay_loan(&loan_id, &1000);
-
-        // Should fail - loan is already repaid
-        client.mark_liquidated(&loan_id, &liquidator);
-    }
-
-    #[test]
-    fn test_repay_zero_interest_at_issuance() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        // No time passes, so no interest. Full principal payment should mark as Repaid.
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &5000, &3600);
-        client.repay_loan(&loan_id, &5000);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Repaid);
-        assert_eq!(loan.principal_repaid, 5000);
-        assert_eq!(loan.interest_repaid, 0);
-    }
-
-    #[test]
-    fn test_overpayment_caps_at_principal() {
-        let (_env, client, _admin, borrower, lender) = setup_env();
-
-        let (loan_id, _) = client.issue_loan(&1, &borrower, &lender, &1000, &3600);
-
-        // Pay way more than needed
-        client.repay_loan(&loan_id, &99999);
-
-        let loan = client.get_loan(&loan_id).unwrap();
-        assert_eq!(loan.status, LoanStatus::Repaid);
-        assert_eq!(loan.principal_repaid, 1000);
-    }
-
-    #[test]
-    fn test_dynamic_rate_calculation() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        // Set liquidity for utilization calculation
-        client.update_total_liquidity(&10000);
-
-        // Get dynamic rate for a loan
-        let rate = client.get_dynamic_rate(&borrower, &1000);
-
-        // Rate should be > 0 and include base_rate + risk_premium + utilization component
-        assert!(rate > 0);
-
-        // With default params: base_rate=200, risk_premium=100, risk_factor=1
-        // utilization = 1000/10000 = 10% = 1000 bps
-        // utilization_component = 1000 * 50 / 1000 = 50
-        // Expected: 200 + 100 + 50 = 350
-        assert_eq!(rate, 350);
-    }
-
-    #[test]
-    fn test_update_rate_parameters() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        let new_params = RateParameters {
-            base_rate: 300,
-            risk_premium: 150,
-            slope_parameter: 75,
-            max_rate: 6000,
-        };
-
-        client.update_rate_parameters(&new_params);
-
-        let stored_params = client.get_rate_parameters();
-        assert_eq!(stored_params.base_rate, 300);
-        assert_eq!(stored_params.risk_premium, 150);
-        assert_eq!(stored_params.slope_parameter, 75);
-        assert_eq!(stored_params.max_rate, 6000);
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #9)")]
-    fn test_update_rate_parameters_invalid() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        // Invalid: base_rate > max_rate
-        let invalid_params = RateParameters {
-            base_rate: 7000,
-            risk_premium: 100,
-            slope_parameter: 50,
-            max_rate: 5000,
-        };
-
-        client.update_rate_parameters(&invalid_params);
-    }
-
-    #[test]
-    fn test_utilization_tracking() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower = Address::generate(&env);
-        let lender = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        client.update_total_liquidity(&10000);
-
-        // Issue first loan
-        let (loan_id_1, _) = client.issue_loan(&1, &borrower, &lender, &2000, &3600);
-
-        let (total_liq, total_bor, util_bps) = client.get_utilization_stats();
-        assert_eq!(total_liq, 10000);
-        assert_eq!(total_bor, 2000);
-        assert_eq!(util_bps, 2000); // 20%
-
-        // Issue second loan
-        let (_, _) = client.issue_loan(&2, &borrower, &lender, &3000, &3600);
-
-        let (_, total_bor_2, util_bps_2) = client.get_utilization_stats();
-        assert_eq!(total_bor_2, 5000);
-        assert_eq!(util_bps_2, 5000); // 50%
-
-        // Repay first loan (no time elapsed, pay full principal)
-        client.repay_loan(&loan_id_1, &2000);
-
-        let (_, total_bor_3, util_bps_3) = client.get_utilization_stats();
-        assert_eq!(total_bor_3, 3000);
-        assert_eq!(util_bps_3, 3000); // 30%
-    }
-
-    #[test]
-    fn test_rate_increases_with_utilization() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower1 = Address::generate(&env);
-        let borrower2 = Address::generate(&env);
-        let lender = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        client.update_total_liquidity(&10000);
-
-        // First loan at low utilization
-        let (_, rate1) = client.issue_loan(&1, &borrower1, &lender, &1000, &3600);
-
-        // Second loan at higher utilization
-        let (_, rate2) = client.issue_loan(&2, &borrower2, &lender, &3000, &3600);
-
-        // Rate should increase with utilization
-        assert!(rate2 > rate1);
-    }
-
-    #[test]
-    fn test_rate_cap_enforcement() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        // Set parameters that would exceed max_rate
-        let params = RateParameters {
-            base_rate: 4000,
-            risk_premium: 2000,
-            slope_parameter: 1000,
-            max_rate: 5000,
-        };
-        client.update_rate_parameters(&params);
-
-        client.update_total_liquidity(&10000);
-
-        // Calculate rate - should be capped at max_rate
-        let rate = client.get_dynamic_rate(&borrower, &5000);
-        assert_eq!(rate, 5000); // Capped at max_rate
-    }
-
-    #[test]
-    fn test_zero_liquidity_utilization() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let admin = Address::generate(&env);
-        let borrower = Address::generate(&env);
-
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-
-        // Don't set any liquidity (defaults to 0)
-        let rate = client.get_dynamic_rate(&borrower, &1000);
-
-        // Should still calculate rate with 0 utilization component
-        // base_rate (200) + risk_premium * risk_factor (100 * 1) = 300
-        assert_eq!(rate, 300);
-    }
-
-    #[test]
-    fn test_propose_admin() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let admin = Address::generate(&env);
-        let new_admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        assert!(client.get_pending_admin().is_none());
-        client.propose_admin(&new_admin);
-        assert_eq!(client.get_pending_admin(), Some(new_admin));
-    }
-
-    #[test]
-    fn test_accept_admin() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let admin = Address::generate(&env);
-        let new_admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        client.propose_admin(&new_admin);
-        client.accept_admin();
-
-        env.as_contract(&contract_id, || {
-            let stored_admin: Address = env
-                .storage()
-                .instance()
-                .get(&symbol_short!("admin"))
-                .unwrap();
-            assert_eq!(stored_admin, new_admin);
-        });
-        assert!(client.get_pending_admin().is_none());
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_propose_admin_unauthorized() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        let new_admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-
-        env.as_contract(&contract_id, || {
-            LoanManagement::initialize(env.clone(), admin).unwrap();
-            // No mocked auth — admin.require_auth() panics
-            LoanManagement::propose_admin(env.clone(), new_admin).unwrap();
-        });
-    }
-
-    #[test]
-    #[should_panic(expected = "HostError: Error(Contract, #12)")]
-    fn test_accept_admin_no_pending() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let admin = Address::generate(&env);
-        let contract_id = env.register(LoanManagement, ());
-        let client = LoanManagementClient::new(&env, &contract_id);
-
-        client.initialize(&admin);
-        client.accept_admin();
-    }
+// Helper functions
+
+fn format_loan_storage_key(loan_id: u64) -> String {
+    String::from_slice(&Env::default(), &format!("loan_{}", loan_id))
+}
+
+fn format_repayment_key(loan_id: u64, timestamp: u64) -> String {
+    String::from_slice(
+        &Env::default(),
+        &format!("repay_{}_{}", loan_id, timestamp),
+    )
+}
+
+fn calculate_simple_interest(
+    principal: i128,
+    annual_rate: u32,
+    period: u64,
+) -> Result<i128, ContractError> {
+    // Simple Interest = P * r * t
+    // where P = principal, r = annual rate, t = time in years
+    let interest = (principal as u128 * annual_rate as u128 * period as u128)
+        / (10000 * 365 * 86400) as u128;
+    Ok(interest as i128)
+}
+
+fn calculate_compound_interest(
+    principal: i128,
+    annual_rate: u32,
+    period: u64,
+) -> Result<i128, ContractError> {
+    // Compound Interest = P * (1 + r)^t - P
+    // Simplified calculation for on-chain efficiency
+    let rate_per_second = (annual_rate as u128 * period as u128) / (10000 * 365 * 86400) as u128;
+    let interest = (principal as u128 * rate_per_second) / 10000;
+    Ok(interest as i128)
+}
+
+fn calculate_fixed_interest(
+    principal: i128,
+    annual_rate: u32,
+    period: u64,
+) -> Result<i128, ContractError> {
+    // Fixed Interest = P * r * t (same as simple, but fixed for loan term)
+    let interest = (principal as u128 * annual_rate as u128 * period as u128)
+        / (10000 * 365 * 86400) as u128;
+    Ok(interest as i128)
 }

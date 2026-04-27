@@ -287,16 +287,26 @@ model OracleEvent {
 }
 
 model Oracle {
-  id            String               @id @default(uuid())
-  address       String               @unique
-  isActive      Boolean              @default(true)
-  registeredAt  DateTime             @default(now())
-  deactivatedAt DateTime?
-  updatedAt     DateTime             @updatedAt
-  confirmations OracleConfirmation[]
-  rateLimits    OracleRateLimit[]
+  id               String              @id @default(uuid())
+  address          String              @unique
+  isActive         Boolean             @default(true)
+  registeredAt     DateTime            @default(now())
+  deactivatedAt    DateTime?
+  updatedAt        DateTime            @updatedAt
+  confirmations    OracleConfirmation[]
+  rateLimits       OracleRateLimit[]
+  reputation       OracleReputation?
+  stake            OracleStake?
+  oracleType       OracleType          @default(GENERAL)
+  metadata         Json?
+  totalConfirmations Int               @default(0)
+  successfulConfirmations Int         @default(0)
+  failedConfirmations Int             @default(0)
+  lastActiveAt     DateTime?
+  rewards          OracleReward[]
 
   @@index([isActive])
+  @@index([oracleType])
 }
 
 model OracleRateLimit {
@@ -321,10 +331,13 @@ model OracleConfirmation {
   signature String
   payload   Json
   createdAt DateTime @default(now())
+  status    ConfirmationStatus @default(PENDING)
+  validated Boolean @default(false)
 
   @@unique([oracleId, escrowId, eventType])
   @@index([escrowId])
   @@index([oracleId])
+  @@index([status])
 }
 
 model Dispute {
@@ -336,6 +349,69 @@ model Dispute {
   status          DisputeStatus @default(OPEN)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  resolution      String?
+  resolvedAt      DateTime?
+
+  @@index([escrowId])
+  @@index([status])
+}
+
+model OracleReputation {
+  id              String   @id @default(uuid())
+  oracleId        String   @unique
+  oracle          Oracle   @relation(fields: [oracleId], references: [id], onDelete: Cascade)
+  score           Int      @default(100)
+  accuracy        Decimal  @default(100) @db.Decimal(5, 2)
+  reliability     Decimal  @default(100) @db.Decimal(5, 2)
+  responsiveness  Decimal  @default(100) @db.Decimal(5, 2)
+  totalVotes      Int      @default(0)
+  positiveVotes   Int      @default(0)
+  negativeVotes   Int      @default(0)
+  lastUpdated     DateTime @default(now())
+
+  @@index([score])
+}
+
+model OracleStake {
+  id              String   @id @default(uuid())
+  oracleId        String   @unique
+  oracle          Oracle   @relation(fields: [oracleId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(20, 7)
+  assetCode       String   @default("USDC")
+  stakedAt        DateTime @default(now())
+  lockedUntil     DateTime?
+  slashedAmount   Decimal  @default(0) @db.Decimal(20, 7)
+  rewardAmount    Decimal  @default(0) @db.Decimal(20, 7)
+  lastRewardAt    DateTime?
+
+  @@index([oracleId])
+}
+
+model OracleReward {
+  id              String   @id @default(uuid())
+  oracleId        String
+  oracle          Oracle   @relation(fields: [oracleId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(20, 7)
+  assetCode       String   @default("USDC")
+  reason          RewardReason
+  confirmationId  String?
+  createdAt       DateTime @default(now())
+  distributedAt   DateTime?
+
+  @@index([oracleId])
+  @@index([createdAt])
+}
+
+model ThresholdSignature {
+  id              String   @id @default(uuid())
+  escrowId        String
+  eventType       String
+  requiredSigs    Int
+  collectedSigs  Int      @default(0)
+  signatures     Json
+  status          SignatureStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
 
   @@index([escrowId])
   @@index([status])
@@ -482,4 +558,32 @@ enum DisputeStatus {
   OPEN
   RESOLVED
   CANCELLED
+}
+
+enum OracleType {
+  GENERAL
+  PRICE
+  WEATHER
+  SHIPPING
+  QUALITY
+}
+
+enum ConfirmationStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+  DISPUTED
+}
+
+enum RewardReason {
+  CONFIRMATION
+  ACCURACY_BONUS
+  RELIABILITY_BONUS
+  PARTICIPATION
+}
+
+enum SignatureStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

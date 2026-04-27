@@ -50,19 +50,24 @@ const MAX_TRANSACTIONS = 10
 // Generate unique ID
 const generateId = () => `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-// Format timestamp for display
-const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp)
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+function loadStoredTransactions(): Transaction[] {
+  if (typeof window === 'undefined') return []
+
+  try {
+    const stored = localStorage.getItem('stellovault_transactions')
+    if (!stored) return []
+
+    const parsed = JSON.parse(stored)
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
+    return parsed.filter((tx: Transaction) => tx.timestamp > oneDayAgo)
+  } catch (error) {
+    console.warn('Failed to load transactions from localStorage:', error)
+    return []
+  }
 }
 
 export function TransactionStatusProvider({ children }: TransactionStatusProviderProps) {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>(loadStoredTransactions)
   const [isDrawerOpen, setDrawerOpen] = useState(false)
 
   // Calculate pending count
@@ -166,25 +171,6 @@ export function TransactionStatusProvider({ children }: TransactionStatusProvide
   // Clear transaction history
   const clearHistory = useCallback(() => {
     setTransactions([])
-  }, [])
-
-  // Load transactions from localStorage on mount. localStorage is only
-  // available after hydration on the client, so a lazy useState initializer
-  // would always read empty during SSR and never re-read on the client.
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('stellovault_transactions')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        // Only load transactions from the last 24 hours
-        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
-        const recentTxs = parsed.filter((tx: Transaction) => tx.timestamp > oneDayAgo)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setTransactions(recentTxs)
-      }
-    } catch (error) {
-      console.warn('Failed to load transactions from localStorage:', error)
-    }
   }, [])
 
   // Persist transactions to localStorage

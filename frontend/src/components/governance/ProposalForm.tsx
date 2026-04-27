@@ -44,6 +44,7 @@ function validate(data: FormData): Record<string, string> {
 export function ProposalForm() {
   const router = useRouter();
   const { createProposal } = useGovernance();
+  const [createdAt] = useState(() => Date.now());
   const [step, setStep] = useState<0 | 1>(0);
   const [formData, setFormData] = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -81,7 +82,7 @@ export function ProposalForm() {
     }
   };
 
-  const expiresAt = new Date(now + 86400000 * formData.duration);
+  const expiresAt = new Date(createdAt + 86400000 * formData.duration);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">
@@ -286,7 +287,7 @@ export function ProposalForm() {
                   <div className="px-6 py-4 flex justify-between">
                     <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Duration</span>
                     <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {formData.duration} days (expires {expiresAt.toLocaleDateString()})
+                      {formData.duration} days
                     </span>
                   </div>
                   <div className="px-6 py-4">

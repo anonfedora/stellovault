@@ -5,7 +5,7 @@ import { useGovernance } from "@/hooks/useGovernance";
 import { VoteTallyBar } from "@/components/governance/VoteTallyBar";
 import { VoteButton } from "@/components/governance/VoteButton";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
@@ -36,19 +36,20 @@ export default function ProposalDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const { proposals, vote, votingState, userVotes, wsConnected } = useGovernance();
+  const [now] = useState(() => Date.now());
 
   const proposal = useMemo(
     () => proposals.find((p) => p.id === id) ?? null,
     [proposals, id],
   );
 
-  // Track wall-clock time so the "X remaining" display ticks down without
-  // calling Date.now() during render. Captured once via the lazy initializer
-  // and refreshed every minute by the interval callback.
-  const [now, setNow] = useState<number>(() => Date.now());
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(interval);
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
   }, []);
 
   if (!proposal) {

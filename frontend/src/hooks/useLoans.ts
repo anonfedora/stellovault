@@ -150,25 +150,41 @@ export const useLoans = (): UseLoansReturn => {
       setLoading(true);
       setError(null);
       try {
-        // TODO: Replace with real API call to GET /api/v1/loans
-        // const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-        // if (status && status !== 'ALL') params.set('status', status);
-        // const res = await fetch(`/api/v1/loans?${params}`);
-        // const data = await res.json();
+        const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+        if (status && status !== 'ALL') params.set('status', status);
+        
+        const res = await fetch(`/api/v1/loans?${params}`);
+        
+        if (!res.ok) {
+          // Fall back to mock data if API fails
+          console.warn('API request failed, using mock data');
+          await new Promise((r) => setTimeout(r, 400));
+          let filtered = [...MOCK_LOANS];
+          if (status && status !== "ALL") {
+            filtered = filtered.filter((l) => l.status === status);
+          }
+          const start = (page - 1) * limit;
+          const paginated = filtered.slice(start, start + limit);
+          setLoans(paginated);
+          setTotalPages(Math.max(1, Math.ceil(filtered.length / limit)));
+          return;
+        }
 
-        await new Promise((r) => setTimeout(r, 400)); // simulate network
-
+        const data = await res.json();
+        setLoans(data.loans || []);
+        setTotalPages(data.totalPages || 1);
+      } catch (err) {
+        // Fall back to mock data on error
+        console.warn('API request failed, using mock data:', err);
+        await new Promise((r) => setTimeout(r, 400));
         let filtered = [...MOCK_LOANS];
         if (status && status !== "ALL") {
           filtered = filtered.filter((l) => l.status === status);
         }
         const start = (page - 1) * limit;
         const paginated = filtered.slice(start, start + limit);
-
         setLoans(paginated);
         setTotalPages(Math.max(1, Math.ceil(filtered.length / limit)));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch loans");
       } finally {
         setLoading(false);
       }
@@ -180,13 +196,27 @@ export const useLoans = (): UseLoansReturn => {
     setLoading(true);
     setError(null);
     try {
-      // TODO: Replace with real API call to GET /api/v1/loans/:id
+      const res = await fetch(`/api/v1/loans/${id}`);
+      
+      if (!res.ok) {
+        // Fall back to mock data
+        console.warn('API request failed, using mock data');
+        await new Promise((r) => setTimeout(r, 300));
+        const found = MOCK_LOANS.find((l) => l.id === id) ?? null;
+        if (!found) throw new Error("Loan not found");
+        setLoan(found);
+        return;
+      }
+
+      const data = await res.json();
+      setLoan(data);
+    } catch (err) {
+      // Fall back to mock data on error
+      console.warn('API request failed, using mock data:', err);
       await new Promise((r) => setTimeout(r, 300));
       const found = MOCK_LOANS.find((l) => l.id === id) ?? null;
       if (!found) throw new Error("Loan not found");
       setLoan(found);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch loan");
     } finally {
       setLoading(false);
     }

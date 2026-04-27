@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Wallet, LogOut, Menu, X, Loader2 } from 'lucide-react'
+import { Wallet, LogOut, Menu, X, Loader2, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
@@ -41,6 +41,7 @@ export function Navbar() {
     { href: '/#features', label: 'Features' },
     { href: '/#innovation', label: 'Innovation' },
     { href: '/#impact', label: 'Impact' },
+    { href: '/escrows', label: 'Escrows' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
     { href: '/governance', label: 'Governance' },
@@ -48,15 +49,15 @@ export function Navbar() {
 
   return (
     <nav className="fixed w-full top-0 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-blue-900 flex items-center gap-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link href="/" className="text-xl sm:text-2xl font-bold text-blue-900 flex items-center gap-2">
           <div className="w-8 h-8 bg-blue-900 rounded-lg flex items-center justify-center">
             <span className="text-white text-sm font-bold">SV</span>
           </div>
           StelloVault
         </Link>
         
-        <div className="hidden md:flex gap-8 text-sm items-center">
+        <div className="hidden lg:flex gap-6 text-sm items-center">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -72,10 +73,10 @@ export function Navbar() {
           ))}
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Pending Transaction Indicator */}
           {pendingCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>{pendingCount} Pending</span>
             </div>
@@ -88,7 +89,7 @@ export function Navbar() {
             {isConnected ? (
               <button
                 onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
-                className="flex items-center gap-2 bg-blue-100 text-blue-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors"
+                className="flex min-h-11 items-center gap-2 bg-blue-100 text-blue-900 px-3 sm:px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors"
               >
                 <Wallet className="w-4 h-4" />
                 {shortenAddress(walletAddress || '')}
@@ -96,7 +97,7 @@ export function Navbar() {
             ) : (
               <button
                 onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
-                className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2 rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
+                className="hidden sm:flex min-h-11 items-center gap-2 bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
               >
                 <Wallet className="w-4 h-4" />
                 Connect Wallet
@@ -140,9 +141,18 @@ export function Navbar() {
             )}
           </div>
           
+          <button
+            onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-blue-900 text-white sm:hidden"
+            aria-label="Connect wallet"
+          >
+            <Wallet className="w-4 h-4" />
+          </button>
+
           <button 
-            className="md:hidden p-2 text-gray-600"
+            className="lg:hidden min-h-11 min-w-11 rounded-lg p-2 text-gray-600"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Open navigation"
           >
             {isMobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -151,15 +161,23 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200 px-6 py-4 space-y-4">
+        <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-4 space-y-2 shadow-lg">
+          <Link
+            href="/escrows/new"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="mb-2 flex min-h-12 items-center justify-center gap-2 rounded-lg bg-blue-900 px-4 font-semibold text-white"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            New escrow
+          </Link>
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setIsMobileMenuOpen(false)}
-              className={`block py-2 transition-colors duration-200 ${
+              className={`block rounded-lg px-3 py-3 transition-colors duration-200 ${
                 isActive(link.href)
-                  ? 'text-blue-900 font-bold bg-blue-50 px-3 rounded-lg'
+                  ? 'text-blue-900 font-bold bg-blue-50'
                   : 'text-gray-600 hover:text-blue-900'
               }`}
             >

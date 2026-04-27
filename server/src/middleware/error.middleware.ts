@@ -7,6 +7,7 @@ import {
     ValidationError,
     TooManyRequestsError,
 } from "../config/errors";
+import logger from "../config/logger";
 
 /**
  * Central error handler. Maps custom error classes to HTTP status codes.
@@ -14,7 +15,7 @@ import {
  */
 export function errorMiddleware(
     err: Error,
-    _req: Request,
+    req: Request,
     res: Response,
     _next: NextFunction
 ) {
@@ -28,12 +29,17 @@ export function errorMiddleware(
     else if (err instanceof TooManyRequestsError) status = 429;
 
     if (status === 500) {
-        console.error("[ERROR]", err);
+        logger.error("unhandled_request_error", {
+            requestId: req.requestId,
+            correlationId: req.correlationId,
+            error: err,
+        });
     }
 
     res.status(status).json({
         success: false,
         error: err.message || "Internal server error",
+        requestId: req.requestId,
     });
 }
 

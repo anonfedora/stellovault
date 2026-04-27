@@ -28,6 +28,26 @@ export type User = Prisma.UserModel
  */
 export type Wallet = Prisma.WalletModel
 /**
+ * Model Permission
+ * 
+ */
+export type Permission = Prisma.PermissionModel
+/**
+ * Model UserRoleModel
+ * 
+ */
+export type UserRoleModel = Prisma.UserRoleModelModel
+/**
+ * Model RolePermission
+ * 
+ */
+export type RolePermission = Prisma.RolePermissionModel
+/**
+ * Model UserPermission
+ * 
+ */
+export type UserPermission = Prisma.UserPermissionModel
+/**
  * Model Session
  * 
  */
@@ -63,6 +83,11 @@ export type Repayment = Prisma.RepaymentModel
  */
 export type PaymentSession = Prisma.PaymentSessionModel
 /**
+ * Model Payment
+ * 
+ */
+export type Payment = Prisma.PaymentModel
+/**
  * Model Investment
  * 
  */
@@ -92,6 +117,26 @@ export type OracleConfirmation = Prisma.OracleConfirmationModel
  * 
  */
 export type Dispute = Prisma.DisputeModel
+/**
+ * Model OracleReputation
+ * 
+ */
+export type OracleReputation = Prisma.OracleReputationModel
+/**
+ * Model OracleStake
+ * 
+ */
+export type OracleStake = Prisma.OracleStakeModel
+/**
+ * Model OracleReward
+ * 
+ */
+export type OracleReward = Prisma.OracleRewardModel
+/**
+ * Model ThresholdSignature
+ * 
+ */
+export type ThresholdSignature = Prisma.ThresholdSignatureModel
 /**
  * Model GovernanceProposal
  * 
