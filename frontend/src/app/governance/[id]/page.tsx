@@ -36,19 +36,18 @@ export default function ProposalDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const { proposals, vote, votingState, userVotes, wsConnected } = useGovernance();
-  const [now] = useState(() => Date.now());
 
   const proposal = useMemo(
     () => proposals.find((p) => p.id === id) ?? null,
     [proposals, id],
   );
 
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  // Live wall-clock so the "X remaining" display ticks down. Captured once
+  // via the lazy initializer and refreshed every minute.
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000); // Update every minute
+    const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
 
