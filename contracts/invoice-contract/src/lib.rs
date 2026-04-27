@@ -11,12 +11,8 @@
 
 #![no_std]
 
-extern crate alloc;
-
-use alloc::format;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
-    Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
 };
 
 mod cross_border;
@@ -361,16 +357,16 @@ impl InvoiceContract {
 
         // Get payment terms
         let terms_key = format_payment_terms_key(invoice_id);
-        let terms: PaymentTerms = env
-            .storage()
-            .persistent()
-            .get(&terms_key)
-            .unwrap_or_else(|| PaymentTerms {
-                discount_rate: 0,
-                early_payment_discount: 0,
-                late_payment_fee: 0,
-                payment_deadline: invoice.due_date,
-            });
+        let terms: PaymentTerms =
+            env.storage()
+                .persistent()
+                .get(&terms_key)
+                .unwrap_or(PaymentTerms {
+                    discount_rate: 0,
+                    early_payment_discount: 0,
+                    late_payment_fee: 0,
+                    payment_deadline: invoice.due_date,
+                });
 
         // Check payment terms
         if env.ledger().timestamp() > terms.payment_deadline {
@@ -445,7 +441,7 @@ impl InvoiceContract {
 
         // Calculate present value: PV = FV / (1 + r*t)
         let remaining_amount = invoice.amount - invoice.paid_amount;
-        let discount_factor = 10000 + (discount_rate as u64 * days_to_maturity as u64 / 365);
+        let discount_factor = 10000 + (discount_rate as u64 * days_to_maturity / 365);
         let present_value = (remaining_amount as u64 * 10000 / discount_factor) as i128;
 
         Ok(present_value)
@@ -536,7 +532,7 @@ impl InvoiceContract {
     /// Vector of payment records
     pub fn get_payment_history(
         env: Env,
-        invoice_id: u64,
+        _invoice_id: u64,
     ) -> Result<Vec<PaymentRecord>, ContractError> {
         // Note: In production, this would iterate through payment records
         // For now, return empty vector as placeholder
@@ -573,32 +569,27 @@ impl InvoiceContract {
 
 // Helper functions
 
-fn format_invoice_storage_key(invoice_id: u64) -> String {
-    // In production, use proper key formatting
-    String::from_slice(&Env::default(), &format!("invoice_{}", invoice_id))
+fn format_invoice_storage_key(invoice_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("invoice"), invoice_id)
 }
 
-fn format_invoice_key(invoice_number: &String) -> String {
-    // In production, use proper key formatting
-    String::from_slice(&Env::default(), &format!("inv_num_{:?}", invoice_number))
+fn format_invoice_key(invoice_number: &String) -> (soroban_sdk::Symbol, String) {
+    (symbol_short!("inv_num"), invoice_number.clone())
 }
 
-fn format_payment_terms_key(invoice_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("terms_{}", invoice_id))
+fn format_payment_terms_key(invoice_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("terms"), invoice_id)
 }
 
-fn format_payment_record_key(invoice_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("payment_{}_{}", invoice_id, timestamp),
-    )
+fn format_payment_record_key(invoice_id: u64, timestamp: u64) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("pay"), invoice_id, timestamp)
 }
 
 fn calculate_effective_payment(
     env: &Env,
     amount: i128,
     terms: &PaymentTerms,
-    invoice: &Invoice,
+    _invoice: &Invoice,
 ) -> Result<i128, ContractError> {
     let mut effective_amount = amount;
 

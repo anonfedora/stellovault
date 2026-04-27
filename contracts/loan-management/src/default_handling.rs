@@ -1,6 +1,6 @@
 //! Default handling and recovery module
 
-use soroban_sdk::{contracttype, Address, String};
+use soroban_sdk::{contracttype, String};
 
 /// Default event
 #[contracttype]

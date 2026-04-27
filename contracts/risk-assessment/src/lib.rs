@@ -1500,7 +1500,7 @@ impl RiskAssessment {
             300
         };
 
-        let final_rate = (base_rate as i32 + score_adjustment).clamp(100, 1500) as u32;
+        let final_rate = (base_rate + score_adjustment).clamp(100, 1500) as u32;
 
         // Ensure rate is within reasonable bounds (1% - 15%)
         Ok(final_rate)
@@ -1847,11 +1847,9 @@ impl RiskAssessment {
             return 500;
         }
 
-        let default_rate = if portfolio.active_loans > 0 {
-            (portfolio.defaulted_loans * 10000) / portfolio.active_loans
-        } else {
-            0
-        };
+        let default_rate = (portfolio.defaulted_loans * 10000)
+            .checked_div(portfolio.active_loans)
+            .unwrap_or(0);
 
         // Higher default rate + higher LTV = higher risk score
         let ltv_risk = portfolio.average_ltv / 10; // Scale LTV to 0-1000

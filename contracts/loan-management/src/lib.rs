@@ -11,14 +11,8 @@
 
 #![no_std]
 
-extern crate alloc;
-
-use alloc::format;
 use core::cmp;
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
-    Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Vec};
 
 mod analytics;
 mod default_handling;
@@ -27,12 +21,9 @@ mod loan;
 mod repayment;
 mod restructuring;
 
-pub use analytics::*;
-pub use default_handling::*;
-pub use interest::*;
-pub use loan::*;
-pub use repayment::*;
-pub use restructuring::*;
+use analytics::PortfolioAnalytics;
+use loan::{InterestType, Loan, LoanRestructuring, LoanStatus};
+use repayment::RepaymentRecord;
 
 /// Contract errors
 #[contracttype]
@@ -527,7 +518,7 @@ impl LoanContract {
     /// Vector of repayment records
     pub fn get_repayment_history(
         env: Env,
-        loan_id: u64,
+        _loan_id: u64,
     ) -> Result<Vec<RepaymentRecord>, ContractError> {
         // Note: In production, would iterate through repayment records
         Ok(Vec::new(&env))
@@ -613,8 +604,8 @@ impl LoanContract {
     /// # Returns
     /// Portfolio analytics
     pub fn get_portfolio_analytics(
-        env: Env,
-        borrower: Option<Address>,
+        _env: Env,
+        _borrower: Option<Address>,
     ) -> Result<PortfolioAnalytics, ContractError> {
         // Note: In production, would aggregate loan data
         Ok(PortfolioAnalytics {
@@ -633,12 +624,12 @@ impl LoanContract {
 
 // Helper functions
 
-fn format_loan_storage_key(loan_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("loan_{}", loan_id))
+fn format_loan_storage_key(loan_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("loan"), loan_id)
 }
 
-fn format_repayment_key(loan_id: u64, timestamp: u64) -> String {
-    String::from_slice(&Env::default(), &format!("repay_{}_{}", loan_id, timestamp))
+fn format_repayment_key(loan_id: u64, timestamp: u64) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("repay"), loan_id, timestamp)
 }
 
 fn calculate_simple_interest(

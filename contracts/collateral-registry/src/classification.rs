@@ -36,6 +36,7 @@ pub enum AssetClass {
 /// Risk rating enumeration
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum RiskRating {
     AAA = 0,
     AA = 1,
@@ -142,6 +143,7 @@ pub struct SecuritiesClassification {
 /// Security type
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum SecurityType {
     Stock = 0,
     Bond = 1,

@@ -11,12 +11,8 @@
 
 #![no_std]
 
-extern crate alloc;
-
-use alloc::format;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
-    Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
 };
 
 mod classification;
@@ -26,12 +22,12 @@ mod ownership;
 mod valuation;
 mod verification;
 
-pub use classification::*;
-pub use collateral::*;
-pub use locking::*;
-pub use ownership::*;
-pub use valuation::*;
-pub use verification::*;
+use classification::*;
+use collateral::*;
+use locking::*;
+use ownership::*;
+use valuation::*;
+use verification::*;
 
 /// Contract errors
 #[contracttype]
@@ -215,7 +211,7 @@ impl CollateralRegistry {
         env: Env,
         collateral_id: u64,
         new_valuation: i128,
-        oracle_signature: BytesN<64>,
+        _oracle_signature: BytesN<64>,
     ) -> Result<(), ContractError> {
         // Get oracle address
         let oracle: Address = env
@@ -546,7 +542,7 @@ impl CollateralRegistry {
     /// Vector of valuation records
     pub fn get_valuation_history(
         env: Env,
-        collateral_id: u64,
+        _collateral_id: u64,
     ) -> Result<Vec<ValuationRecord>, ContractError> {
         // Note: In production, would iterate through valuation records
         Ok(Vec::new(&env))
@@ -561,7 +557,7 @@ impl CollateralRegistry {
     /// Vector of transfer records
     pub fn get_transfer_history(
         env: Env,
-        collateral_id: u64,
+        _collateral_id: u64,
     ) -> Result<Vec<OwnershipTransfer>, ContractError> {
         // Note: In production, would iterate through transfer records
         Ok(Vec::new(&env))
@@ -587,7 +583,7 @@ impl CollateralRegistry {
 
         // Get collateral
         let storage_key = format_collateral_storage_key(collateral_id);
-        let collateral: Collateral = env
+        let _collateral: Collateral = env
             .storage()
             .persistent()
             .get(&storage_key)
@@ -627,49 +623,43 @@ impl CollateralRegistry {
 
 // Helper functions
 
-fn format_collateral_storage_key(collateral_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("collateral_{}", collateral_id))
+fn format_collateral_storage_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("collat"), collateral_id)
 }
 
-fn format_asset_hash_key(asset_hash: &BytesN<32>) -> String {
-    String::from_slice(&Env::default(), &format!("hash_{:?}", asset_hash))
+fn format_asset_hash_key(asset_hash: &BytesN<32>) -> (soroban_sdk::Symbol, BytesN<32>) {
+    (symbol_short!("hash"), asset_hash.clone())
 }
 
-fn format_owner_collateral_key(owner: &Address, collateral_id: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("owner_{:?}_{}", owner, collateral_id),
-    )
+fn format_owner_collateral_key(
+    owner: &Address,
+    collateral_id: u64,
+) -> (soroban_sdk::Symbol, Address, u64) {
+    (symbol_short!("owner"), owner.clone(), collateral_id)
 }
 
-fn format_valuation_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("valuation_{}_{}", collateral_id, timestamp),
-    )
+fn format_valuation_history_key(
+    collateral_id: u64,
+    timestamp: u64,
+) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("val"), collateral_id, timestamp)
 }
 
-fn format_transfer_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("transfer_{}_{}", collateral_id, timestamp),
-    )
+fn format_transfer_history_key(
+    collateral_id: u64,
+    timestamp: u64,
+) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("trans"), collateral_id, timestamp)
 }
 
-fn format_lock_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("lock_{}_{}", collateral_id, timestamp),
-    )
+fn format_lock_history_key(collateral_id: u64, timestamp: u64) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("lock"), collateral_id, timestamp)
 }
 
-fn format_verification_history_key(collateral_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("verification_{}", collateral_id))
+fn format_verification_history_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("verif"), collateral_id)
 }
 
-fn format_classification_key(collateral_id: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("classification_{}", collateral_id),
-    )
+fn format_classification_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("class"), collateral_id)
 }
