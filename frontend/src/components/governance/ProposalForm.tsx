@@ -44,16 +44,11 @@ function validate(data: FormData): Record<string, string> {
 export function ProposalForm() {
   const router = useRouter();
   const { createProposal } = useGovernance();
-  const [createdAt] = useState(() => Date.now());
   const [step, setStep] = useState<0 | 1>(0);
   const [formData, setFormData] = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // Capture mount time once so the rendered "expires" date is stable across
-  // re-renders without calling Date.now() during render. Date.now() is only
-  // invoked once via the lazy initializer.
-  const [now] = useState<number>(() => Date.now());
 
   const set = (field: keyof FormData, value: string | number) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -81,8 +76,6 @@ export function ProposalForm() {
       setSubmitting(false);
     }
   };
-
-  const expiresAt = new Date(createdAt + 86400000 * formData.duration);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">
