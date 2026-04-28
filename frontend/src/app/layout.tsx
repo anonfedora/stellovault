@@ -1,4 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { AppProviders } from "@/components/providers/AppProviders";
+import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
+import { LanguageProvider } from '@/components/i18n/LanguageProvider';
+import { Toaster } from "sonner";
+import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileRuntimeSignals } from "@/components/layout/MobileRuntimeSignals";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,5 +42,28 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <html lang="en">
+      <body>
+        <LanguageProvider initialLocale="en">
+          <AppProviders>
+            <TransactionStatusProvider>
+              {children}
+              <Toaster 
+                position="top-right"
+                expand={false}
+                richColors
+                closeButton
+                duration={5000}
+                visibleToasts={3}
+              />
+              <TransactionHistoryDrawer />
+              <MobileBottomNav />
+              <MobileRuntimeSignals />
+            </TransactionStatusProvider>
+          </AppProviders>
+        </LanguageProvider>
+      </body>
+    </html>
+  );
 }

@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
 import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
 import { useTranslation } from '@/components/i18n/LanguageProvider'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -87,6 +88,11 @@ export function Navbar() {
           {/* Transaction History Button */}
           <TransactionHistoryButton />
           
+          {/* Language Switcher */}
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
+          
           <div className="relative">
             {isConnected ? (
               <button
@@ -164,6 +170,9 @@ export function Navbar() {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-4 space-y-2 shadow-lg">
+          <div className="mb-4">
+            <LanguageSwitcher className="w-full justify-center" />
+          </div>
           <Link
             href="/escrows/new"
             onClick={() => setIsMobileMenuOpen(false)}
