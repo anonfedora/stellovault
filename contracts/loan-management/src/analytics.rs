@@ -1,6 +1,6 @@
 //! Loan portfolio analytics module
 
-use soroban_sdk::contracttype;
+use soroban_sdk::{contracttype, String};
 
 /// Portfolio analytics
 #[contracttype]

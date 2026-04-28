@@ -11,24 +11,19 @@
 
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
-    Vec, Map,
-};
+use core::cmp;
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Vec};
 
-mod loan;
-mod interest;
-mod repayment;
-mod default_handling;
-mod restructuring;
 mod analytics;
+mod default_handling;
+mod interest;
+mod loan;
+mod repayment;
+mod restructuring;
 
-pub use loan::*;
-pub use interest::*;
-pub use repayment::*;
-pub use default_handling::*;
-pub use restructuring::*;
-pub use analytics::*;
+use analytics::PortfolioAnalytics;
+use loan::{InterestType, Loan, LoanRestructuring, LoanStatus};
+use repayment::RepaymentRecord;
 
 /// Contract errors
 #[contracttype]
@@ -107,10 +102,10 @@ impl LoanContract {
             .set(&symbol_short!("treasury"), &treasury);
         env.storage()
             .instance()
-            .set(&symbol_short!("collateral_reg"), &collateral_registry);
+            .set(&symbol_short!("col_reg"), &collateral_registry);
         env.storage()
             .instance()
-            .set(&symbol_short!("next_loan_id"), &1u64);
+            .set(&symbol_short!("nextloan"), &1u64);
 
         // Initialize default parameters
         env.storage()
@@ -126,10 +121,8 @@ impl LoanContract {
             .instance()
             .set(&symbol_short!("max_term"), &31536000u64); // 1 year maximum
 
-        env.events().publish(
-            (symbol_short!("loan_init"),),
-            (admin.clone(), treasury),
-        );
+        env.events()
+            .publish((symbol_short!("loan_init"),), (admin.clone(), treasury));
 
         Ok(())
     }
@@ -209,7 +202,7 @@ impl LoanContract {
         let loan_id: u64 = env
             .storage()
             .instance()
-            .get(&symbol_short!("next_loan_id"))
+            .get(&symbol_short!("nextloan"))
             .unwrap_or(1u64);
 
         // Create loan record
@@ -231,7 +224,7 @@ impl LoanContract {
             total_repaid: 0,
             last_payment_date: env.ledger().timestamp(),
             next_payment_date: env.ledger().timestamp() + 86400 * 30, // 30 days
-            grace_period: 86400 * 5, // 5 days grace period
+            grace_period: 86400 * 5,                                  // 5 days grace period
             default_date: 0,
             created_at: env.ledger().timestamp(),
             updated_at: env.ledger().timestamp(),
@@ -244,11 +237,11 @@ impl LoanContract {
         // Update next loan ID
         env.storage()
             .instance()
-            .set(&symbol_short!("next_loan_id"), &(loan_id + 1));
+            .set(&symbol_short!("nextloan"), &(loan_id + 1));
 
         // Emit event
         env.events().publish(
-            (symbol_short!("loan_created"),),
+            (symbol_short!("loan_crea"),),
             (loan_id, borrower, principal, interest_rate),
         );
 
@@ -263,11 +256,7 @@ impl LoanContract {
     ///
     /// # Returns
     /// Accrued interest amount
-    pub fn calculate_interest(
-        env: Env,
-        loan_id: u64,
-        period: u64,
-    ) -> Result<i128, ContractError> {
+    pub fn calculate_interest(env: Env, loan_id: u64, period: u64) -> Result<i128, ContractError> {
         // Get loan
         let storage_key = format_loan_storage_key(loan_id);
         let loan: Loan = env
@@ -333,7 +322,8 @@ impl LoanContract {
 
         // Calculate current interest
         let time_since_last_payment = env.ledger().timestamp() - loan.last_payment_date;
-        let accrued_interest = self.calculate_interest(env.clone(), loan_id, time_since_last_payment)?;
+        let accrued_interest =
+            Self::calculate_interest(env.clone(), loan_id, time_since_last_payment)?;
 
         // Calculate total owed
         let total_owed = loan.outstanding_balance + accrued_interest;
@@ -342,22 +332,13 @@ impl LoanContract {
             return Err(ContractError::RepaymentExceedsBalance);
         }
 
-        // Apply repayment
-        let principal_payment = if amount >= loan.outstanding_balance {
-            loan.outstanding_balance
-        } else {
-            // Allocate to interest first, then principal
-            if accrued_interest > 0 {
-                let interest_payment = std::cmp::min(amount, accrued_interest);
-                amount - interest_payment
-            } else {
-                amount
-            }
-        };
+        // Apply repayment: interest first, then principal.
+        let interest_payment = cmp::min(amount, accrued_interest);
+        let principal_payment = amount - interest_payment;
 
         loan.outstanding_balance -= principal_payment;
         loan.total_repaid += amount;
-        loan.total_interest_paid += accrued_interest;
+        loan.total_interest_paid += interest_payment;
         loan.last_payment_date = env.ledger().timestamp();
         loan.updated_at = env.ledger().timestamp();
 
@@ -377,7 +358,7 @@ impl LoanContract {
             payer: payer.clone(),
             amount,
             principal_payment,
-            interest_payment: accrued_interest,
+            interest_payment,
             timestamp: env.ledger().timestamp(),
         };
 
@@ -386,7 +367,7 @@ impl LoanContract {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("repayment_made"),),
+            (symbol_short!("repaymade"),),
             (loan_id, amount, loan.outstanding_balance),
         );
 
@@ -427,7 +408,7 @@ impl LoanContract {
 
             // Emit event
             env.events().publish(
-                (symbol_short!("loan_defaulted"),),
+                (symbol_short!("loan_def"),),
                 (loan_id, loan.outstanding_balance),
             );
 
@@ -507,10 +488,8 @@ impl LoanContract {
         env.storage().persistent().set(&storage_key, &loan);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("loan_restructured"),),
-            (loan_id, loan.interest_rate),
-        );
+        env.events()
+            .publish((symbol_short!("loan_rest"),), (loan_id, loan.interest_rate));
 
         Ok(())
     }
@@ -539,7 +518,7 @@ impl LoanContract {
     /// Vector of repayment records
     pub fn get_repayment_history(
         env: Env,
-        loan_id: u64,
+        _loan_id: u64,
     ) -> Result<Vec<RepaymentRecord>, ContractError> {
         // Note: In production, would iterate through repayment records
         Ok(Vec::new(&env))
@@ -573,7 +552,7 @@ impl LoanContract {
             0
         };
 
-        let remaining_interest = self.calculate_interest(env, loan_id, time_remaining)?;
+        let remaining_interest = Self::calculate_interest(env, loan_id, time_remaining)?;
 
         // Calculate penalty
         let penalty = (loan.outstanding_balance * prepayment_penalty_rate as i128) / 10000;
@@ -612,7 +591,7 @@ impl LoanContract {
             .set(&symbol_short!("max_ltv"), &max_ltv);
 
         env.events()
-            .publish((symbol_short!("ltv_updated"),), (min_ltv, max_ltv));
+            .publish((symbol_short!("ltv_updt"),), (min_ltv, max_ltv));
 
         Ok(())
     }
@@ -625,8 +604,8 @@ impl LoanContract {
     /// # Returns
     /// Portfolio analytics
     pub fn get_portfolio_analytics(
-        env: Env,
-        borrower: Option<Address>,
+        _env: Env,
+        _borrower: Option<Address>,
     ) -> Result<PortfolioAnalytics, ContractError> {
         // Note: In production, would aggregate loan data
         Ok(PortfolioAnalytics {
@@ -645,15 +624,12 @@ impl LoanContract {
 
 // Helper functions
 
-fn format_loan_storage_key(loan_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("loan_{}", loan_id))
+fn format_loan_storage_key(loan_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("loan"), loan_id)
 }
 
-fn format_repayment_key(loan_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("repay_{}_{}", loan_id, timestamp),
-    )
+fn format_repayment_key(loan_id: u64, timestamp: u64) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("repay"), loan_id, timestamp)
 }
 
 fn calculate_simple_interest(
@@ -664,7 +640,7 @@ fn calculate_simple_interest(
     // Simple Interest = P * r * t
     // where P = principal, r = annual rate, t = time in years
     let interest = (principal as u128 * annual_rate as u128 * period as u128)
-        / (10000 * 365 * 86400) as u128;
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }
 
@@ -673,10 +649,9 @@ fn calculate_compound_interest(
     annual_rate: u32,
     period: u64,
 ) -> Result<i128, ContractError> {
-    // Compound Interest = P * (1 + r)^t - P
-    // Simplified calculation for on-chain efficiency
-    let rate_per_second = (annual_rate as u128 * period as u128) / (10000 * 365 * 86400) as u128;
-    let interest = (principal as u128 * rate_per_second) / 10000;
+    // Approximation for compound accrual over short intervals.
+    let interest = (principal as u128 * annual_rate as u128 * period as u128)
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }
 
@@ -687,6 +662,6 @@ fn calculate_fixed_interest(
 ) -> Result<i128, ContractError> {
     // Fixed Interest = P * r * t (same as simple, but fixed for loan term)
     let interest = (principal as u128 * annual_rate as u128 * period as u128)
-        / (10000 * 365 * 86400) as u128;
+        / (10000u128 * 365u128 * 86400u128);
     Ok(interest as i128)
 }

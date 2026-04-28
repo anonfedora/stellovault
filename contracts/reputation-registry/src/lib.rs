@@ -236,28 +236,24 @@ impl ReputationRegistry {
             + profile.late_repayments
             + profile.defaults;
 
-        let repayment_score = if total_repayments > 0 {
+        let repayment_score = {
             let good_repayments = profile.early_repayments + profile.on_time_repayments;
-            (good_repayments * 1000 / total_repayments)
-        } else {
-            500
+            (good_repayments * 1000)
+                .checked_div(total_repayments)
+                .unwrap_or(500)
         };
 
         let total_interactions = profile.successful_trades + profile.disputes_lost;
-        let dispute_rate = if total_interactions > 0 {
-            (profile.disputes_lost * 10000 / total_interactions)
-        } else {
-            0
-        };
+        let dispute_rate = (profile.disputes_lost * 10000)
+            .checked_div(total_interactions)
+            .unwrap_or(0);
 
         TrustMetrics {
             successful_trades: profile.successful_trades,
             total_volume: profile.total_volume,
-            default_rate: if total_repayments > 0 {
-                (profile.defaults * 10000 / total_repayments)
-            } else {
-                0
-            },
+            default_rate: (profile.defaults * 10000)
+                .checked_div(total_repayments)
+                .unwrap_or(0),
             dispute_rate,
             repayment_score,
             behavior_score: Self::calculate_reputation_score(env, user_address),
@@ -271,11 +267,7 @@ impl ReputationRegistry {
             .get(&(symbol_short!("hist"), user_address.clone()))
             .unwrap_or_else(|| Vec::new(&env));
         let current_time = env.ledger().timestamp();
-        let cutoff_time = if current_time > period {
-            current_time - period
-        } else {
-            0
-        };
+        let cutoff_time = current_time.saturating_sub(period);
 
         let mut filtered_history = Vec::new(&env);
         for item in user_history.iter() {

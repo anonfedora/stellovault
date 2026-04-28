@@ -837,24 +837,6 @@ impl RiskAssessment {
         Ok(risk_score)
     }
 
-    /// Set borrower risk factor (for testing purposes only)
-    #[cfg(any(test, feature = "testutils"))]
-    pub fn set_borrower_risk_factor(
-        env: Env,
-        borrower: Address,
-        risk_factor: u32,
-    ) -> Result<(), ContractError> {
-        if risk_factor > 3 {
-            return Err(ContractError::InvalidHealthFactor);
-        }
-
-        let borrower_risk_key = (symbol_short!("bwr_risk"), borrower);
-        env.storage()
-            .persistent()
-            .set(&borrower_risk_key, &risk_factor);
-        Ok(())
-    }
-
     // ========================================================================
     // Liquidation Engine
     // ========================================================================
@@ -1378,7 +1360,10 @@ impl RiskAssessment {
     }
 
     /// Get credit score for a wallet address
-    pub fn get_credit_score(env: Env, wallet_address: Address) -> Result<CreditScore, ContractError> {
+    pub fn get_credit_score(
+        env: Env,
+        wallet_address: Address,
+    ) -> Result<CreditScore, ContractError> {
         let credit_key = (symbol_short!("credit"), wallet_address);
         env.storage()
             .persistent()
@@ -1423,8 +1408,10 @@ impl RiskAssessment {
         env.storage().persistent().set(&credit_key, &credit_data);
 
         // Emit event
-        env.events()
-            .publish((EVT_REPAY_TRACK,), (borrower, loan_id, payment_data.on_time));
+        env.events().publish(
+            (EVT_REPAY_TRACK,),
+            (borrower, loan_id, payment_data.on_time),
+        );
 
         Ok(())
     }
@@ -1490,16 +1477,15 @@ impl RiskAssessment {
         // 850 score = -200 bps, 300 score = +300 bps
         let score_adjustment = if credit_score >= 300 {
             let normalized_score = credit_score - 300;
-            let adjustment = 300 - (normalized_score * 100) / 55; // Maps 300->300, 850->-200
-            adjustment as i32
+            300 - ((normalized_score as i32 * 500) / 550) // Maps 300->300, 850->-200
         } else {
             300
         };
 
-        let final_rate = base_rate + score_adjustment as u32;
+        let final_rate = (base_rate + score_adjustment).clamp(100, 1500) as u32;
 
         // Ensure rate is within reasonable bounds (1% - 15%)
-        Ok(final_rate.clamp(100, 1500))
+        Ok(final_rate)
     }
 
     /// Assess portfolio risk for a lender
@@ -1593,13 +1579,12 @@ impl RiskAssessment {
         // Lower score = higher fee
         let score_adjustment = if credit_score >= 300 {
             let normalized_score = credit_score - 300;
-            let adjustment = 200 - (normalized_score * 200) / 55; // Maps 300->200, 850->0
-            adjustment as i32
+            200 - ((normalized_score as i32 * 200) / 550) // Maps 300->200, 850->0
         } else {
             200
         };
 
-        let adjusted_fee_bps = (base_fee_bps as i32 + score_adjustment) as u32;
+        let adjusted_fee_bps = (base_fee_bps as i32 + score_adjustment).max(0) as u32;
 
         // Calculate fee amount
         let fee = loan_amount
@@ -1617,7 +1602,6 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
-
         governance.require_auth();
 
         // Validate weights sum to 10000
@@ -1645,7 +1629,6 @@ impl RiskAssessment {
             .instance()
             .get(&symbol_short!("gov"))
             .ok_or(ContractError::Unauthorized)?;
-
         governance.require_auth();
 
         // Validate LTV values
@@ -1846,11 +1829,9 @@ impl RiskAssessment {
             return 500;
         }
 
-        let default_rate = if portfolio.active_loans > 0 {
-            (portfolio.defaulted_loans * 10000) / portfolio.active_loans
-        } else {
-            0
-        };
+        let default_rate = (portfolio.defaulted_loans * 10000)
+            .checked_div(portfolio.active_loans)
+            .unwrap_or(0);
 
         // Higher default rate + higher LTV = higher risk score
         let ltv_risk = portfolio.average_ltv / 10; // Scale LTV to 0-1000
@@ -1959,24 +1940,6 @@ impl RiskAssessment {
             .ok_or(ContractError::EscrowNotFound)?;
 
         Ok((loan, collateral, escrow))
-    }
-
-    /// Set test data for a position (for testing only)
-    #[cfg(any(test, feature = "testutils"))]
-    pub fn set_test_position(
-        env: Env,
-        position_id: u64,
-        loan: Loan,
-        collateral: Collateral,
-        escrow: TradeEscrow,
-    ) {
-        let loan_key = (symbol_short!("test_loan"), position_id);
-        let coll_key = (symbol_short!("test_coll"), position_id);
-        let escrow_key = (symbol_short!("test_escr"), position_id);
-
-        env.storage().persistent().set(&loan_key, &loan);
-        env.storage().persistent().set(&coll_key, &collateral);
-        env.storage().persistent().set(&escrow_key, &escrow);
     }
 
     // ========================================================================
@@ -2262,6 +2225,43 @@ impl RiskAssessment {
         env.storage()
             .persistent()
             .get(&(symbol_short!("auction"), loan_id))
+    }
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl RiskAssessment {
+    /// Set borrower risk factor (for testing purposes only)
+    pub fn set_borrower_risk_factor(
+        env: Env,
+        borrower: Address,
+        risk_factor: u32,
+    ) -> Result<(), ContractError> {
+        if risk_factor > 3 {
+            return Err(ContractError::InvalidHealthFactor);
+        }
+
+        let borrower_risk_key = (symbol_short!("bwr_risk"), borrower);
+        env.storage()
+            .persistent()
+            .set(&borrower_risk_key, &risk_factor);
+        Ok(())
+    }
+
+    /// Set test data for a position (for testing only)
+    pub fn set_test_position(
+        env: Env,
+        position_id: u64,
+        loan: Loan,
+        collateral: Collateral,
+        escrow: TradeEscrow,
+    ) {
+        let loan_key = (symbol_short!("test_loan"), position_id);
+        let coll_key = (symbol_short!("test_coll"), position_id);
+        let escrow_key = (symbol_short!("test_escr"), position_id);
+
+        env.storage().persistent().set(&loan_key, &loan);
+        env.storage().persistent().set(&coll_key, &collateral);
+        env.storage().persistent().set(&escrow_key, &escrow);
     }
 }
 
@@ -3743,101 +3743,63 @@ mod test {
     fn test_update_credit_model() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let new_model = CreditScoreModel {
+            payment_history_weight: 4000,
+            utilization_weight: 3000,
+            length_weight: 1000,
+            diversity_weight: 1000,
+            new_credit_weight: 1000,
+        };
 
-            let new_model = CreditScoreModel {
-                payment_history_weight: 4000,
-                utilization_weight: 3000,
-                length_weight: 1000,
-                diversity_weight: 1000,
-                new_credit_weight: 1000,
-            };
+        client.update_credit_model(&new_model);
 
-            // Governance can update
-            env.mock_all_auths();
-            RiskAssessment::update_credit_model(env.clone(), new_model.clone()).unwrap();
-
-            let stored_model = RiskAssessment::get_credit_model(env.clone());
-            assert_eq!(stored_model.payment_history_weight, 4000);
-        });
+        let stored_model = client.get_credit_model();
+        assert_eq!(stored_model.payment_history_weight, 4000);
     }
 
     #[test]
+    #[should_panic]
     fn test_update_credit_model_invalid_weights() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let invalid_model = CreditScoreModel {
+            payment_history_weight: 5000,
+            utilization_weight: 3000,
+            length_weight: 1000,
+            diversity_weight: 1000,
+            new_credit_weight: 1000,
+        }; // Sum = 11000, not 10000
 
-            let invalid_model = CreditScoreModel {
-                payment_history_weight: 5000,
-                utilization_weight: 3000,
-                length_weight: 1000,
-                diversity_weight: 1000,
-                new_credit_weight: 1000,
-            }; // Sum = 11000, not 10000
-
-            env.mock_all_auths();
-            let result = RiskAssessment::update_credit_model(env.clone(), invalid_model);
-            assert_eq!(result, Err(ContractError::InvalidThreshold));
-        });
+        client.update_credit_model(&invalid_model);
     }
 
     #[test]
     fn test_update_ltv_config() {
         let (env, admin, governance, coll_reg, loan_mgr, vault) = setup_env();
         let contract_id = env.register(RiskAssessment, ());
-
         env.mock_all_auths();
+        let client = RiskAssessmentClient::new(&env, &contract_id);
+        client.initialize(&admin, &governance, &coll_reg, &loan_mgr, &vault);
 
-        env.as_contract(&contract_id, || {
-            RiskAssessment::initialize(
-                env.clone(),
-                admin.clone(),
-                governance.clone(),
-                coll_reg.clone(),
-                loan_mgr.clone(),
-                vault.clone(),
-            )
-            .unwrap();
+        let new_config = LTVConfig {
+            collateral_type: CollateralType::Invoice,
+            base_ltv_bps: 8000,
+            max_ltv_bps: 9000,
+            credit_score_multiplier: 60,
+        };
 
-            let new_config = LTVConfig {
-                collateral_type: CollateralType::Invoice,
-                base_ltv_bps: 8000,
-                max_ltv_bps: 9000,
-                credit_score_multiplier: 60,
-            };
+        client.update_ltv_config(&new_config);
 
-            env.mock_all_auths();
-            RiskAssessment::update_ltv_config(env.clone(), new_config.clone()).unwrap();
-
-            let stored_config =
-                RiskAssessment::get_ltv_config(env.clone(), CollateralType::Invoice).unwrap();
-            assert_eq!(stored_config.base_ltv_bps, 8000);
-        });
+        let stored_config = client.get_ltv_config(&CollateralType::Invoice);
+        assert_eq!(stored_config.base_ltv_bps, 8000);
     }
 
     #[test]

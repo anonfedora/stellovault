@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, BytesN as _, Ledger},
     Address, BytesN, Env, String,
 };
 
@@ -16,9 +16,9 @@ use soroban_sdk::{
 #[test]
 fn test_initialize_contract() {
     // Setup
-    let env = Env::new();
-    let admin = Address::random(&env);
-    let oracle = Address::random(&env);
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
 
     // Initialize contract
     // let contract = CollateralRegistry::initialize(&env, admin.clone(), oracle.clone());
@@ -35,8 +35,8 @@ fn test_initialize_contract() {
 #[test]
 fn test_register_collateral_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let initial_valuation = 1_000_000i128;
@@ -63,8 +63,8 @@ fn test_register_collateral_success() {
 #[test]
 fn test_register_collateral_invalid_valuation() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let invalid_valuation = 0i128;
@@ -87,9 +87,9 @@ fn test_register_collateral_invalid_valuation() {
 #[test]
 fn test_register_duplicate_collateral() {
     // Setup
-    let env = Env::new();
-    let owner1 = Address::random(&env);
-    let owner2 = Address::random(&env);
+    let env = Env::default();
+    let owner1 = Address::generate(&env);
+    let owner2 = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let valuation = 1_000_000i128;
@@ -121,9 +121,9 @@ fn test_register_duplicate_collateral() {
 #[test]
 fn test_update_valuation_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
-    let oracle = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    let oracle = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let initial_valuation = 1_000_000i128;
@@ -159,7 +159,7 @@ fn test_update_valuation_success() {
 #[test]
 fn test_update_valuation_invalid() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let collateral_id = 1u64;
     let invalid_valuation = -1000i128;
     let oracle_signature = BytesN::<64>::random(&env);
@@ -180,9 +180,9 @@ fn test_update_valuation_invalid() {
 #[test]
 fn test_transfer_collateral_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
-    let new_owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let valuation = 1_000_000i128;
@@ -213,9 +213,9 @@ fn test_transfer_collateral_success() {
 #[test]
 fn test_transfer_locked_collateral() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
-    let new_owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
     let collateral_id = 1u64;
     let escrow_id = 100u64;
 
@@ -234,8 +234,8 @@ fn test_transfer_locked_collateral() {
 #[test]
 fn test_lock_collateral_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let collateral_id = 1u64;
     let escrow_id = 100u64;
 
@@ -255,7 +255,7 @@ fn test_lock_collateral_success() {
 #[test]
 fn test_lock_already_locked_collateral() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let collateral_id = 1u64;
     let escrow_id1 = 100u64;
     let escrow_id2 = 200u64;
@@ -275,8 +275,8 @@ fn test_lock_already_locked_collateral() {
 #[test]
 fn test_unlock_collateral_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let collateral_id = 1u64;
     let escrow_id = 100u64;
 
@@ -298,7 +298,7 @@ fn test_unlock_collateral_success() {
 #[test]
 fn test_unlock_unlocked_collateral() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let collateral_id = 1u64;
 
     // Try to unlock without locking
@@ -313,9 +313,9 @@ fn test_unlock_unlocked_collateral() {
 #[test]
 fn test_verify_collateral_success() {
     // Setup
-    let env = Env::new();
-    let admin = Address::random(&env);
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let valuation = 1_000_000i128;
@@ -350,8 +350,8 @@ fn test_verify_collateral_success() {
 #[test]
 fn test_verify_collateral_hash_mismatch() {
     // Setup
-    let env = Env::new();
-    let admin = Address::random(&env);
+    let env = Env::default();
+    let admin = Address::generate(&env);
     let collateral_id = 1u64;
     let wrong_hash = BytesN::<32>::random(&env);
 
@@ -372,8 +372,8 @@ fn test_verify_collateral_hash_mismatch() {
 #[test]
 fn test_get_collateral_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let valuation = 1_000_000i128;
@@ -404,7 +404,7 @@ fn test_get_collateral_success() {
 #[test]
 fn test_get_collateral_not_found() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let non_existent_id = 999u64;
 
     // Try to get non-existent collateral
@@ -419,8 +419,8 @@ fn test_get_collateral_not_found() {
 #[test]
 fn test_get_collateral_by_hash_success() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
     let asset_hash = BytesN::<32>::random(&env);
     let metadata_uri = String::from_slice(&env, "ipfs://QmTest");
     let valuation = 1_000_000i128;
@@ -447,8 +447,8 @@ fn test_get_collateral_by_hash_success() {
 #[test]
 fn test_classify_collateral_success() {
     // Setup
-    let env = Env::new();
-    let admin = Address::random(&env);
+    let env = Env::default();
+    let admin = Address::generate(&env);
     let collateral_id = 1u64;
 
     // Classify collateral
@@ -474,8 +474,8 @@ fn test_classify_collateral_success() {
 #[test]
 fn test_get_classification_success() {
     // Setup
-    let env = Env::new();
-    let admin = Address::random(&env);
+    let env = Env::default();
+    let admin = Address::generate(&env);
     let collateral_id = 1u64;
 
     // Classify collateral
@@ -503,10 +503,10 @@ fn test_get_classification_success() {
 #[test]
 fn test_multiple_collateral_registrations() {
     // Setup
-    let env = Env::new();
-    let owner1 = Address::random(&env);
-    let owner2 = Address::random(&env);
-    let owner3 = Address::random(&env);
+    let env = Env::default();
+    let owner1 = Address::generate(&env);
+    let owner2 = Address::generate(&env);
+    let owner3 = Address::generate(&env);
 
     // Register multiple collaterals
     // let id1 = contract.register_collateral(...).unwrap();
@@ -525,7 +525,7 @@ fn test_multiple_collateral_registrations() {
 #[test]
 fn test_collateral_expiry() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let collateral_id = 1u64;
     let expired_timestamp = 1000u64;
 
@@ -544,9 +544,9 @@ fn test_collateral_expiry() {
 #[test]
 fn test_unauthorized_operations() {
     // Setup
-    let env = Env::new();
-    let owner = Address::random(&env);
-    let unauthorized = Address::random(&env);
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
     let collateral_id = 1u64;
 
     // Try to transfer without owner auth
@@ -561,7 +561,7 @@ fn test_unauthorized_operations() {
 #[test]
 fn test_valuation_history_tracking() {
     // Setup
-    let env = Env::new();
+    let env = Env::default();
     let collateral_id = 1u64;
     let valuations = vec![1_000_000i128, 1_100_000i128, 1_050_000i128];
 
@@ -583,10 +583,10 @@ fn test_valuation_history_tracking() {
 #[test]
 fn test_transfer_history_tracking() {
     // Setup
-    let env = Env::new();
-    let owner1 = Address::random(&env);
-    let owner2 = Address::random(&env);
-    let owner3 = Address::random(&env);
+    let env = Env::default();
+    let owner1 = Address::generate(&env);
+    let owner2 = Address::generate(&env);
+    let owner3 = Address::generate(&env);
     let collateral_id = 1u64;
 
     // Transfer multiple times

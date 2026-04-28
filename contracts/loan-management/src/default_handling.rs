@@ -1,6 +1,6 @@
 //! Default handling and recovery module
 
-use soroban_sdk::{contracttype, Address, String};
+use soroban_sdk::{contracttype, String};
 
 /// Default event
 #[contracttype]
@@ -54,7 +54,7 @@ pub struct ForbearanceAgreement {
     pub loan_id: u64,
     pub start_date: u64,
     pub end_date: u64,
-    pub payment_reduction: u32,  // basis points
+    pub payment_reduction: u32, // basis points
     pub status: ForbearanceStatus,
 }
 
