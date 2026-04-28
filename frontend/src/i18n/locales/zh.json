@@ -47,9 +47,9 @@
     "profile": "个人资料",
     "contact": "联系我们",
     "about": "关于",
-    "features": "Features",
-    "innovation": "Innovation",
-    "impact": "Impact"
+    "features": "功能",
+    "innovation": "创新",
+    "impact": "影响"
   },
   "auth": {
     "login": "登录",
@@ -71,8 +71,8 @@
     "authenticationRequired": "需要身份验证",
     "loginSuccess": "登录成功",
     "logoutSuccess": "已成功退出",
-    "selectProvider": "Select a Stellar wallet provider",
-    "stellarWallet": "Stellar wallet"
+    "selectProvider": "选择 Stellar 钱包提供商",
+    "stellarWallet": "Stellar 钱包"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -99,7 +99,7 @@
     "lender": "贷款人",
     "collateralRequired": "需要抵押品",
     "repayment": "还款",
-    "dueDate": "到���日",
+    "dueDate": "到期日",
     "createLoan": "创建贷款",
     "myLoans": "我的贷款",
     "allLoans": "所有贷款",
@@ -119,7 +119,7 @@
     "myEscrows": "我的托管",
     "allEscrows": "所有托管",
     "escrowDetails": "托管详情",
-    "new": "New escrow"
+    "new": "新建托管"
   },
   "collateral": {
     "title": "抵押品",
