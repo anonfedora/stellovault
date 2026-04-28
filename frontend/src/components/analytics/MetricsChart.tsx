@@ -105,7 +105,7 @@ export function AnalyticsMetricsChart({ data, loading = false }: MetricsChartPro
                 tickFormatter={(v: number) => `$${v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
               />
               <Tooltip
-                formatter={(v: number | string | undefined) => [`$${Number(v ?? 0).toLocaleString()}`, chartType === "tvl" ? "TVL" : "Volume"]}
+                formatter={(v) => [`$${Number(Array.isArray(v) ? v[0] : (v ?? 0)).toLocaleString()}`, chartType === "tvl" ? "TVL" : "Volume"]}
                 contentStyle={{ borderRadius: 8, fontSize: 12 }}
               />
               <Area

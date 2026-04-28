@@ -49,7 +49,7 @@ export function ReputationChart({ reputation }: ReputationChartProps) {
               fillOpacity={0.25}
               strokeWidth={2}
             />
-            <Tooltip formatter={(v: number) => [`${v.toFixed(1)}`, ""]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            <Tooltip formatter={(v) => [`${Number(Array.isArray(v) ? v[0] : (v ?? 0)).toFixed(1)}`, ""]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
           </RadarChart>
         </ResponsiveContainer>
       </div>

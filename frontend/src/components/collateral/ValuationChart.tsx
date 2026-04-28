@@ -62,7 +62,7 @@ export function ValuationChart({ data, loading = false }: ValuationChartProps) {
                 tickFormatter={(v: number) => `$${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
               />
               <Tooltip
-                formatter={(v: number) => [`$${v.toLocaleString()}`, "Value"]}
+                formatter={(v) => [`$${Number(Array.isArray(v) ? v[0] : (v ?? 0)).toLocaleString()}`, "Value"]}
                 contentStyle={{ borderRadius: 8, fontSize: 12 }}
               />
               <Area

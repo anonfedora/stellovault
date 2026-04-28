@@ -30,7 +30,7 @@ export function RiskAnalysis({ stats, protocol }: RiskAnalysisProps) {
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={escrowData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                <Pie data={escrowData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
                   {escrowData.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
