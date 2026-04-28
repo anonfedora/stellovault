@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
 import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
+import { useTranslation } from '@/components/i18n/LanguageProvider'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -14,6 +16,7 @@ export function Navbar() {
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { pendingCount } = useTransactionStatus()
+  const { t } = useTranslation()
 
   const handleWalletConnect = async () => {
     const mockAddress = 'G' + Math.random().toString(16).slice(2, 54).toUpperCase()
@@ -38,13 +41,13 @@ export function Navbar() {
   }
 
   const navLinks = [
-    { href: '/#features', label: 'Features' },
-    { href: '/#innovation', label: 'Innovation' },
-    { href: '/#impact', label: 'Impact' },
-    { href: '/escrows', label: 'Escrows' },
-    { href: '/about', label: 'About' },
-    { href: '/contact', label: 'Contact' },
-    { href: '/governance', label: 'Governance' },
+    { href: '/#features', label: t('nav.features') },
+    { href: '/#innovation', label: t('nav.innovation') },
+    { href: '/#impact', label: t('nav.impact') },
+    { href: '/escrows', label: t('nav.escrows') },
+    { href: '/about', label: t('nav.about') },
+    { href: '/contact', label: t('nav.contact') },
+    { href: '/governance', label: t('nav.governance') },
   ]
 
   return (
@@ -85,6 +88,11 @@ export function Navbar() {
           {/* Transaction History Button */}
           <TransactionHistoryButton />
           
+          {/* Language Switcher */}
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
+          
           <div className="relative">
             {isConnected ? (
               <button
@@ -100,16 +108,16 @@ export function Navbar() {
                 className="hidden sm:flex min-h-11 items-center gap-2 bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
               >
                 <Wallet className="w-4 h-4" />
-                Connect Wallet
+                {t('auth.connectWallet')}
               </button>
             )}
 
             {isWalletMenuOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
                 <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-900 mb-1">Connect Wallet</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">{t('auth.connectWallet')}</h3>
                   <p className="text-xs text-gray-500">
-                    Select a Stellar wallet provider
+                    {t('auth.selectProvider')}
                   </p>
                 </div>
 
@@ -121,7 +129,7 @@ export function Navbar() {
                       className="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                     >
                       <div className="font-medium text-sm text-gray-900">{provider}</div>
-                      <div className="text-xs text-gray-500">Stellar wallet</div>
+                      <div className="text-xs text-gray-500">{t('auth.stellarWallet')}</div>
                     </button>
                   ))}
                 </div>
@@ -133,7 +141,7 @@ export function Navbar() {
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors rounded-lg"
                     >
                       <LogOut className="w-4 h-4" />
-                      Disconnect
+                      {t('auth.disconnectWallet')}
                     </button>
                   </div>
                 )}
@@ -144,7 +152,7 @@ export function Navbar() {
           <button
             onClick={() => setIsWalletMenuOpen(!isWalletMenuOpen)}
             className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-blue-900 text-white sm:hidden"
-            aria-label="Connect wallet"
+            aria-label={t('auth.connectWallet')}
           >
             <Wallet className="w-4 h-4" />
           </button>
@@ -152,7 +160,7 @@ export function Navbar() {
           <button 
             className="lg:hidden min-h-11 min-w-11 rounded-lg p-2 text-gray-600"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Open navigation"
+            aria-label={isMobileMenuOpen ? t('common.close') : t('common.open')}
           >
             {isMobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -162,13 +170,16 @@ export function Navbar() {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-4 space-y-2 shadow-lg">
+          <div className="mb-4">
+            <LanguageSwitcher className="w-full justify-center" />
+          </div>
           <Link
             href="/escrows/new"
             onClick={() => setIsMobileMenuOpen(false)}
             className="mb-2 flex min-h-12 items-center justify-center gap-2 rounded-lg bg-blue-900 px-4 font-semibold text-white"
           >
             <ShieldCheck className="h-4 w-4" />
-            New escrow
+            {t('escrows.new')}
           </Link>
           {navLinks.map((link) => (
             <Link
