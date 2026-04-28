@@ -2,6 +2,12 @@ import { NextIntlClientProvider } from 'next-intl';
 import { LanguageProvider } from '@/components/i18n/LanguageProvider';
 import { rtlLocales } from '@/utils/i18n/config';
 import type { ReactNode } from 'react';
+import { Toaster } from "sonner";
+import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
+import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
+import { AppProviders } from "@/components/providers/AppProviders";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileRuntimeSignals } from "@/components/layout/MobileRuntimeSignals";
 
 export function generateStaticParams() {
   return [
@@ -45,7 +51,22 @@ export default async function LocaleLayout({
       <body>
         <NextIntlClientProvider locale={locale} messages={messages.default}>
           <LanguageProvider initialLocale={locale}>
-            {children}
+            <AppProviders>
+              <TransactionStatusProvider>
+                {children}
+                <Toaster 
+                  position="top-right"
+                  expand={false}
+                  richColors
+                  closeButton
+                  duration={5000}
+                  visibleToasts={3}
+                />
+                <TransactionHistoryDrawer />
+                <MobileBottomNav />
+                <MobileRuntimeSignals />
+              </TransactionStatusProvider>
+            </AppProviders>
           </LanguageProvider>
         </NextIntlClientProvider>
       </body>

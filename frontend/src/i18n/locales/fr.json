@@ -46,7 +46,10 @@
     "risk": "Risque",
     "profile": "Profil",
     "contact": "Contact",
-    "about": "À Propos"
+    "about": "À Propos",
+    "features": "Features",
+    "innovation": "Innovation",
+    "impact": "Impact"
   },
   "auth": {
     "login": "Connexion",
@@ -67,7 +70,9 @@
     "disconnectWallet": "Déconnecter le Portefeuille",
     "authenticationRequired": "Authentification Requise",
     "loginSuccess": "Connexion Réussie",
-    "logoutSuccess": "Déconnexion Réussie"
+    "logoutSuccess": "Déconnexion Réussie",
+    "selectProvider": "Select a Stellar wallet provider",
+    "stellarWallet": "Stellar wallet"
   },
   "dashboard": {
     "title": "Tableau de Bord",
@@ -113,7 +118,8 @@
     "conditions": "Conditions de Libération",
     "myEscrows": "Mes Dépôts",
     "allEscrows": "Tous les Dépôts",
-    "escrowDetails": "Détails du Dépôt"
+    "escrowDetails": "Détails du Dépôt",
+    "new": "New escrow"
   },
   "collateral": {
     "title": "Garantie",

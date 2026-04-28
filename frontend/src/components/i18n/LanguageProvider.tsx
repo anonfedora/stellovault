@@ -57,6 +57,7 @@ export function LanguageProvider({
     if (!locale || locale === 'en') {
       initLocale();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setLocale = (newLocale: string) => {
@@ -80,11 +81,15 @@ export function LanguageProvider({
 
   const t = (key: string): string => {
     const keys = key.split('.');
-    let value: any = translations;
+    let value: unknown = translations;
     for (const k of keys) {
-      value = value?.[k];
+      if (value && typeof value === 'object') {
+        value = (value as Record<string, unknown>)[k];
+      } else {
+        value = undefined;
+      }
     }
-    return value || key;
+    return (value as string) || key;
   };
 
   return (

@@ -30,7 +30,7 @@ interface LanguageSwitcherProps {
 }
 
 export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
-  const { locale, setLocale, t, isLoading } = useLanguage();
+  const { locale, setLocale, isLoading } = useLanguage();
   const [, startTransition] = useTransition();
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -76,7 +76,7 @@ export function LanguageButton({
   locale: string; 
   className?: string;
 }) {
-  const { locale, setLocale, t } = useLanguage();
+  const { locale, setLocale } = useLanguage();
   const [, startTransition] = useTransition();
 
   if (locale === targetLocale) {

@@ -46,7 +46,10 @@
     "risk": "סיכון",
     "profile": "פרופיל",
     "contact": "צור קשר",
-    "about": "אודות"
+    "about": "אודות",
+    "features": "Features",
+    "innovation": "Innovation",
+    "impact": "Impact"
   },
   "auth": {
     "login": "התחברות",
@@ -67,7 +70,9 @@
     "disconnectWallet": "נתק ארנק",
     "authenticationRequired": "נדרשת אימות",
     "loginSuccess": "התחברות הצליחה",
-    "logoutSuccess": "התנתקות הצליחה"
+    "logoutSuccess": "התנתקות הצליחה",
+    "selectProvider": "Select a Stellar wallet provider",
+    "stellarWallet": "Stellar wallet"
   },
   "dashboard": {
     "title": "לוח בקרה",
@@ -113,7 +118,8 @@
     "conditions": "תנאי שחרור",
     "myEscrows": "הנאמנויות שלי",
     "allEscrows": "כל הנאמנויות",
-    "escrowDetails": "פרטי הנאמנות"
+    "escrowDetails": "פרטי הנאמנות",
+    "new": "New escrow"
   },
   "collateral": {
     "title": "בטוחה",

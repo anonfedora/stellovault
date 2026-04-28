@@ -46,7 +46,10 @@
     "risk": "リスク",
     "profile": "プロフィール",
     "contact": "お問い合わせ",
-    "about": "概要"
+    "about": "概要",
+    "features": "Features",
+    "innovation": "Innovation",
+    "impact": "Impact"
   },
   "auth": {
     "login": "ログイン",
@@ -67,7 +70,9 @@
     "disconnectWallet": "ウォレットを切断",
     "authenticationRequired": "認証が必要です",
     "loginSuccess": "ログインしました",
-    "logoutSuccess": "ログアウトしました"
+    "logoutSuccess": "ログアウトしました",
+    "selectProvider": "Select a Stellar wallet provider",
+    "stellarWallet": "Stellar wallet"
   },
   "dashboard": {
     "title": "ダッシュボード",
@@ -113,7 +118,8 @@
     "conditions": "解放条件",
     "myEscrows": "マイエスクロー",
     "allEscrows": "すべてのエスクロー",
-    "escrowDetails": "エスクロー詳細"
+    "escrowDetails": "エスクロー詳細",
+    "new": "New escrow"
   },
   "collateral": {
     "title": "担保",

@@ -46,7 +46,10 @@
     "risk": "Risk",
     "profile": "Profile",
     "contact": "Contact",
-    "about": "About"
+    "about": "About",
+    "features": "Features",
+    "innovation": "Innovation",
+    "impact": "Impact"
   },
   "auth": {
     "login": "Login",
@@ -67,7 +70,9 @@
     "disconnectWallet": "Disconnect Wallet",
     "authenticationRequired": "Authentication Required",
     "loginSuccess": "Login Successful",
-    "logoutSuccess": "Logged Out Successfully"
+    "logoutSuccess": "Logged Out Successfully",
+    "selectProvider": "Select a Stellar wallet provider",
+    "stellarWallet": "Stellar wallet"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -113,7 +118,8 @@
     "conditions": "Release Conditions",
     "myEscrows": "My Escrows",
     "allEscrows": "All Escrows",
-    "escrowDetails": "Escrow Details"
+    "escrowDetails": "Escrow Details",
+    "new": "New escrow"
   },
   "collateral": {
     "title": "Collateral",

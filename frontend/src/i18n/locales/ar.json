@@ -46,7 +46,10 @@
     "risk": "المخاطر",
     "profile": "الملف الشخصي",
     "contact": "اتصل بنا",
-    "about": "حول"
+    "about": "حول",
+    "features": "Features",
+    "innovation": "Innovation",
+    "impact": "Impact"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -67,7 +70,9 @@
     "disconnectWallet": "قطع المحفظة",
     "authenticationRequired": "المصادقة مطلوبة",
     "loginSuccess": "تم تسجيل الدخول بنجاح",
-    "logoutSuccess": "تم تسجيل الخروج بنجاح"
+    "logoutSuccess": "تم تسجيل الخروج بنجاح",
+    "selectProvider": "Select a Stellar wallet provider",
+    "stellarWallet": "Stellar wallet"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -113,7 +118,8 @@
     "conditions": "شروط التحريد",
     "myEscrows": "ضماناتي",
     "allEscrows": "كل الضمانات",
-    "escrowDetails": "تفاصيل الضمان"
+    "escrowDetails": "تفاصيل الضمان",
+    "new": "New escrow"
   },
   "collateral": {
     "title": "الضمان",
