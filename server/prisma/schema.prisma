@@ -28,6 +28,7 @@ model User {
   borrowedLoans       Loan[]               @relation("BorrowerLoans")
   lentLoans           Loan[]               @relation("LenderLoans")
   governanceProposals GovernanceProposal[] @relation("ProposerProposals")
+  webhooks            Webhook[]
   
   // RBAC relationships
   userPermissions     UserPermission[]
@@ -494,6 +495,55 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model Webhook {
+  id                  String            @id @default(uuid())
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url                 String
+  secret              String
+  events              String[]          @default([])
+  isActive            Boolean           @default(true)
+  authMethod          WebhookAuthMethod @default(SIGNATURE)
+  authConfig          Json?
+  encryptionEnabled   Boolean           @default(false)
+  encryptionKey       String?
+  rateLimitPerMinute  Int               @default(60)
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  consecutiveFailures Int               @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model WebhookDelivery {
+  id             String                @id @default(uuid())
+  webhookId      String
+  webhook        Webhook               @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  eventType      String
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempt        Int                   @default(0)
+  requestHeaders Json?
+  requestBody    Json?
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  nextRetryAt    DateTime?
+  deliveredAt    DateTime?
+  durationMs     Int?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([webhookId, createdAt])
+  @@index([status, nextRetryAt])
+  @@index([eventType])
+}
+
 // ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
@@ -558,6 +608,21 @@ enum DisputeStatus {
   OPEN
   RESOLVED
   CANCELLED
+}
+
+enum WebhookAuthMethod {
+  SIGNATURE
+  BEARER
+  BASIC
+  CUSTOM_HEADER
+  NONE
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  RETRYING
+  SUCCESS
+  FAILED
 }
 
 enum OracleType {
