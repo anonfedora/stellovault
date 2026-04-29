@@ -15,6 +15,7 @@ export { Navbar } from './layout/Navbar';
 export { Footer } from './layout/Footer';
 export { FAQ } from './contact/FAQ';
 export { ContactSection } from './contact/ContactSection';
+export { TransactionHistoryButton } from './transactions/TransactionHistoryButton';
 
 // Risk Components
 export { default as ScoreGauge } from './risk/ScoreGauge';

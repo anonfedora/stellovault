@@ -5,9 +5,7 @@ import { Wallet, LogOut, Menu, X, Loader2, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
-import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
-import { useTranslation } from '@/components/i18n/LanguageProvider'
-import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
+import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryButton'
 
 export function Navbar() {
   const pathname = usePathname()

@@ -85,7 +85,7 @@ export default function Home() {
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-6 group-hover:bg-blue-200 transition-colors">
                 <Zap className="w-6 h-6 text-blue-900" />
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-3hover:text-blue-900">
+              <h3 className="text-xl font-bold text-foreground mb-3 hover:text-blue-900">
                 Automated Escrows
               </h3>
               <p className="text-foreground/70 leading-relaxed  hover:text-gray-900">
