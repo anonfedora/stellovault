@@ -147,6 +147,22 @@ impl BridgeContract {
         BridgeStatus::Pending
     }
 
+    /// Change bridge admin (admin-only)
+    /// - Call this to switch admin to a new address. Current admin must sign.
+    pub fn set_admin(env: Env, new_admin: Address) -> Result<(), BridgeError> {
+        let cfg = Self::get_config(&env)?;
+        // Require current admin auth to authorize change
+        cfg.admin.require_auth();
+        let mut updated = cfg;
+        let old_admin = updated.admin.clone();
+        updated.admin = new_admin.clone();
+        // Persist updated config
+        env.storage().instance().set(&DataKey::Config, &updated);
+        // Emit event to denote admin change
+        env.events().publish((symbol_short!("bridge_admin_changed"),), (old_admin, new_admin));
+        Ok(())
+    }
+
     // Helpers
     fn get_config(env: &Env) -> Result<BridgeConfig, BridgeError> {
         if !env.storage().instance().has(&DataKey::Config) {
