@@ -36,6 +36,9 @@ export default function NewCollateralPage() {
           <p className="mt-2 text-gray-600">
             Convert a real-world asset into a Stellar collateral token with embedded metadata.
           </p>
+          <p className="mt-3 text-sm text-gray-500">
+            Supported collateral types include invoices, commodities, receivables, inventory, and real estate. Attach proof documents and confirm the details before minting.
+          </p>
         </div>
 
         <div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
