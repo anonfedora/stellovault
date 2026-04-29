@@ -409,14 +409,6 @@ export type OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput = {
   deleteMany?: Prisma.OracleRateLimitScalarWhereInput | Prisma.OracleRateLimitScalarWhereInput[]
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type OracleRateLimitCreateWithoutOracleInput = {
   id?: string
   minuteWindow: Date | string

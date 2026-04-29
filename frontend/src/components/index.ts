@@ -2,6 +2,12 @@
 
 export { Button } from './ui/Button';
 export { StatsCard } from './dashboard/StatsCard';
+export { PortfolioOverview } from './dashboard/PortfolioOverview';
+export { RecentActivity } from './dashboard/RecentActivity';
+export { QuickActions } from './dashboard/QuickActions';
+export { MetricsChart } from './dashboard/MetricsChart';
+export { NotificationCenter } from './dashboard/NotificationCenter';
+export { WidgetCustomizer } from './dashboard/WidgetCustomizer';
 export { LoanCard } from './loans/LoanCard';
 export { RepaymentSchedule } from './loans/RepaymentSchedule';
 export { LoanForm } from './loans/LoanForm';

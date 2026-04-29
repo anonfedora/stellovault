@@ -319,8 +319,10 @@ impl OracleAdapter {
             .set(&symbol_short!("pend_adm"), &new_admin);
 
         let contract_data = Self::get_contract_data(&env)?;
-        env.events()
-            .publish((symbol_short!("adm_prop"),), (contract_data.admin, new_admin));
+        env.events().publish(
+            (symbol_short!("adm_prop"),),
+            (contract_data.admin, new_admin),
+        );
 
         Ok(())
     }
@@ -341,9 +343,7 @@ impl OracleAdapter {
         env.storage()
             .instance()
             .set(&symbol_short!("data"), &contract_data);
-        env.storage()
-            .instance()
-            .remove(&symbol_short!("pend_adm"));
+        env.storage().instance().remove(&symbol_short!("pend_adm"));
 
         env.events()
             .publish((symbol_short!("adm_acpt"),), (pending,));
@@ -353,9 +353,7 @@ impl OracleAdapter {
 
     /// Return the pending admin address if a proposal is active.
     pub fn get_pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .instance()
-            .get(&symbol_short!("pend_adm"))
+        env.storage().instance().get(&symbol_short!("pend_adm"))
     }
 
     /// Check if consensus threshold is met for an escrow.

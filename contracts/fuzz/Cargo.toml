@@ -18,6 +18,9 @@ arbitrary = { version = "1", features = ["derive"] }
 [workspace]
 members = ["."]
 
+[patch.crates-io]
+ethnum = { path = "vendor/ethnum" }
+
 [[bin]]
 name = "fuzz_escrow_invariants"
 path = "fuzz_targets/fuzz_escrow_invariants.rs"

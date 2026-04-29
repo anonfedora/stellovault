@@ -77,8 +77,6 @@ export function ProposalForm() {
     }
   };
 
-  const expiresAt = new Date(Date.now() + 86400000 * formData.duration);
-
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
@@ -282,7 +280,7 @@ export function ProposalForm() {
                   <div className="px-6 py-4 flex justify-between">
                     <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Duration</span>
                     <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {formData.duration} days (expires {expiresAt.toLocaleDateString()})
+                      {formData.duration} days
                     </span>
                   </div>
                   <div className="px-6 py-4">

@@ -1,5 +1,5 @@
 use crate::{ContractError, Escrow, EscrowStatus};
-use soroban_sdk::{token, Address, Env};
+use soroban_sdk::{token, Env};
 
 /// Process a refund for an escrow
 ///
