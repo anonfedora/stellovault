@@ -16,11 +16,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
 
       - name: Build
         run: |
@@ -30,12 +32,12 @@ jobs:
       - name: Check Bundle Size
         run: |
           cd frontend
-          # Simple check for main bundle size (example budget 500KB)
-          SIZE=$(du -sk .next/static/chunks/main-*.js | cut -f1)
-          echo "Main bundle size: ${SIZE}KB"
+          # Calculate total size of main bundles (using find to be robust across Next.js versions)
+          SIZE=$(find .next/static/chunks -name "main-*.js" -o -name "main-app-*.js" -o -name "layout-*.js" | xargs du -sk 2>/dev/null | awk '{sum+=$1} END {print sum + 0}')
+          echo "Total main bundle size: ${SIZE}KB"
           if [ "$SIZE" -gt 500 ]; then
             echo "Main bundle exceeds 500KB budget!"
-            # exit 1 # Uncomment to fail CI
+            # exit 1 # Uncomment to fail CI if budget is strictly enforced
           fi
 
       - name: Lighthouse CI

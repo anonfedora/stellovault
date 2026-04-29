@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
-import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
 import { AppProviders } from "@/components/providers/AppProviders";
 import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import dynamic from "next/dynamic";
+
+const TransactionHistoryDrawer = dynamic(
+  () => import("@/components/transactions/TransactionHistoryDrawer").then(mod => mod.TransactionHistoryDrawer),
+  { ssr: false }
+);
+
+const Toaster = dynamic(
+  () => import("sonner").then(mod => mod.Toaster),
+  { ssr: false }
+);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

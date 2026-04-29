@@ -5,7 +5,7 @@ import { Wallet, LogOut, Menu, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTransactionStatus } from '@/contexts/TransactionStatusProvider'
-import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryDrawer'
+import { TransactionHistoryButton } from '@/components/transactions/TransactionHistoryButton'
 
 export function Navbar() {
   const pathname = usePathname()
