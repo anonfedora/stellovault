@@ -7,12 +7,9 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-black">
-            {/* Sidebar - fixed position */}
+        <div className="min-h-screen bg-gray-50 dark:bg-black lg:flex">
             <Sidebar />
-
-            {/* Main Content - needs margin left to account for fixed sidebar */}
-            <main className="flex-1 ml-64 overflow-y-auto">
+            <main className="min-h-screen flex-1 overflow-y-auto pb-24 lg:ml-64 lg:pb-0">
                 {children}
             </main>
         </div>

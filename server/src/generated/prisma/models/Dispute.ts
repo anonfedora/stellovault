@@ -32,6 +32,8 @@ export type DisputeMinAggregateOutputType = {
   status: $Enums.DisputeStatus | null
   createdAt: Date | null
   updatedAt: Date | null
+  resolution: string | null
+  resolvedAt: Date | null
 }
 
 export type DisputeMaxAggregateOutputType = {
@@ -42,6 +44,8 @@ export type DisputeMaxAggregateOutputType = {
   status: $Enums.DisputeStatus | null
   createdAt: Date | null
   updatedAt: Date | null
+  resolution: string | null
+  resolvedAt: Date | null
 }
 
 export type DisputeCountAggregateOutputType = {
@@ -52,6 +56,8 @@ export type DisputeCountAggregateOutputType = {
   status: number
   createdAt: number
   updatedAt: number
+  resolution: number
+  resolvedAt: number
   _all: number
 }
 
@@ -64,6 +70,8 @@ export type DisputeMinAggregateInputType = {
   status?: true
   createdAt?: true
   updatedAt?: true
+  resolution?: true
+  resolvedAt?: true
 }
 
 export type DisputeMaxAggregateInputType = {
@@ -74,6 +82,8 @@ export type DisputeMaxAggregateInputType = {
   status?: true
   createdAt?: true
   updatedAt?: true
+  resolution?: true
+  resolvedAt?: true
 }
 
 export type DisputeCountAggregateInputType = {
@@ -84,6 +94,8 @@ export type DisputeCountAggregateInputType = {
   status?: true
   createdAt?: true
   updatedAt?: true
+  resolution?: true
+  resolvedAt?: true
   _all?: true
 }
 
@@ -167,6 +179,8 @@ export type DisputeGroupByOutputType = {
   status: $Enums.DisputeStatus
   createdAt: Date
   updatedAt: Date
+  resolution: string | null
+  resolvedAt: Date | null
   _count: DisputeCountAggregateOutputType | null
   _min: DisputeMinAggregateOutputType | null
   _max: DisputeMaxAggregateOutputType | null
@@ -198,6 +212,8 @@ export type DisputeWhereInput = {
   status?: Prisma.EnumDisputeStatusFilter<"Dispute"> | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
+  resolution?: Prisma.StringNullableFilter<"Dispute"> | string | null
+  resolvedAt?: Prisma.DateTimeNullableFilter<"Dispute"> | Date | string | null
   escrow?: Prisma.XOR<Prisma.EscrowScalarRelationFilter, Prisma.EscrowWhereInput>
 }
 
@@ -209,6 +225,8 @@ export type DisputeOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  resolution?: Prisma.SortOrderInput | Prisma.SortOrder
+  resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   escrow?: Prisma.EscrowOrderByWithRelationInput
 }
 
@@ -223,6 +241,8 @@ export type DisputeWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.EnumDisputeStatusFilter<"Dispute"> | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
+  resolution?: Prisma.StringNullableFilter<"Dispute"> | string | null
+  resolvedAt?: Prisma.DateTimeNullableFilter<"Dispute"> | Date | string | null
   escrow?: Prisma.XOR<Prisma.EscrowScalarRelationFilter, Prisma.EscrowWhereInput>
 }, "id">
 
@@ -234,6 +254,8 @@ export type DisputeOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  resolution?: Prisma.SortOrderInput | Prisma.SortOrder
+  resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.DisputeCountOrderByAggregateInput
   _max?: Prisma.DisputeMaxOrderByAggregateInput
   _min?: Prisma.DisputeMinOrderByAggregateInput
@@ -250,6 +272,8 @@ export type DisputeScalarWhereWithAggregatesInput = {
   status?: Prisma.EnumDisputeStatusWithAggregatesFilter<"Dispute"> | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Dispute"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Dispute"> | Date | string
+  resolution?: Prisma.StringNullableWithAggregatesFilter<"Dispute"> | string | null
+  resolvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Dispute"> | Date | string | null
 }
 
 export type DisputeCreateInput = {
@@ -259,6 +283,8 @@ export type DisputeCreateInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
   escrow: Prisma.EscrowCreateNestedOneWithoutDisputesInput
 }
 
@@ -270,6 +296,8 @@ export type DisputeUncheckedCreateInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
 }
 
 export type DisputeUpdateInput = {
@@ -279,6 +307,8 @@ export type DisputeUpdateInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   escrow?: Prisma.EscrowUpdateOneRequiredWithoutDisputesNestedInput
 }
 
@@ -290,6 +320,8 @@ export type DisputeUncheckedUpdateInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type DisputeCreateManyInput = {
@@ -300,6 +332,8 @@ export type DisputeCreateManyInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
 }
 
 export type DisputeUpdateManyMutationInput = {
@@ -309,6 +343,8 @@ export type DisputeUpdateManyMutationInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type DisputeUncheckedUpdateManyInput = {
@@ -319,6 +355,8 @@ export type DisputeUncheckedUpdateManyInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type DisputeListRelationFilter = {
@@ -339,6 +377,8 @@ export type DisputeCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  resolution?: Prisma.SortOrder
+  resolvedAt?: Prisma.SortOrder
 }
 
 export type DisputeMaxOrderByAggregateInput = {
@@ -349,6 +389,8 @@ export type DisputeMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  resolution?: Prisma.SortOrder
+  resolvedAt?: Prisma.SortOrder
 }
 
 export type DisputeMinOrderByAggregateInput = {
@@ -359,6 +401,8 @@ export type DisputeMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  resolution?: Prisma.SortOrder
+  resolvedAt?: Prisma.SortOrder
 }
 
 export type DisputeCreateNestedManyWithoutEscrowInput = {
@@ -414,6 +458,8 @@ export type DisputeCreateWithoutEscrowInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
 }
 
 export type DisputeUncheckedCreateWithoutEscrowInput = {
@@ -423,6 +469,8 @@ export type DisputeUncheckedCreateWithoutEscrowInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
 }
 
 export type DisputeCreateOrConnectWithoutEscrowInput = {
@@ -462,6 +510,8 @@ export type DisputeScalarWhereInput = {
   status?: Prisma.EnumDisputeStatusFilter<"Dispute"> | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Dispute"> | Date | string
+  resolution?: Prisma.StringNullableFilter<"Dispute"> | string | null
+  resolvedAt?: Prisma.DateTimeNullableFilter<"Dispute"> | Date | string | null
 }
 
 export type DisputeCreateManyEscrowInput = {
@@ -471,6 +521,8 @@ export type DisputeCreateManyEscrowInput = {
   status?: $Enums.DisputeStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  resolution?: string | null
+  resolvedAt?: Date | string | null
 }
 
 export type DisputeUpdateWithoutEscrowInput = {
@@ -480,6 +532,8 @@ export type DisputeUpdateWithoutEscrowInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type DisputeUncheckedUpdateWithoutEscrowInput = {
@@ -489,6 +543,8 @@ export type DisputeUncheckedUpdateWithoutEscrowInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type DisputeUncheckedUpdateManyWithoutEscrowInput = {
@@ -498,6 +554,8 @@ export type DisputeUncheckedUpdateManyWithoutEscrowInput = {
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 
@@ -510,6 +568,8 @@ export type DisputeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  resolution?: boolean
+  resolvedAt?: boolean
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dispute"]>
 
@@ -521,6 +581,8 @@ export type DisputeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  resolution?: boolean
+  resolvedAt?: boolean
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dispute"]>
 
@@ -532,6 +594,8 @@ export type DisputeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  resolution?: boolean
+  resolvedAt?: boolean
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dispute"]>
 
@@ -543,9 +607,11 @@ export type DisputeSelectScalar = {
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  resolution?: boolean
+  resolvedAt?: boolean
 }
 
-export type DisputeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "escrowId" | "reporterAddress" | "reason" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["dispute"]>
+export type DisputeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "escrowId" | "reporterAddress" | "reason" | "status" | "createdAt" | "updatedAt" | "resolution" | "resolvedAt", ExtArgs["result"]["dispute"]>
 export type DisputeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }
@@ -569,6 +635,8 @@ export type $DisputePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     status: $Enums.DisputeStatus
     createdAt: Date
     updatedAt: Date
+    resolution: string | null
+    resolvedAt: Date | null
   }, ExtArgs["result"]["dispute"]>
   composites: {}
 }
@@ -1000,6 +1068,8 @@ export interface DisputeFieldRefs {
   readonly status: Prisma.FieldRef<"Dispute", 'DisputeStatus'>
   readonly createdAt: Prisma.FieldRef<"Dispute", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Dispute", 'DateTime'>
+  readonly resolution: Prisma.FieldRef<"Dispute", 'String'>
+  readonly resolvedAt: Prisma.FieldRef<"Dispute", 'DateTime'>
 }
     
 

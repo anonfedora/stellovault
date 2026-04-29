@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
@@ -50,10 +50,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
@@ -78,7 +78,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -87,7 +87,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache Cargo Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -104,8 +104,56 @@ jobs:
       - name: Build Contract (WASM)
         run: cargo build --target wasm32-unknown-unknown --release
 
-      - name: Run Tests
-        run: cargo test
+      # ── Comprehensive Testing Infrastructure ────────────────────────────────
+      - name: Run Unit Tests
+        run: cargo test unit_ -- --nocapture
+
+      - name: Run Integration Tests
+        run: cargo test integration_ -- --nocapture
 
       - name: Run Property-Based Tests (proptest)
-        run: cargo test --features testutils -- --include-ignored fuzz --test-threads=1
+        run: cargo test property_ --features testutils -- --nocapture --test-threads=1
+
+      - name: Run Security Tests
+        run: cargo test security_ -- --nocapture
+
+      - name: Run Attack Vector Tests
+        run: cargo test attack_ -- --nocapture
+
+      - name: Run Gas Optimization Tests
+        run: cargo test gas_ -- --nocapture
+
+      - name: Run Formal Verification Tests
+        run: cargo test invariant_ -- --nocapture
+
+      - name: Run Economic Simulation Tests
+        run: cargo test economic_ -- --nocapture
+
+      - name: Run Performance Tests
+        run: cargo test performance_ -- --nocapture
+
+      - name: Run All Tests
+        run: cargo test -- --nocapture
+
+      # ── Security Scanning ──────────────────────────────────────────────────
+      - name: Security Audit (cargo-audit)
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Check for Unsafe Code
+        run: cargo clippy --all-targets -- -W unsafe-code
+
+      # ── Code Coverage ──────────────────────────────────────────────────────
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate Coverage Report
+        run: cargo tarpaulin --out Xml --timeout 300
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./cobertura.xml
+          flags: contracts
+          fail_ci_if_error: false

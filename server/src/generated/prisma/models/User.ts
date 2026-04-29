@@ -31,6 +31,7 @@ export type UserMinAggregateOutputType = {
   role: $Enums.Role | null
   createdAt: Date | null
   updatedAt: Date | null
+  roleId: string | null
 }
 
 export type UserMaxAggregateOutputType = {
@@ -40,6 +41,7 @@ export type UserMaxAggregateOutputType = {
   role: $Enums.Role | null
   createdAt: Date | null
   updatedAt: Date | null
+  roleId: string | null
 }
 
 export type UserCountAggregateOutputType = {
@@ -49,6 +51,7 @@ export type UserCountAggregateOutputType = {
   role: number
   createdAt: number
   updatedAt: number
+  roleId: number
   _all: number
 }
 
@@ -60,6 +63,7 @@ export type UserMinAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  roleId?: true
 }
 
 export type UserMaxAggregateInputType = {
@@ -69,6 +73,7 @@ export type UserMaxAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  roleId?: true
 }
 
 export type UserCountAggregateInputType = {
@@ -78,6 +83,7 @@ export type UserCountAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  roleId?: true
   _all?: true
 }
 
@@ -160,6 +166,7 @@ export type UserGroupByOutputType = {
   role: $Enums.Role
   createdAt: Date
   updatedAt: Date
+  roleId: string | null
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
@@ -190,6 +197,7 @@ export type UserWhereInput = {
   role?: Prisma.EnumRoleFilter<"User"> | $Enums.Role
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  roleId?: Prisma.StringNullableFilter<"User"> | string | null
   wallets?: Prisma.WalletListRelationFilter
   challenges?: Prisma.WalletChallengeListRelationFilter
   boughtEscrows?: Prisma.EscrowListRelationFilter
@@ -199,6 +207,8 @@ export type UserWhereInput = {
   borrowedLoans?: Prisma.LoanListRelationFilter
   lentLoans?: Prisma.LoanListRelationFilter
   governanceProposals?: Prisma.GovernanceProposalListRelationFilter
+  userPermissions?: Prisma.UserPermissionListRelationFilter
+  assignedRole?: Prisma.XOR<Prisma.UserRoleModelNullableScalarRelationFilter, Prisma.UserRoleModelWhereInput> | null
 }
 
 export type UserOrderByWithRelationInput = {
@@ -208,6 +218,7 @@ export type UserOrderByWithRelationInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  roleId?: Prisma.SortOrderInput | Prisma.SortOrder
   wallets?: Prisma.WalletOrderByRelationAggregateInput
   challenges?: Prisma.WalletChallengeOrderByRelationAggregateInput
   boughtEscrows?: Prisma.EscrowOrderByRelationAggregateInput
@@ -217,6 +228,8 @@ export type UserOrderByWithRelationInput = {
   borrowedLoans?: Prisma.LoanOrderByRelationAggregateInput
   lentLoans?: Prisma.LoanOrderByRelationAggregateInput
   governanceProposals?: Prisma.GovernanceProposalOrderByRelationAggregateInput
+  userPermissions?: Prisma.UserPermissionOrderByRelationAggregateInput
+  assignedRole?: Prisma.UserRoleModelOrderByWithRelationInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -229,6 +242,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   role?: Prisma.EnumRoleFilter<"User"> | $Enums.Role
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  roleId?: Prisma.StringNullableFilter<"User"> | string | null
   wallets?: Prisma.WalletListRelationFilter
   challenges?: Prisma.WalletChallengeListRelationFilter
   boughtEscrows?: Prisma.EscrowListRelationFilter
@@ -238,6 +252,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   borrowedLoans?: Prisma.LoanListRelationFilter
   lentLoans?: Prisma.LoanListRelationFilter
   governanceProposals?: Prisma.GovernanceProposalListRelationFilter
+  userPermissions?: Prisma.UserPermissionListRelationFilter
+  assignedRole?: Prisma.XOR<Prisma.UserRoleModelNullableScalarRelationFilter, Prisma.UserRoleModelWhereInput> | null
 }, "id" | "stellarAddress">
 
 export type UserOrderByWithAggregationInput = {
@@ -247,6 +263,7 @@ export type UserOrderByWithAggregationInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  roleId?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
@@ -262,6 +279,7 @@ export type UserScalarWhereWithAggregatesInput = {
   role?: Prisma.EnumRoleWithAggregatesFilter<"User"> | $Enums.Role
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
+  roleId?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
 }
 
 export type UserCreateInput = {
@@ -280,6 +298,8 @@ export type UserCreateInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -289,6 +309,7 @@ export type UserUncheckedCreateInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -298,6 +319,7 @@ export type UserUncheckedCreateInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -316,6 +338,8 @@ export type UserUpdateInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -325,6 +349,7 @@ export type UserUncheckedUpdateInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -334,6 +359,7 @@ export type UserUncheckedUpdateInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -343,6 +369,7 @@ export type UserCreateManyInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
 }
 
 export type UserUpdateManyMutationInput = {
@@ -361,6 +388,7 @@ export type UserUncheckedUpdateManyInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type UserCountOrderByAggregateInput = {
@@ -370,6 +398,7 @@ export type UserCountOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  roleId?: Prisma.SortOrder
 }
 
 export type UserMaxOrderByAggregateInput = {
@@ -379,6 +408,7 @@ export type UserMaxOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  roleId?: Prisma.SortOrder
 }
 
 export type UserMinOrderByAggregateInput = {
@@ -388,11 +418,22 @@ export type UserMinOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  roleId?: Prisma.SortOrder
 }
 
 export type UserScalarRelationFilter = {
   is?: Prisma.UserWhereInput
   isNot?: Prisma.UserWhereInput
+}
+
+export type UserListRelationFilter = {
+  every?: Prisma.UserWhereInput
+  some?: Prisma.UserWhereInput
+  none?: Prisma.UserWhereInput
+}
+
+export type UserOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type UserNullableScalarRelationFilter = {
@@ -428,6 +469,62 @@ export type UserUpdateOneRequiredWithoutWalletsNestedInput = {
   upsert?: Prisma.UserUpsertWithoutWalletsInput
   connect?: Prisma.UserWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWalletsInput, Prisma.UserUpdateWithoutWalletsInput>, Prisma.UserUncheckedUpdateWithoutWalletsInput>
+}
+
+export type UserCreateNestedManyWithoutAssignedRoleInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput> | Prisma.UserCreateWithoutAssignedRoleInput[] | Prisma.UserUncheckedCreateWithoutAssignedRoleInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAssignedRoleInput | Prisma.UserCreateOrConnectWithoutAssignedRoleInput[]
+  createMany?: Prisma.UserCreateManyAssignedRoleInputEnvelope
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+}
+
+export type UserUncheckedCreateNestedManyWithoutAssignedRoleInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput> | Prisma.UserCreateWithoutAssignedRoleInput[] | Prisma.UserUncheckedCreateWithoutAssignedRoleInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAssignedRoleInput | Prisma.UserCreateOrConnectWithoutAssignedRoleInput[]
+  createMany?: Prisma.UserCreateManyAssignedRoleInputEnvelope
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+}
+
+export type UserUpdateManyWithoutAssignedRoleNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput> | Prisma.UserCreateWithoutAssignedRoleInput[] | Prisma.UserUncheckedCreateWithoutAssignedRoleInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAssignedRoleInput | Prisma.UserCreateOrConnectWithoutAssignedRoleInput[]
+  upsert?: Prisma.UserUpsertWithWhereUniqueWithoutAssignedRoleInput | Prisma.UserUpsertWithWhereUniqueWithoutAssignedRoleInput[]
+  createMany?: Prisma.UserCreateManyAssignedRoleInputEnvelope
+  set?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  disconnect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  delete?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  update?: Prisma.UserUpdateWithWhereUniqueWithoutAssignedRoleInput | Prisma.UserUpdateWithWhereUniqueWithoutAssignedRoleInput[]
+  updateMany?: Prisma.UserUpdateManyWithWhereWithoutAssignedRoleInput | Prisma.UserUpdateManyWithWhereWithoutAssignedRoleInput[]
+  deleteMany?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+}
+
+export type UserUncheckedUpdateManyWithoutAssignedRoleNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput> | Prisma.UserCreateWithoutAssignedRoleInput[] | Prisma.UserUncheckedCreateWithoutAssignedRoleInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAssignedRoleInput | Prisma.UserCreateOrConnectWithoutAssignedRoleInput[]
+  upsert?: Prisma.UserUpsertWithWhereUniqueWithoutAssignedRoleInput | Prisma.UserUpsertWithWhereUniqueWithoutAssignedRoleInput[]
+  createMany?: Prisma.UserCreateManyAssignedRoleInputEnvelope
+  set?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  disconnect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  delete?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  update?: Prisma.UserUpdateWithWhereUniqueWithoutAssignedRoleInput | Prisma.UserUpdateWithWhereUniqueWithoutAssignedRoleInput[]
+  updateMany?: Prisma.UserUpdateManyWithWhereWithoutAssignedRoleInput | Prisma.UserUpdateManyWithWhereWithoutAssignedRoleInput[]
+  deleteMany?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+}
+
+export type UserCreateNestedOneWithoutUserPermissionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUserPermissionsInput, Prisma.UserUncheckedCreateWithoutUserPermissionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUserPermissionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutUserPermissionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUserPermissionsInput, Prisma.UserUncheckedCreateWithoutUserPermissionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUserPermissionsInput
+  upsert?: Prisma.UserUpsertWithoutUserPermissionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutUserPermissionsInput, Prisma.UserUpdateWithoutUserPermissionsInput>, Prisma.UserUncheckedUpdateWithoutUserPermissionsInput>
 }
 
 export type UserCreateNestedOneWithoutSessionsInput = {
@@ -559,6 +656,8 @@ export type UserCreateWithoutWalletsInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutWalletsInput = {
@@ -568,6 +667,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
   soldEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutSellerInput
@@ -576,6 +676,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWalletsInput = {
@@ -609,6 +710,8 @@ export type UserUpdateWithoutWalletsInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWalletsInput = {
@@ -618,6 +721,177 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
+  boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
+  soldEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutSellerNestedInput
+  investments?: Prisma.InvestmentUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
+  lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
+  governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutAssignedRoleInput = {
+  id?: string
+  stellarAddress: string
+  name?: string | null
+  role?: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  challenges?: Prisma.WalletChallengeCreateNestedManyWithoutUserInput
+  boughtEscrows?: Prisma.EscrowCreateNestedManyWithoutBuyerInput
+  soldEscrows?: Prisma.EscrowCreateNestedManyWithoutSellerInput
+  investments?: Prisma.InvestmentCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
+  lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
+  governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutAssignedRoleInput = {
+  id?: string
+  stellarAddress: string
+  name?: string | null
+  role?: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
+  boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
+  soldEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutSellerInput
+  investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
+  lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
+  governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutAssignedRoleInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput>
+}
+
+export type UserCreateManyAssignedRoleInputEnvelope = {
+  data: Prisma.UserCreateManyAssignedRoleInput | Prisma.UserCreateManyAssignedRoleInput[]
+  skipDuplicates?: boolean
+}
+
+export type UserUpsertWithWhereUniqueWithoutAssignedRoleInput = {
+  where: Prisma.UserWhereUniqueInput
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAssignedRoleInput, Prisma.UserUncheckedUpdateWithoutAssignedRoleInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAssignedRoleInput, Prisma.UserUncheckedCreateWithoutAssignedRoleInput>
+}
+
+export type UserUpdateWithWhereUniqueWithoutAssignedRoleInput = {
+  where: Prisma.UserWhereUniqueInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAssignedRoleInput, Prisma.UserUncheckedUpdateWithoutAssignedRoleInput>
+}
+
+export type UserUpdateManyWithWhereWithoutAssignedRoleInput = {
+  where: Prisma.UserScalarWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateManyMutationInput, Prisma.UserUncheckedUpdateManyWithoutAssignedRoleInput>
+}
+
+export type UserScalarWhereInput = {
+  AND?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+  OR?: Prisma.UserScalarWhereInput[]
+  NOT?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+  id?: Prisma.StringFilter<"User"> | string
+  stellarAddress?: Prisma.StringFilter<"User"> | string
+  name?: Prisma.StringNullableFilter<"User"> | string | null
+  role?: Prisma.EnumRoleFilter<"User"> | $Enums.Role
+  createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  roleId?: Prisma.StringNullableFilter<"User"> | string | null
+}
+
+export type UserCreateWithoutUserPermissionsInput = {
+  id?: string
+  stellarAddress: string
+  name?: string | null
+  role?: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  challenges?: Prisma.WalletChallengeCreateNestedManyWithoutUserInput
+  boughtEscrows?: Prisma.EscrowCreateNestedManyWithoutBuyerInput
+  soldEscrows?: Prisma.EscrowCreateNestedManyWithoutSellerInput
+  investments?: Prisma.InvestmentCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
+  lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
+  governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
+}
+
+export type UserUncheckedCreateWithoutUserPermissionsInput = {
+  id?: string
+  stellarAddress: string
+  name?: string | null
+  role?: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  roleId?: string | null
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
+  boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
+  soldEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutSellerInput
+  investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
+  lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
+  governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+}
+
+export type UserCreateOrConnectWithoutUserPermissionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutUserPermissionsInput, Prisma.UserUncheckedCreateWithoutUserPermissionsInput>
+}
+
+export type UserUpsertWithoutUserPermissionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutUserPermissionsInput, Prisma.UserUncheckedUpdateWithoutUserPermissionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutUserPermissionsInput, Prisma.UserUncheckedCreateWithoutUserPermissionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutUserPermissionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutUserPermissionsInput, Prisma.UserUncheckedUpdateWithoutUserPermissionsInput>
+}
+
+export type UserUpdateWithoutUserPermissionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  challenges?: Prisma.WalletChallengeUpdateManyWithoutUserNestedInput
+  boughtEscrows?: Prisma.EscrowUpdateManyWithoutBuyerNestedInput
+  soldEscrows?: Prisma.EscrowUpdateManyWithoutSellerNestedInput
+  investments?: Prisma.InvestmentUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
+  lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
+  governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
+}
+
+export type UserUncheckedUpdateWithoutUserPermissionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
   soldEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutSellerNestedInput
@@ -643,6 +917,8 @@ export type UserCreateWithoutSessionsInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
@@ -652,6 +928,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -660,6 +937,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -693,6 +971,8 @@ export type UserUpdateWithoutSessionsInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -702,6 +982,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -710,6 +991,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutChallengesInput = {
@@ -727,6 +1009,8 @@ export type UserCreateWithoutChallengesInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutChallengesInput = {
@@ -736,6 +1020,7 @@ export type UserUncheckedCreateWithoutChallengesInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
   soldEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutSellerInput
@@ -744,6 +1029,7 @@ export type UserUncheckedCreateWithoutChallengesInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutChallengesInput = {
@@ -777,6 +1063,8 @@ export type UserUpdateWithoutChallengesInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutChallengesInput = {
@@ -786,6 +1074,7 @@ export type UserUncheckedUpdateWithoutChallengesInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
   soldEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutSellerNestedInput
@@ -794,6 +1083,7 @@ export type UserUncheckedUpdateWithoutChallengesInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutBoughtEscrowsInput = {
@@ -811,6 +1101,8 @@ export type UserCreateWithoutBoughtEscrowsInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutBoughtEscrowsInput = {
@@ -820,6 +1112,7 @@ export type UserUncheckedCreateWithoutBoughtEscrowsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   soldEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutSellerInput
@@ -828,6 +1121,7 @@ export type UserUncheckedCreateWithoutBoughtEscrowsInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutBoughtEscrowsInput = {
@@ -850,6 +1144,8 @@ export type UserCreateWithoutSoldEscrowsInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutSoldEscrowsInput = {
@@ -859,6 +1155,7 @@ export type UserUncheckedCreateWithoutSoldEscrowsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -867,6 +1164,7 @@ export type UserUncheckedCreateWithoutSoldEscrowsInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSoldEscrowsInput = {
@@ -900,6 +1198,8 @@ export type UserUpdateWithoutBoughtEscrowsInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutBoughtEscrowsInput = {
@@ -909,6 +1209,7 @@ export type UserUncheckedUpdateWithoutBoughtEscrowsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   soldEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutSellerNestedInput
@@ -917,6 +1218,7 @@ export type UserUncheckedUpdateWithoutBoughtEscrowsInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutSoldEscrowsInput = {
@@ -945,6 +1247,8 @@ export type UserUpdateWithoutSoldEscrowsInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSoldEscrowsInput = {
@@ -954,6 +1258,7 @@ export type UserUncheckedUpdateWithoutSoldEscrowsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -962,6 +1267,7 @@ export type UserUncheckedUpdateWithoutSoldEscrowsInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutBorrowedLoansInput = {
@@ -979,6 +1285,8 @@ export type UserCreateWithoutBorrowedLoansInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutBorrowedLoansInput = {
@@ -988,6 +1296,7 @@ export type UserUncheckedCreateWithoutBorrowedLoansInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -996,6 +1305,7 @@ export type UserUncheckedCreateWithoutBorrowedLoansInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutBorrowedLoansInput = {
@@ -1018,6 +1328,8 @@ export type UserCreateWithoutLentLoansInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutLentLoansInput = {
@@ -1027,6 +1339,7 @@ export type UserUncheckedCreateWithoutLentLoansInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -1035,6 +1348,7 @@ export type UserUncheckedCreateWithoutLentLoansInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutLentLoansInput = {
@@ -1068,6 +1382,8 @@ export type UserUpdateWithoutBorrowedLoansInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutBorrowedLoansInput = {
@@ -1077,6 +1393,7 @@ export type UserUncheckedUpdateWithoutBorrowedLoansInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -1085,6 +1402,7 @@ export type UserUncheckedUpdateWithoutBorrowedLoansInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutLentLoansInput = {
@@ -1113,6 +1431,8 @@ export type UserUpdateWithoutLentLoansInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutLentLoansInput = {
@@ -1122,6 +1442,7 @@ export type UserUncheckedUpdateWithoutLentLoansInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -1130,6 +1451,7 @@ export type UserUncheckedUpdateWithoutLentLoansInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutInvestmentsInput = {
@@ -1147,6 +1469,8 @@ export type UserCreateWithoutInvestmentsInput = {
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutInvestmentsInput = {
@@ -1156,6 +1480,7 @@ export type UserUncheckedCreateWithoutInvestmentsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -1164,6 +1489,7 @@ export type UserUncheckedCreateWithoutInvestmentsInput = {
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedCreateNestedManyWithoutProposerInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInvestmentsInput = {
@@ -1197,6 +1523,8 @@ export type UserUpdateWithoutInvestmentsInput = {
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInvestmentsInput = {
@@ -1206,6 +1534,7 @@ export type UserUncheckedUpdateWithoutInvestmentsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
   boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
@@ -1214,6 +1543,7 @@ export type UserUncheckedUpdateWithoutInvestmentsInput = {
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
   governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutGovernanceProposalsInput = {
@@ -1231,6 +1561,8 @@ export type UserCreateWithoutGovernanceProposalsInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   borrowedLoans?: Prisma.LoanCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanCreateNestedManyWithoutLenderInput
+  userPermissions?: Prisma.UserPermissionCreateNestedManyWithoutUserInput
+  assignedRole?: Prisma.UserRoleModelCreateNestedOneWithoutUsersInput
 }
 
 export type UserUncheckedCreateWithoutGovernanceProposalsInput = {
@@ -1240,6 +1572,7 @@ export type UserUncheckedCreateWithoutGovernanceProposalsInput = {
   role?: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  roleId?: string | null
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   challenges?: Prisma.WalletChallengeUncheckedCreateNestedManyWithoutUserInput
   boughtEscrows?: Prisma.EscrowUncheckedCreateNestedManyWithoutBuyerInput
@@ -1248,6 +1581,7 @@ export type UserUncheckedCreateWithoutGovernanceProposalsInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   borrowedLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutBorrowerInput
   lentLoans?: Prisma.LoanUncheckedCreateNestedManyWithoutLenderInput
+  userPermissions?: Prisma.UserPermissionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGovernanceProposalsInput = {
@@ -1281,9 +1615,58 @@ export type UserUpdateWithoutGovernanceProposalsInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+  assignedRole?: Prisma.UserRoleModelUpdateOneWithoutUsersNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGovernanceProposalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  roleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  challenges?: Prisma.WalletChallengeUncheckedUpdateManyWithoutUserNestedInput
+  boughtEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutBuyerNestedInput
+  soldEscrows?: Prisma.EscrowUncheckedUpdateManyWithoutSellerNestedInput
+  investments?: Prisma.InvestmentUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
+  lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateManyAssignedRoleInput = {
+  id?: string
+  stellarAddress: string
+  name?: string | null
+  role?: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type UserUpdateWithoutAssignedRoleInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  challenges?: Prisma.WalletChallengeUpdateManyWithoutUserNestedInput
+  boughtEscrows?: Prisma.EscrowUpdateManyWithoutBuyerNestedInput
+  soldEscrows?: Prisma.EscrowUpdateManyWithoutSellerNestedInput
+  investments?: Prisma.InvestmentUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  borrowedLoans?: Prisma.LoanUpdateManyWithoutBorrowerNestedInput
+  lentLoans?: Prisma.LoanUpdateManyWithoutLenderNestedInput
+  governanceProposals?: Prisma.GovernanceProposalUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAssignedRoleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1298,6 +1681,17 @@ export type UserUncheckedUpdateWithoutGovernanceProposalsInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
   borrowedLoans?: Prisma.LoanUncheckedUpdateManyWithoutBorrowerNestedInput
   lentLoans?: Prisma.LoanUncheckedUpdateManyWithoutLenderNestedInput
+  governanceProposals?: Prisma.GovernanceProposalUncheckedUpdateManyWithoutProposerNestedInput
+  userPermissions?: Prisma.UserPermissionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateManyWithoutAssignedRoleInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stellarAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -1315,6 +1709,7 @@ export type UserCountOutputType = {
   borrowedLoans: number
   lentLoans: number
   governanceProposals: number
+  userPermissions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1327,6 +1722,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   borrowedLoans?: boolean | UserCountOutputTypeCountBorrowedLoansArgs
   lentLoans?: boolean | UserCountOutputTypeCountLentLoansArgs
   governanceProposals?: boolean | UserCountOutputTypeCountGovernanceProposalsArgs
+  userPermissions?: boolean | UserCountOutputTypeCountUserPermissionsArgs
 }
 
 /**
@@ -1402,6 +1798,13 @@ export type UserCountOutputTypeCountGovernanceProposalsArgs<ExtArgs extends runt
   where?: Prisma.GovernanceProposalWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountUserPermissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.UserPermissionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1410,6 +1813,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  roleId?: boolean
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   challenges?: boolean | Prisma.User$challengesArgs<ExtArgs>
   boughtEscrows?: boolean | Prisma.User$boughtEscrowsArgs<ExtArgs>
@@ -1419,6 +1823,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   borrowedLoans?: boolean | Prisma.User$borrowedLoansArgs<ExtArgs>
   lentLoans?: boolean | Prisma.User$lentLoansArgs<ExtArgs>
   governanceProposals?: boolean | Prisma.User$governanceProposalsArgs<ExtArgs>
+  userPermissions?: boolean | Prisma.User$userPermissionsArgs<ExtArgs>
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1429,6 +1835,8 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  roleId?: boolean
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1438,6 +1846,8 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  roleId?: boolean
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -1447,9 +1857,10 @@ export type UserSelectScalar = {
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  roleId?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stellarAddress" | "name" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stellarAddress" | "name" | "role" | "createdAt" | "updatedAt" | "roleId", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   challenges?: boolean | Prisma.User$challengesArgs<ExtArgs>
@@ -1460,10 +1871,16 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   borrowedLoans?: boolean | Prisma.User$borrowedLoansArgs<ExtArgs>
   lentLoans?: boolean | Prisma.User$lentLoansArgs<ExtArgs>
   governanceProposals?: boolean | Prisma.User$governanceProposalsArgs<ExtArgs>
+  userPermissions?: boolean | Prisma.User$userPermissionsArgs<ExtArgs>
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
+}
+export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  assignedRole?: boolean | Prisma.User$assignedRoleArgs<ExtArgs>
+}
 
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
@@ -1477,6 +1894,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     borrowedLoans: Prisma.$LoanPayload<ExtArgs>[]
     lentLoans: Prisma.$LoanPayload<ExtArgs>[]
     governanceProposals: Prisma.$GovernanceProposalPayload<ExtArgs>[]
+    userPermissions: Prisma.$UserPermissionPayload<ExtArgs>[]
+    assignedRole: Prisma.$UserRoleModelPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1485,6 +1904,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     role: $Enums.Role
     createdAt: Date
     updatedAt: Date
+    roleId: string | null
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -1888,6 +2308,8 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   borrowedLoans<T extends Prisma.User$borrowedLoansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$borrowedLoansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LoanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   lentLoans<T extends Prisma.User$lentLoansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$lentLoansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LoanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   governanceProposals<T extends Prisma.User$governanceProposalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$governanceProposalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GovernanceProposalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  userPermissions<T extends Prisma.User$userPermissionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$userPermissionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserPermissionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  assignedRole<T extends Prisma.User$assignedRoleArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$assignedRoleArgs<ExtArgs>>): Prisma.Prisma__UserRoleModelClient<runtime.Types.Result.GetResult<Prisma.$UserRoleModelPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1923,6 +2345,7 @@ export interface UserFieldRefs {
   readonly role: Prisma.FieldRef<"User", 'Role'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly roleId: Prisma.FieldRef<"User", 'String'>
 }
     
 
@@ -2172,6 +2595,10 @@ export type UserCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    */
   data: Prisma.UserCreateManyInput | Prisma.UserCreateManyInput[]
   skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2242,6 +2669,10 @@ export type UserUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many Users to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2524,6 +2955,49 @@ export type User$governanceProposalsArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   distinct?: Prisma.GovernanceProposalScalarFieldEnum | Prisma.GovernanceProposalScalarFieldEnum[]
+}
+
+/**
+ * User.userPermissions
+ */
+export type User$userPermissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the UserPermission
+   */
+  select?: Prisma.UserPermissionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the UserPermission
+   */
+  omit?: Prisma.UserPermissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserPermissionInclude<ExtArgs> | null
+  where?: Prisma.UserPermissionWhereInput
+  orderBy?: Prisma.UserPermissionOrderByWithRelationInput | Prisma.UserPermissionOrderByWithRelationInput[]
+  cursor?: Prisma.UserPermissionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.UserPermissionScalarFieldEnum | Prisma.UserPermissionScalarFieldEnum[]
+}
+
+/**
+ * User.assignedRole
+ */
+export type User$assignedRoleArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the UserRoleModel
+   */
+  select?: Prisma.UserRoleModelSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the UserRoleModel
+   */
+  omit?: Prisma.UserRoleModelOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserRoleModelInclude<ExtArgs> | null
+  where?: Prisma.UserRoleModelWhereInput
 }
 
 /**

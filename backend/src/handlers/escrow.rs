@@ -15,7 +15,7 @@ use crate::escrow::{
 };
 use crate::websocket::WsEvent;
 use crate::loan::{CreateLoanRequest, ListLoansQuery, Loan, Repayment, RepaymentRequest};
-use crate::websocket::{WsEvent, EscrowEvent as WsEscrowEvent};
+use crate::websocket::EscrowEvent as WsEscrowEvent;
 use crate::models::{ApiResponse, User};
 use crate::state::AppState;
 

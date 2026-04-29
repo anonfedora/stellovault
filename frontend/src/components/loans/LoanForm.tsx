@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { LoanFormData } from "@/types";
 import { Button } from "@/components/ui/Button";
+import { signTransaction } from "@stellar/freighter-api";
+import { Networks } from "@stellar/stellar-sdk";
 
 // Mock collateral tokens the user owns
 const MOCK_COLLATERALS = [
@@ -42,6 +44,7 @@ export const LoanForm = ({ onSubmit }: LoanFormProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [xdr, setXdr] = useState<string | null>(null);
   const [signed, setSigned] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<LoanFormData>({
     selectedCollateralId: "",
@@ -74,29 +77,68 @@ export const LoanForm = ({ onSubmit }: LoanFormProps) => {
   const handleNext = async () => {
     if (step < 3) {
       setStep(step + 1);
-      // When reaching the sign step, generate mock XDR
+      setError(null);
+      // When reaching the sign step, generate XDR from API
       if (step === 2) {
         setSubmitting(true);
-        // Simulating POST /api/v1/loans → returns XDR
-        await new Promise((r) => setTimeout(r, 800));
-        const mockXdr =
-          "AAAAAgAAAAD" + btoa(JSON.stringify(form)).slice(0, 60) + "...AAAA";
-        setXdr(mockXdr);
-        setSubmitting(false);
+        try {
+          // POST /api/v1/loans to get XDR
+          const res = await fetch('/api/v1/loans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+          });
+          
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || 'Failed to generate loan transaction');
+          }
+          
+          const data = await res.json();
+          setXdr(data.xdr);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to generate transaction');
+          setStep(step); // Go back to previous step
+        } finally {
+          setSubmitting(false);
+        }
       }
     }
   };
 
   const handleSign = async () => {
     setSubmitting(true);
+    setError(null);
     try {
-      // TODO: Replace with real Freighter signTransaction()
-      // const signedXdr = await window.freighterApi.signTransaction(xdr, { networkPassphrase: Networks.TESTNET });
-      await new Promise((r) => setTimeout(r, 1200));
+      if (!xdr) {
+        throw new Error('No transaction XDR available');
+      }
+
+      // Sign with Freighter
+      const { signedTxXdr, error: signError } = await signTransaction(xdr, {
+        networkPassphrase: Networks.TESTNET,
+      });
+
+      if (signError || !signedTxXdr) {
+        throw new Error(signError || 'Signing failed. Please try again.');
+      }
+
+      // Submit signed XDR to backend
+      const res = await fetch('/api/v1/loans/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signedXdr: signedTxXdr, loanData: form }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to submit signed transaction');
+      }
+
       setSigned(true);
       if (onSubmit) await onSubmit(form);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign transaction');
     } finally {
       setSubmitting(false);
     }
@@ -336,6 +378,13 @@ export const LoanForm = ({ onSubmit }: LoanFormProps) => {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               Review the transaction XDR and sign with your Freighter wallet.
             </p>
+
+            {/* Error display */}
+            {error && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            )}
 
             {xdr && (
               <div className="mb-6">

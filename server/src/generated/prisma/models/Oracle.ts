@@ -20,8 +20,22 @@ export type OracleModel = runtime.Types.Result.DefaultSelection<Prisma.$OraclePa
 
 export type AggregateOracle = {
   _count: OracleCountAggregateOutputType | null
+  _avg: OracleAvgAggregateOutputType | null
+  _sum: OracleSumAggregateOutputType | null
   _min: OracleMinAggregateOutputType | null
   _max: OracleMaxAggregateOutputType | null
+}
+
+export type OracleAvgAggregateOutputType = {
+  totalConfirmations: number | null
+  successfulConfirmations: number | null
+  failedConfirmations: number | null
+}
+
+export type OracleSumAggregateOutputType = {
+  totalConfirmations: number | null
+  successfulConfirmations: number | null
+  failedConfirmations: number | null
 }
 
 export type OracleMinAggregateOutputType = {
@@ -31,6 +45,11 @@ export type OracleMinAggregateOutputType = {
   registeredAt: Date | null
   deactivatedAt: Date | null
   updatedAt: Date | null
+  oracleType: $Enums.OracleType | null
+  totalConfirmations: number | null
+  successfulConfirmations: number | null
+  failedConfirmations: number | null
+  lastActiveAt: Date | null
 }
 
 export type OracleMaxAggregateOutputType = {
@@ -40,6 +59,11 @@ export type OracleMaxAggregateOutputType = {
   registeredAt: Date | null
   deactivatedAt: Date | null
   updatedAt: Date | null
+  oracleType: $Enums.OracleType | null
+  totalConfirmations: number | null
+  successfulConfirmations: number | null
+  failedConfirmations: number | null
+  lastActiveAt: Date | null
 }
 
 export type OracleCountAggregateOutputType = {
@@ -49,9 +73,27 @@ export type OracleCountAggregateOutputType = {
   registeredAt: number
   deactivatedAt: number
   updatedAt: number
+  oracleType: number
+  metadata: number
+  totalConfirmations: number
+  successfulConfirmations: number
+  failedConfirmations: number
+  lastActiveAt: number
   _all: number
 }
 
+
+export type OracleAvgAggregateInputType = {
+  totalConfirmations?: true
+  successfulConfirmations?: true
+  failedConfirmations?: true
+}
+
+export type OracleSumAggregateInputType = {
+  totalConfirmations?: true
+  successfulConfirmations?: true
+  failedConfirmations?: true
+}
 
 export type OracleMinAggregateInputType = {
   id?: true
@@ -60,6 +102,11 @@ export type OracleMinAggregateInputType = {
   registeredAt?: true
   deactivatedAt?: true
   updatedAt?: true
+  oracleType?: true
+  totalConfirmations?: true
+  successfulConfirmations?: true
+  failedConfirmations?: true
+  lastActiveAt?: true
 }
 
 export type OracleMaxAggregateInputType = {
@@ -69,6 +116,11 @@ export type OracleMaxAggregateInputType = {
   registeredAt?: true
   deactivatedAt?: true
   updatedAt?: true
+  oracleType?: true
+  totalConfirmations?: true
+  successfulConfirmations?: true
+  failedConfirmations?: true
+  lastActiveAt?: true
 }
 
 export type OracleCountAggregateInputType = {
@@ -78,6 +130,12 @@ export type OracleCountAggregateInputType = {
   registeredAt?: true
   deactivatedAt?: true
   updatedAt?: true
+  oracleType?: true
+  metadata?: true
+  totalConfirmations?: true
+  successfulConfirmations?: true
+  failedConfirmations?: true
+  lastActiveAt?: true
   _all?: true
 }
 
@@ -119,6 +177,18 @@ export type OracleAggregateArgs<ExtArgs extends runtime.Types.Extensions.Interna
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: OracleAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: OracleSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: OracleMinAggregateInputType
@@ -149,6 +219,8 @@ export type OracleGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   _count?: OracleCountAggregateInputType | true
+  _avg?: OracleAvgAggregateInputType
+  _sum?: OracleSumAggregateInputType
   _min?: OracleMinAggregateInputType
   _max?: OracleMaxAggregateInputType
 }
@@ -160,7 +232,15 @@ export type OracleGroupByOutputType = {
   registeredAt: Date
   deactivatedAt: Date | null
   updatedAt: Date
+  oracleType: $Enums.OracleType
+  metadata: runtime.JsonValue | null
+  totalConfirmations: number
+  successfulConfirmations: number
+  failedConfirmations: number
+  lastActiveAt: Date | null
   _count: OracleCountAggregateOutputType | null
+  _avg: OracleAvgAggregateOutputType | null
+  _sum: OracleSumAggregateOutputType | null
   _min: OracleMinAggregateOutputType | null
   _max: OracleMaxAggregateOutputType | null
 }
@@ -190,8 +270,17 @@ export type OracleWhereInput = {
   registeredAt?: Prisma.DateTimeFilter<"Oracle"> | Date | string
   deactivatedAt?: Prisma.DateTimeNullableFilter<"Oracle"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"Oracle"> | Date | string
+  oracleType?: Prisma.EnumOracleTypeFilter<"Oracle"> | $Enums.OracleType
+  metadata?: Prisma.JsonNullableFilter<"Oracle">
+  totalConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  successfulConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  failedConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  lastActiveAt?: Prisma.DateTimeNullableFilter<"Oracle"> | Date | string | null
   confirmations?: Prisma.OracleConfirmationListRelationFilter
   rateLimits?: Prisma.OracleRateLimitListRelationFilter
+  reputation?: Prisma.XOR<Prisma.OracleReputationNullableScalarRelationFilter, Prisma.OracleReputationWhereInput> | null
+  stake?: Prisma.XOR<Prisma.OracleStakeNullableScalarRelationFilter, Prisma.OracleStakeWhereInput> | null
+  rewards?: Prisma.OracleRewardListRelationFilter
 }
 
 export type OracleOrderByWithRelationInput = {
@@ -201,8 +290,17 @@ export type OracleOrderByWithRelationInput = {
   registeredAt?: Prisma.SortOrder
   deactivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  oracleType?: Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
+  lastActiveAt?: Prisma.SortOrderInput | Prisma.SortOrder
   confirmations?: Prisma.OracleConfirmationOrderByRelationAggregateInput
   rateLimits?: Prisma.OracleRateLimitOrderByRelationAggregateInput
+  reputation?: Prisma.OracleReputationOrderByWithRelationInput
+  stake?: Prisma.OracleStakeOrderByWithRelationInput
+  rewards?: Prisma.OracleRewardOrderByRelationAggregateInput
 }
 
 export type OracleWhereUniqueInput = Prisma.AtLeast<{
@@ -215,8 +313,17 @@ export type OracleWhereUniqueInput = Prisma.AtLeast<{
   registeredAt?: Prisma.DateTimeFilter<"Oracle"> | Date | string
   deactivatedAt?: Prisma.DateTimeNullableFilter<"Oracle"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"Oracle"> | Date | string
+  oracleType?: Prisma.EnumOracleTypeFilter<"Oracle"> | $Enums.OracleType
+  metadata?: Prisma.JsonNullableFilter<"Oracle">
+  totalConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  successfulConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  failedConfirmations?: Prisma.IntFilter<"Oracle"> | number
+  lastActiveAt?: Prisma.DateTimeNullableFilter<"Oracle"> | Date | string | null
   confirmations?: Prisma.OracleConfirmationListRelationFilter
   rateLimits?: Prisma.OracleRateLimitListRelationFilter
+  reputation?: Prisma.XOR<Prisma.OracleReputationNullableScalarRelationFilter, Prisma.OracleReputationWhereInput> | null
+  stake?: Prisma.XOR<Prisma.OracleStakeNullableScalarRelationFilter, Prisma.OracleStakeWhereInput> | null
+  rewards?: Prisma.OracleRewardListRelationFilter
 }, "id" | "address">
 
 export type OracleOrderByWithAggregationInput = {
@@ -226,9 +333,17 @@ export type OracleOrderByWithAggregationInput = {
   registeredAt?: Prisma.SortOrder
   deactivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  oracleType?: Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
+  lastActiveAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.OracleCountOrderByAggregateInput
+  _avg?: Prisma.OracleAvgOrderByAggregateInput
   _max?: Prisma.OracleMaxOrderByAggregateInput
   _min?: Prisma.OracleMinOrderByAggregateInput
+  _sum?: Prisma.OracleSumOrderByAggregateInput
 }
 
 export type OracleScalarWhereWithAggregatesInput = {
@@ -241,6 +356,12 @@ export type OracleScalarWhereWithAggregatesInput = {
   registeredAt?: Prisma.DateTimeWithAggregatesFilter<"Oracle"> | Date | string
   deactivatedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Oracle"> | Date | string | null
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Oracle"> | Date | string
+  oracleType?: Prisma.EnumOracleTypeWithAggregatesFilter<"Oracle"> | $Enums.OracleType
+  metadata?: Prisma.JsonNullableWithAggregatesFilter<"Oracle">
+  totalConfirmations?: Prisma.IntWithAggregatesFilter<"Oracle"> | number
+  successfulConfirmations?: Prisma.IntWithAggregatesFilter<"Oracle"> | number
+  failedConfirmations?: Prisma.IntWithAggregatesFilter<"Oracle"> | number
+  lastActiveAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Oracle"> | Date | string | null
 }
 
 export type OracleCreateInput = {
@@ -250,8 +371,17 @@ export type OracleCreateInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   confirmations?: Prisma.OracleConfirmationCreateNestedManyWithoutOracleInput
   rateLimits?: Prisma.OracleRateLimitCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardCreateNestedManyWithoutOracleInput
 }
 
 export type OracleUncheckedCreateInput = {
@@ -261,8 +391,17 @@ export type OracleUncheckedCreateInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   confirmations?: Prisma.OracleConfirmationUncheckedCreateNestedManyWithoutOracleInput
   rateLimits?: Prisma.OracleRateLimitUncheckedCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationUncheckedCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeUncheckedCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardUncheckedCreateNestedManyWithoutOracleInput
 }
 
 export type OracleUpdateInput = {
@@ -272,8 +411,17 @@ export type OracleUpdateInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   confirmations?: Prisma.OracleConfirmationUpdateManyWithoutOracleNestedInput
   rateLimits?: Prisma.OracleRateLimitUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUpdateManyWithoutOracleNestedInput
 }
 
 export type OracleUncheckedUpdateInput = {
@@ -283,8 +431,17 @@ export type OracleUncheckedUpdateInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   confirmations?: Prisma.OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput
   rateLimits?: Prisma.OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUncheckedUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUncheckedUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUncheckedUpdateManyWithoutOracleNestedInput
 }
 
 export type OracleCreateManyInput = {
@@ -294,6 +451,12 @@ export type OracleCreateManyInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
 }
 
 export type OracleUpdateManyMutationInput = {
@@ -303,6 +466,12 @@ export type OracleUpdateManyMutationInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OracleUncheckedUpdateManyInput = {
@@ -312,6 +481,12 @@ export type OracleUncheckedUpdateManyInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OracleCountOrderByAggregateInput = {
@@ -321,6 +496,18 @@ export type OracleCountOrderByAggregateInput = {
   registeredAt?: Prisma.SortOrder
   deactivatedAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  oracleType?: Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
+  lastActiveAt?: Prisma.SortOrder
+}
+
+export type OracleAvgOrderByAggregateInput = {
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
 }
 
 export type OracleMaxOrderByAggregateInput = {
@@ -330,6 +517,11 @@ export type OracleMaxOrderByAggregateInput = {
   registeredAt?: Prisma.SortOrder
   deactivatedAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  oracleType?: Prisma.SortOrder
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
+  lastActiveAt?: Prisma.SortOrder
 }
 
 export type OracleMinOrderByAggregateInput = {
@@ -339,11 +531,34 @@ export type OracleMinOrderByAggregateInput = {
   registeredAt?: Prisma.SortOrder
   deactivatedAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  oracleType?: Prisma.SortOrder
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
+  lastActiveAt?: Prisma.SortOrder
+}
+
+export type OracleSumOrderByAggregateInput = {
+  totalConfirmations?: Prisma.SortOrder
+  successfulConfirmations?: Prisma.SortOrder
+  failedConfirmations?: Prisma.SortOrder
 }
 
 export type OracleScalarRelationFilter = {
   is?: Prisma.OracleWhereInput
   isNot?: Prisma.OracleWhereInput
+}
+
+export type EnumOracleTypeFieldUpdateOperationsInput = {
+  set?: $Enums.OracleType
+}
+
+export type IntFieldUpdateOperationsInput = {
+  set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
 }
 
 export type OracleCreateNestedOneWithoutRateLimitsInput = {
@@ -374,6 +589,48 @@ export type OracleUpdateOneRequiredWithoutConfirmationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OracleUpdateToOneWithWhereWithoutConfirmationsInput, Prisma.OracleUpdateWithoutConfirmationsInput>, Prisma.OracleUncheckedUpdateWithoutConfirmationsInput>
 }
 
+export type OracleCreateNestedOneWithoutReputationInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutReputationInput, Prisma.OracleUncheckedCreateWithoutReputationInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutReputationInput
+  connect?: Prisma.OracleWhereUniqueInput
+}
+
+export type OracleUpdateOneRequiredWithoutReputationNestedInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutReputationInput, Prisma.OracleUncheckedCreateWithoutReputationInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutReputationInput
+  upsert?: Prisma.OracleUpsertWithoutReputationInput
+  connect?: Prisma.OracleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OracleUpdateToOneWithWhereWithoutReputationInput, Prisma.OracleUpdateWithoutReputationInput>, Prisma.OracleUncheckedUpdateWithoutReputationInput>
+}
+
+export type OracleCreateNestedOneWithoutStakeInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutStakeInput, Prisma.OracleUncheckedCreateWithoutStakeInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutStakeInput
+  connect?: Prisma.OracleWhereUniqueInput
+}
+
+export type OracleUpdateOneRequiredWithoutStakeNestedInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutStakeInput, Prisma.OracleUncheckedCreateWithoutStakeInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutStakeInput
+  upsert?: Prisma.OracleUpsertWithoutStakeInput
+  connect?: Prisma.OracleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OracleUpdateToOneWithWhereWithoutStakeInput, Prisma.OracleUpdateWithoutStakeInput>, Prisma.OracleUncheckedUpdateWithoutStakeInput>
+}
+
+export type OracleCreateNestedOneWithoutRewardsInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutRewardsInput, Prisma.OracleUncheckedCreateWithoutRewardsInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutRewardsInput
+  connect?: Prisma.OracleWhereUniqueInput
+}
+
+export type OracleUpdateOneRequiredWithoutRewardsNestedInput = {
+  create?: Prisma.XOR<Prisma.OracleCreateWithoutRewardsInput, Prisma.OracleUncheckedCreateWithoutRewardsInput>
+  connectOrCreate?: Prisma.OracleCreateOrConnectWithoutRewardsInput
+  upsert?: Prisma.OracleUpsertWithoutRewardsInput
+  connect?: Prisma.OracleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OracleUpdateToOneWithWhereWithoutRewardsInput, Prisma.OracleUpdateWithoutRewardsInput>, Prisma.OracleUncheckedUpdateWithoutRewardsInput>
+}
+
 export type OracleCreateWithoutRateLimitsInput = {
   id?: string
   address: string
@@ -381,7 +638,16 @@ export type OracleCreateWithoutRateLimitsInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   confirmations?: Prisma.OracleConfirmationCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardCreateNestedManyWithoutOracleInput
 }
 
 export type OracleUncheckedCreateWithoutRateLimitsInput = {
@@ -391,7 +657,16 @@ export type OracleUncheckedCreateWithoutRateLimitsInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   confirmations?: Prisma.OracleConfirmationUncheckedCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationUncheckedCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeUncheckedCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardUncheckedCreateNestedManyWithoutOracleInput
 }
 
 export type OracleCreateOrConnectWithoutRateLimitsInput = {
@@ -417,7 +692,16 @@ export type OracleUpdateWithoutRateLimitsInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   confirmations?: Prisma.OracleConfirmationUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUpdateManyWithoutOracleNestedInput
 }
 
 export type OracleUncheckedUpdateWithoutRateLimitsInput = {
@@ -427,7 +711,16 @@ export type OracleUncheckedUpdateWithoutRateLimitsInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   confirmations?: Prisma.OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUncheckedUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUncheckedUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUncheckedUpdateManyWithoutOracleNestedInput
 }
 
 export type OracleCreateWithoutConfirmationsInput = {
@@ -437,7 +730,16 @@ export type OracleCreateWithoutConfirmationsInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   rateLimits?: Prisma.OracleRateLimitCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardCreateNestedManyWithoutOracleInput
 }
 
 export type OracleUncheckedCreateWithoutConfirmationsInput = {
@@ -447,7 +749,16 @@ export type OracleUncheckedCreateWithoutConfirmationsInput = {
   registeredAt?: Date | string
   deactivatedAt?: Date | string | null
   updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
   rateLimits?: Prisma.OracleRateLimitUncheckedCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationUncheckedCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeUncheckedCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardUncheckedCreateNestedManyWithoutOracleInput
 }
 
 export type OracleCreateOrConnectWithoutConfirmationsInput = {
@@ -473,7 +784,16 @@ export type OracleUpdateWithoutConfirmationsInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rateLimits?: Prisma.OracleRateLimitUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUpdateManyWithoutOracleNestedInput
 }
 
 export type OracleUncheckedUpdateWithoutConfirmationsInput = {
@@ -483,7 +803,292 @@ export type OracleUncheckedUpdateWithoutConfirmationsInput = {
   registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rateLimits?: Prisma.OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUncheckedUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUncheckedUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUncheckedUpdateManyWithoutOracleNestedInput
+}
+
+export type OracleCreateWithoutReputationInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitCreateNestedManyWithoutOracleInput
+  stake?: Prisma.OracleStakeCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardCreateNestedManyWithoutOracleInput
+}
+
+export type OracleUncheckedCreateWithoutReputationInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedCreateNestedManyWithoutOracleInput
+  stake?: Prisma.OracleStakeUncheckedCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardUncheckedCreateNestedManyWithoutOracleInput
+}
+
+export type OracleCreateOrConnectWithoutReputationInput = {
+  where: Prisma.OracleWhereUniqueInput
+  create: Prisma.XOR<Prisma.OracleCreateWithoutReputationInput, Prisma.OracleUncheckedCreateWithoutReputationInput>
+}
+
+export type OracleUpsertWithoutReputationInput = {
+  update: Prisma.XOR<Prisma.OracleUpdateWithoutReputationInput, Prisma.OracleUncheckedUpdateWithoutReputationInput>
+  create: Prisma.XOR<Prisma.OracleCreateWithoutReputationInput, Prisma.OracleUncheckedCreateWithoutReputationInput>
+  where?: Prisma.OracleWhereInput
+}
+
+export type OracleUpdateToOneWithWhereWithoutReputationInput = {
+  where?: Prisma.OracleWhereInput
+  data: Prisma.XOR<Prisma.OracleUpdateWithoutReputationInput, Prisma.OracleUncheckedUpdateWithoutReputationInput>
+}
+
+export type OracleUpdateWithoutReputationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUpdateManyWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUpdateManyWithoutOracleNestedInput
+}
+
+export type OracleUncheckedUpdateWithoutReputationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUncheckedUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUncheckedUpdateManyWithoutOracleNestedInput
+}
+
+export type OracleCreateWithoutStakeInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardCreateNestedManyWithoutOracleInput
+}
+
+export type OracleUncheckedCreateWithoutStakeInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationUncheckedCreateNestedOneWithoutOracleInput
+  rewards?: Prisma.OracleRewardUncheckedCreateNestedManyWithoutOracleInput
+}
+
+export type OracleCreateOrConnectWithoutStakeInput = {
+  where: Prisma.OracleWhereUniqueInput
+  create: Prisma.XOR<Prisma.OracleCreateWithoutStakeInput, Prisma.OracleUncheckedCreateWithoutStakeInput>
+}
+
+export type OracleUpsertWithoutStakeInput = {
+  update: Prisma.XOR<Prisma.OracleUpdateWithoutStakeInput, Prisma.OracleUncheckedUpdateWithoutStakeInput>
+  create: Prisma.XOR<Prisma.OracleCreateWithoutStakeInput, Prisma.OracleUncheckedCreateWithoutStakeInput>
+  where?: Prisma.OracleWhereInput
+}
+
+export type OracleUpdateToOneWithWhereWithoutStakeInput = {
+  where?: Prisma.OracleWhereInput
+  data: Prisma.XOR<Prisma.OracleUpdateWithoutStakeInput, Prisma.OracleUncheckedUpdateWithoutStakeInput>
+}
+
+export type OracleUpdateWithoutStakeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUpdateManyWithoutOracleNestedInput
+}
+
+export type OracleUncheckedUpdateWithoutStakeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUncheckedUpdateOneWithoutOracleNestedInput
+  rewards?: Prisma.OracleRewardUncheckedUpdateManyWithoutOracleNestedInput
+}
+
+export type OracleCreateWithoutRewardsInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeCreateNestedOneWithoutOracleInput
+}
+
+export type OracleUncheckedCreateWithoutRewardsInput = {
+  id?: string
+  address: string
+  isActive?: boolean
+  registeredAt?: Date | string
+  deactivatedAt?: Date | string | null
+  updatedAt?: Date | string
+  oracleType?: $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: number
+  successfulConfirmations?: number
+  failedConfirmations?: number
+  lastActiveAt?: Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedCreateNestedManyWithoutOracleInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedCreateNestedManyWithoutOracleInput
+  reputation?: Prisma.OracleReputationUncheckedCreateNestedOneWithoutOracleInput
+  stake?: Prisma.OracleStakeUncheckedCreateNestedOneWithoutOracleInput
+}
+
+export type OracleCreateOrConnectWithoutRewardsInput = {
+  where: Prisma.OracleWhereUniqueInput
+  create: Prisma.XOR<Prisma.OracleCreateWithoutRewardsInput, Prisma.OracleUncheckedCreateWithoutRewardsInput>
+}
+
+export type OracleUpsertWithoutRewardsInput = {
+  update: Prisma.XOR<Prisma.OracleUpdateWithoutRewardsInput, Prisma.OracleUncheckedUpdateWithoutRewardsInput>
+  create: Prisma.XOR<Prisma.OracleCreateWithoutRewardsInput, Prisma.OracleUncheckedCreateWithoutRewardsInput>
+  where?: Prisma.OracleWhereInput
+}
+
+export type OracleUpdateToOneWithWhereWithoutRewardsInput = {
+  where?: Prisma.OracleWhereInput
+  data: Prisma.XOR<Prisma.OracleUpdateWithoutRewardsInput, Prisma.OracleUncheckedUpdateWithoutRewardsInput>
+}
+
+export type OracleUpdateWithoutRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUpdateOneWithoutOracleNestedInput
+}
+
+export type OracleUncheckedUpdateWithoutRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  registeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  oracleType?: Prisma.EnumOracleTypeFieldUpdateOperationsInput | $Enums.OracleType
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  totalConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  successfulConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  failedConfirmations?: Prisma.IntFieldUpdateOperationsInput | number
+  lastActiveAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  confirmations?: Prisma.OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput
+  rateLimits?: Prisma.OracleRateLimitUncheckedUpdateManyWithoutOracleNestedInput
+  reputation?: Prisma.OracleReputationUncheckedUpdateOneWithoutOracleNestedInput
+  stake?: Prisma.OracleStakeUncheckedUpdateOneWithoutOracleNestedInput
 }
 
 
@@ -494,11 +1099,13 @@ export type OracleUncheckedUpdateWithoutConfirmationsInput = {
 export type OracleCountOutputType = {
   confirmations: number
   rateLimits: number
+  rewards: number
 }
 
 export type OracleCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   confirmations?: boolean | OracleCountOutputTypeCountConfirmationsArgs
   rateLimits?: boolean | OracleCountOutputTypeCountRateLimitsArgs
+  rewards?: boolean | OracleCountOutputTypeCountRewardsArgs
 }
 
 /**
@@ -525,6 +1132,13 @@ export type OracleCountOutputTypeCountRateLimitsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.OracleRateLimitWhereInput
 }
 
+/**
+ * OracleCountOutputType without action
+ */
+export type OracleCountOutputTypeCountRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OracleRewardWhereInput
+}
+
 
 export type OracleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -533,8 +1147,17 @@ export type OracleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   registeredAt?: boolean
   deactivatedAt?: boolean
   updatedAt?: boolean
+  oracleType?: boolean
+  metadata?: boolean
+  totalConfirmations?: boolean
+  successfulConfirmations?: boolean
+  failedConfirmations?: boolean
+  lastActiveAt?: boolean
   confirmations?: boolean | Prisma.Oracle$confirmationsArgs<ExtArgs>
   rateLimits?: boolean | Prisma.Oracle$rateLimitsArgs<ExtArgs>
+  reputation?: boolean | Prisma.Oracle$reputationArgs<ExtArgs>
+  stake?: boolean | Prisma.Oracle$stakeArgs<ExtArgs>
+  rewards?: boolean | Prisma.Oracle$rewardsArgs<ExtArgs>
   _count?: boolean | Prisma.OracleCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["oracle"]>
 
@@ -545,6 +1168,12 @@ export type OracleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   registeredAt?: boolean
   deactivatedAt?: boolean
   updatedAt?: boolean
+  oracleType?: boolean
+  metadata?: boolean
+  totalConfirmations?: boolean
+  successfulConfirmations?: boolean
+  failedConfirmations?: boolean
+  lastActiveAt?: boolean
 }, ExtArgs["result"]["oracle"]>
 
 export type OracleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -554,6 +1183,12 @@ export type OracleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   registeredAt?: boolean
   deactivatedAt?: boolean
   updatedAt?: boolean
+  oracleType?: boolean
+  metadata?: boolean
+  totalConfirmations?: boolean
+  successfulConfirmations?: boolean
+  failedConfirmations?: boolean
+  lastActiveAt?: boolean
 }, ExtArgs["result"]["oracle"]>
 
 export type OracleSelectScalar = {
@@ -563,12 +1198,21 @@ export type OracleSelectScalar = {
   registeredAt?: boolean
   deactivatedAt?: boolean
   updatedAt?: boolean
+  oracleType?: boolean
+  metadata?: boolean
+  totalConfirmations?: boolean
+  successfulConfirmations?: boolean
+  failedConfirmations?: boolean
+  lastActiveAt?: boolean
 }
 
-export type OracleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "address" | "isActive" | "registeredAt" | "deactivatedAt" | "updatedAt", ExtArgs["result"]["oracle"]>
+export type OracleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "address" | "isActive" | "registeredAt" | "deactivatedAt" | "updatedAt" | "oracleType" | "metadata" | "totalConfirmations" | "successfulConfirmations" | "failedConfirmations" | "lastActiveAt", ExtArgs["result"]["oracle"]>
 export type OracleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   confirmations?: boolean | Prisma.Oracle$confirmationsArgs<ExtArgs>
   rateLimits?: boolean | Prisma.Oracle$rateLimitsArgs<ExtArgs>
+  reputation?: boolean | Prisma.Oracle$reputationArgs<ExtArgs>
+  stake?: boolean | Prisma.Oracle$stakeArgs<ExtArgs>
+  rewards?: boolean | Prisma.Oracle$rewardsArgs<ExtArgs>
   _count?: boolean | Prisma.OracleCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OracleIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -579,6 +1223,9 @@ export type $OraclePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
   objects: {
     confirmations: Prisma.$OracleConfirmationPayload<ExtArgs>[]
     rateLimits: Prisma.$OracleRateLimitPayload<ExtArgs>[]
+    reputation: Prisma.$OracleReputationPayload<ExtArgs> | null
+    stake: Prisma.$OracleStakePayload<ExtArgs> | null
+    rewards: Prisma.$OracleRewardPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -587,6 +1234,12 @@ export type $OraclePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     registeredAt: Date
     deactivatedAt: Date | null
     updatedAt: Date
+    oracleType: $Enums.OracleType
+    metadata: runtime.JsonValue | null
+    totalConfirmations: number
+    successfulConfirmations: number
+    failedConfirmations: number
+    lastActiveAt: Date | null
   }, ExtArgs["result"]["oracle"]>
   composites: {}
 }
@@ -983,6 +1636,9 @@ export interface Prisma__OracleClient<T, Null = never, ExtArgs extends runtime.T
   readonly [Symbol.toStringTag]: "PrismaPromise"
   confirmations<T extends Prisma.Oracle$confirmationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Oracle$confirmationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OracleConfirmationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rateLimits<T extends Prisma.Oracle$rateLimitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Oracle$rateLimitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OracleRateLimitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reputation<T extends Prisma.Oracle$reputationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Oracle$reputationArgs<ExtArgs>>): Prisma.Prisma__OracleReputationClient<runtime.Types.Result.GetResult<Prisma.$OracleReputationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  stake<T extends Prisma.Oracle$stakeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Oracle$stakeArgs<ExtArgs>>): Prisma.Prisma__OracleStakeClient<runtime.Types.Result.GetResult<Prisma.$OracleStakePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  rewards<T extends Prisma.Oracle$rewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Oracle$rewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OracleRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1018,6 +1674,12 @@ export interface OracleFieldRefs {
   readonly registeredAt: Prisma.FieldRef<"Oracle", 'DateTime'>
   readonly deactivatedAt: Prisma.FieldRef<"Oracle", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Oracle", 'DateTime'>
+  readonly oracleType: Prisma.FieldRef<"Oracle", 'OracleType'>
+  readonly metadata: Prisma.FieldRef<"Oracle", 'Json'>
+  readonly totalConfirmations: Prisma.FieldRef<"Oracle", 'Int'>
+  readonly successfulConfirmations: Prisma.FieldRef<"Oracle", 'Int'>
+  readonly failedConfirmations: Prisma.FieldRef<"Oracle", 'Int'>
+  readonly lastActiveAt: Prisma.FieldRef<"Oracle", 'DateTime'>
 }
     
 
@@ -1451,6 +2113,68 @@ export type Oracle$rateLimitsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.OracleRateLimitScalarFieldEnum | Prisma.OracleRateLimitScalarFieldEnum[]
+}
+
+/**
+ * Oracle.reputation
+ */
+export type Oracle$reputationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OracleReputation
+   */
+  select?: Prisma.OracleReputationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OracleReputation
+   */
+  omit?: Prisma.OracleReputationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OracleReputationInclude<ExtArgs> | null
+  where?: Prisma.OracleReputationWhereInput
+}
+
+/**
+ * Oracle.stake
+ */
+export type Oracle$stakeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OracleStake
+   */
+  select?: Prisma.OracleStakeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OracleStake
+   */
+  omit?: Prisma.OracleStakeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OracleStakeInclude<ExtArgs> | null
+  where?: Prisma.OracleStakeWhereInput
+}
+
+/**
+ * Oracle.rewards
+ */
+export type Oracle$rewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OracleReward
+   */
+  select?: Prisma.OracleRewardSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OracleReward
+   */
+  omit?: Prisma.OracleRewardOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OracleRewardInclude<ExtArgs> | null
+  where?: Prisma.OracleRewardWhereInput
+  orderBy?: Prisma.OracleRewardOrderByWithRelationInput | Prisma.OracleRewardOrderByWithRelationInput[]
+  cursor?: Prisma.OracleRewardWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OracleRewardScalarFieldEnum | Prisma.OracleRewardScalarFieldEnum[]
 }
 
 /**

@@ -1,10 +1,24 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+const requiredInProduction = [
+  "DATABASE_URL",
+  "JWT_ACCESS_SECRET",
+  "JWT_REFRESH_SECRET",
+];
+
+if (process.env.NODE_ENV === "production") {
+  const missing = requiredInProduction.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+  }
+}
+
 export const env = {
   port: parseInt(process.env.PORT || "3001", 10),
   databaseUrl: process.env.DATABASE_URL || "",
   appBaseUrl: process.env.APP_BASE_URL || "https://stellovault.com",
+  requestTimeoutMs: parseInt(process.env.REQUEST_TIMEOUT_MS || "30000", 10),
 
   redis: {
     host: process.env.REDIS_HOST || "localhost",

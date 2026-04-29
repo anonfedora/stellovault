@@ -17,6 +17,10 @@ const MAX_CONFIRMATIONS_PER_MINUTE = 10;
 
 type CreateOracleInput = {
     address: string;
+    oracleType?: string;
+    metadata?: Record<string, unknown>;
+    stakeAmount?: number;
+    assetCode?: string;
 };
 
 type ConfirmEventInput = {
@@ -184,21 +188,75 @@ export class OracleService {
 
         const existing = await prisma.oracle.findUnique({
             where: { address },
+            include: { reputation: true, stake: true },
         });
 
         if (existing) {
             if (existing.isActive) {
                 throw new ConflictError("Oracle already registered and active");
             }
-            return prisma.oracle.update({
-                where: { address },
-                data: { isActive: true, deactivatedAt: null },
+            return prisma.$transaction(async (tx) => {
+                const oracle = await tx.oracle.update({
+                    where: { address },
+                    data: {
+                        isActive: true,
+                        deactivatedAt: null,
+                        oracleType: (input.oracleType || "GENERAL") as any,
+                        metadata: input.metadata ? toJsonValue(input.metadata) : undefined,
+                    },
+                });
+
+                if (input.stakeAmount && input.stakeAmount > 0) {
+                    await tx.oracleStake.upsert({
+                        where: { oracleId: oracle.id },
+                        update: {
+                            amount: input.stakeAmount,
+                            assetCode: input.assetCode || "USDC",
+                            stakedAt: new Date(),
+                        },
+                        create: {
+                            oracleId: oracle.id,
+                            amount: input.stakeAmount,
+                            assetCode: input.assetCode || "USDC",
+                        },
+                    });
+                }
+
+                if (!existing.reputation) {
+                    await tx.oracleReputation.create({
+                        data: { oracleId: oracle.id },
+                    });
+                }
+
+                return oracle;
             });
         }
 
         try {
-            return await prisma.oracle.create({
-                data: { address },
+            return await prisma.$transaction(async (tx) => {
+                const oracle = await tx.oracle.create({
+                    data: {
+                        address,
+                        oracleType: (input.oracleType || "GENERAL") as any,
+                        metadata: input.metadata ? toJsonValue(input.metadata) : undefined,
+                    },
+                });
+
+                if (input.stakeAmount && input.stakeAmount > 0) {
+                    await tx.oracleStake.create({
+                        data: {
+                            oracleId: oracle.id,
+                            amount: input.stakeAmount,
+                            assetCode: input.assetCode || "USDC",
+                        },
+                    });
+                }
+
+                await tx.oracleReputation.create({
+                    data: { oracleId: oracle.id },
+                });
+
+                return oracle;
             });
         } catch (error) {
             if (
@@ -471,11 +529,11 @@ export class OracleService {
 
         const avgConfirmationsPerOracle =
             totalOracles > 0
-                ? confirmationsPerOracle.reduce((sum, o) => sum + o._count.id, 0) / totalOracles
+                ? confirmationsPerOracle.reduce((sum: number, o: any) => sum + o._count.id, 0) / totalOracles
                 : 0;
 
         const escrowCounts: Record<string, number> = {};
-        escrowsByStatus.forEach((item) => {
+        escrowsByStatus.forEach((item: any) => {
             escrowCounts[item.status] = item._count.id;
         });
 
@@ -488,6 +546,343 @@ export class OracleService {
             avgConfirmationsPerOracle: Math.round(avgConfirmationsPerOracle * 100) / 100,
             escrowCounts,
         };
+    }
+
+    async updateReputation(oracleId: string, outcome: "success" | "failure") {
+        const oracle = await prisma.oracle.findUnique({
+            where: { id: oracleId },
+            include: { reputation: true },
+        });
+
+        if (!oracle || !oracle.reputation) {
+            throw new NotFoundError("Oracle or reputation not found");
+        }
+
+        const rep = oracle.reputation;
+        const scoreChange = outcome === "success" ? 2 : -5;
+        const newScore = Math.max(0, Math.min(100, rep.score + scoreChange));
+
+        const accuracyChange = outcome === "success" ? 1 : -2;
+        const newAccuracy = Math.max(0, Math.min(100, Number(rep.accuracy) + accuracyChange));
+
+        const newTotalVotes = rep.totalVotes + 1;
+        const newPositiveVotes = outcome === "success" ? rep.positiveVotes + 1 : rep.positiveVotes;
+        const newNegativeVotes = outcome === "failure" ? rep.negativeVotes + 1 : rep.negativeVotes;
+
+        const reliability = newTotalVotes > 0
+            ? (newPositiveVotes / newTotalVotes) * 100
+            : Number(rep.reliability);
+
+        await prisma.oracleReputation.update({
+            where: { oracleId },
+            data: {
+                score: newScore,
+                accuracy: newAccuracy,
+                reliability,
+                totalVotes: newTotalVotes,
+                positiveVotes: newPositiveVotes,
+                negativeVotes: newNegativeVotes,
+                lastUpdated: new Date(),
+            },
+        });
+
+        await prisma.oracle.update({
+            where: { id: oracleId },
+            data: {
+                totalConfirmations: { increment: 1 },
+                successfulConfirmations: outcome === "success" ? { increment: 1 } : undefined,
+                failedConfirmations: outcome === "failure" ? { increment: 1 } : undefined,
+                lastActiveAt: new Date(),
+            },
+        });
+
+        return { score: newScore, accuracy: newAccuracy, reliability };
+    }
+
+    async getOracleReputation(oracleId: string) {
+        const oracle = await prisma.oracle.findUnique({
+            where: { id: oracleId },
+            include: { reputation: true, stake: true },
+        });
+
+        if (!oracle) {
+            throw new NotFoundError("Oracle not found");
+        }
+
+        return {
+            oracle: {
+                id: oracle.id,
+                address: oracle.address,
+                oracleType: oracle.oracleType,
+                isActive: oracle.isActive,
+                totalConfirmations: oracle.totalConfirmations,
+                successfulConfirmations: oracle.successfulConfirmations,
+                failedConfirmations: oracle.failedConfirmations,
+            },
+            reputation: oracle.reputation,
+            stake: oracle.stake,
+        };
+    }
+
+    async distributeReward(oracleId: string, amount: number, reason: string, confirmationId?: string) {
+        const oracle = await prisma.oracle.findUnique({
+            where: { id: oracleId },
+            include: { stake: true },
+        });
+
+        if (!oracle) {
+            throw new NotFoundError("Oracle not found");
+        }
+
+        const reward = await prisma.oracleReward.create({
+            data: {
+                oracleId,
+                amount,
+                assetCode: "USDC",
+                reason: reason as any,
+                confirmationId,
+            },
+        });
+
+        if (oracle.stake) {
+            await prisma.oracleStake.update({
+                where: { oracleId },
+                data: {
+                    rewardAmount: { increment: amount },
+                    lastRewardAt: new Date(),
+                },
+            });
+        }
+
+        return reward;
+    }
+
+    async slashStake(oracleId: string, amount: number, reason: string) {
+        const oracle = await prisma.oracle.findUnique({
+            where: { id: oracleId },
+            include: { stake: true },
+        });
+
+        if (!oracle || !oracle.stake) {
+            throw new NotFoundError("Oracle or stake not found");
+        }
+
+        if (Number(oracle.stake.amount) < amount) {
+            throw new ValidationError("Insufficient stake to slash");
+        }
+
+        const updatedStake = await prisma.oracleStake.update({
+            where: { oracleId },
+            data: {
+                amount: { decrement: amount },
+                slashedAmount: { increment: amount },
+            },
+        });
+
+        await this.updateReputation(oracleId, "failure");
+
+        return updatedStake;
+    }
+
+    async getOracleNetworkStatus() {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const [
+            activeOracles,
+            totalOracles,
+            recentConfirmations,
+            avgReputation,
+            oraclesByType,
+        ] = await Promise.all([
+            prisma.oracle.count({ where: { isActive: true } }),
+            prisma.oracle.count(),
+            prisma.oracleConfirmation.count({
+                where: { createdAt: { gte: oneHourAgo } },
+            }),
+            prisma.oracleReputation.aggregate({
+                _avg: { score: true, accuracy: true, reliability: true },
+            }),
+            prisma.oracle.groupBy({
+                by: ["oracleType"],
+                _count: { id: true },
+                where: { isActive: true },
+            }),
+        ]);
+
+        const oraclesByTypeMap: Record<string, number> = {};
+        oraclesByType.forEach((item: any) => {
+            oraclesByTypeMap[item.oracleType] = item._count.id;
+        });
+
+        const healthScore = activeOracles > 0
+            ? (recentConfirmations / activeOracles) * 100
+            : 0;
+
+        return {
+            activeOracles,
+            totalOracles,
+            networkHealth: Math.min(100, healthScore),
+            recentActivity: recentConfirmations,
+            averageReputation: {
+                score: avgReputation._avg.score || 0,
+                accuracy: avgReputation._avg.accuracy || 0,
+                reliability: avgReputation._avg.reliability || 0,
+            },
+            oraclesByType: oraclesByTypeMap,
+        };
+    }
+
+    async validateConfirmation(confirmationData: any) {
+        const { oracleAddress, escrowId, eventType, signature, payload, nonce } = confirmationData;
+
+        const oracle = await prisma.oracle.findUnique({
+            where: { address: oracleAddress },
+        });
+
+        if (!oracle) {
+            throw new UnauthorizedError("Unknown oracle address");
+        }
+
+        if (!oracle.isActive) {
+            throw new UnauthorizedError("Oracle is not active");
+        }
+
+        const message = Buffer.from(
+            canonicalStringify({
+                escrowId,
+                eventType,
+                nonce,
+                payload,
+            })
+        );
+
+        const signatureBytes = this.decodeSignature(signature);
+        const isValid = Keypair.fromPublicKey(oracleAddress).verify(message, signatureBytes);
+
+        if (!isValid) {
+            throw new UnauthorizedError("Invalid oracle signature");
+        }
+
+        return true;
+    }
+
+    async resolveDispute(disputeId: string, resolution: string, outcome: "favor_oracle" | "favor_reporter") {
+        const dispute = await prisma.dispute.findUnique({
+            where: { id: disputeId },
+            include: { escrow: { include: { confirmations: true } } },
+        });
+
+        if (!dispute) {
+            throw new NotFoundError("Dispute not found");
+        }
+
+        if (dispute.status !== "OPEN") {
+            throw new ValidationError("Dispute is not open");
+        }
+
+        const updatedDispute = await prisma.$transaction(async (tx) => {
+            const updated = await tx.dispute.update({
+                where: { id: disputeId },
+                data: {
+                    status: "RESOLVED",
+                    resolution,
+                    resolvedAt: new Date(),
+                },
+            });
+
+            if (outcome === "favor_reporter") {
+                const confirmations = await tx.oracleConfirmation.findMany({
+                    where: { escrowId: dispute.escrowId },
+                });
+
+                for (const confirmation of confirmations) {
+                    await this.updateReputation(confirmation.oracleId, "failure");
+                    await this.slashStake(confirmation.oracleId, 100, "Dispute lost");
+                }
+            } else {
+                const confirmations = await tx.oracleConfirmation.findMany({
+                    where: { escrowId: dispute.escrowId },
+                });
+
+                for (const confirmation of confirmations) {
+                    await this.updateReputation(confirmation.oracleId, "success");
+                }
+            }
+
+            return updated;
+        });
+
+        return updatedDispute;
+    }
+
+    async createThresholdSignature(escrowId: string, eventType: string, requiredSigs: number) {
+        const escrow = await prisma.escrow.findUnique({
+            where: { id: escrowId },
+        });
+
+        if (!escrow) {
+            throw new NotFoundError("Escrow not found");
+        }
+
+        const thresholdSig = await prisma.thresholdSignature.create({
+            data: {
+                escrowId,
+                eventType,
+                requiredSigs,
+                signatures: [],
+            },
+        });
+
+        return thresholdSig;
+    }
+
+    async addThresholdSignature(thresholdId: string, oracleAddress: string, signature: string) {
+        const threshold = await prisma.thresholdSignature.findUnique({
+            where: { id: thresholdId },
+        });
+
+        if (!threshold) {
+            throw new NotFoundError("Threshold signature not found");
+        }
+
+        if (threshold.status !== "PENDING") {
+            throw new ValidationError("Threshold signature is not pending");
+        }
+
+        const signatures = (threshold.signatures as any[]) || [];
+        const existingSig = signatures.find((sig: any) => sig.oracleAddress === oracleAddress);
+
+        if (existingSig) {
+            throw new ConflictError("Oracle already signed");
+        }
+
+        signatures.push({ oracleAddress, signature, timestamp: new Date() });
+
+        const updated = await prisma.thresholdSignature.update({
+            where: { id: thresholdId },
+            data: {
+                signatures: toJsonValue(signatures as unknown as Record<string, unknown>),
+                collectedSigs: signatures.length,
+                status: signatures.length >= threshold.requiredSigs ? "COMPLETED" : "PENDING",
+                completedAt: signatures.length >= threshold.requiredSigs ? new Date() : null,
+            },
+        });
+
+        return updated;
+    }
+
+    async getThresholdSignature(thresholdId: string) {
+        const threshold = await prisma.thresholdSignature.findUnique({
+            where: { id: thresholdId },
+        });
+
+        if (!threshold) {
+            throw new NotFoundError("Threshold signature not found");
+        }
+
+        return threshold;
     }
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Loan } from "@/types";
 import { shortenAddress } from "@/utils/stellar";
+import { Check } from "lucide-react";
 
 // Status badge colour map
 const STATUS_STYLES: Record<string, string> = {
@@ -16,23 +17,56 @@ const STATUS_STYLES: Record<string, string> = {
 
 interface LoanCardProps {
   loan: Loan;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (loanId: string) => void;
 }
 
-export const LoanCard = ({ loan }: LoanCardProps) => {
+export const LoanCard = ({ loan, selectable = false, selected = false, onSelect }: LoanCardProps) => {
   const totalOwed = loan.principal * (1 + loan.interestRate / 100);
   const totalRepaid = loan.repayments.reduce((s, r) => s + r.amount, 0);
   const progress = Math.min(100, (totalRepaid / totalOwed) * 100);
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (selectable && onSelect) {
+      e.preventDefault();
+      onSelect(loan.id);
+    }
+  };
+
   return (
     <Link
       href={`/loans/${loan.id}`}
-      className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 group"
+      className={`block bg-white dark:bg-gray-800 rounded-xl border p-6 hover:shadow-lg transition-all duration-200 group ${
+        selected
+          ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900/40"
+          : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
+      }`}
+      onClick={handleClick}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-mono text-gray-500 dark:text-gray-400">
-          #{loan.id}
-        </span>
+        <div className="flex items-center gap-2">
+          {selectable && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelect?.(loan.id);
+              }}
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                selected
+                  ? "bg-blue-600 border-blue-600"
+                  : "border-gray-300 dark:border-gray-600 hover:border-blue-400"
+              }`}
+            >
+              {selected && <Check className="w-3 h-3 text-white" />}
+            </button>
+          )}
+          <span className="text-sm font-mono text-gray-500 dark:text-gray-400">
+            #{loan.id}
+          </span>
+        </div>
         <span
           className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[loan.status]}`}
         >

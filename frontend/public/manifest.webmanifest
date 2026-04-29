@@ -1,0 +1,24 @@
+{
+  "name": "StelloVault",
+  "short_name": "StelloVault",
+  "description": "Mobile trade finance escrows and lending on Stellar.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f3b82",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/window.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/globe.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

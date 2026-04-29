@@ -171,7 +171,7 @@ export const Sidebar = () => {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen fixed">
+    <div className="hidden w-64 flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen fixed lg:flex">
       <div className="flex items-center justify-center h-16 border-b border-gray-200 dark:border-gray-800">
         <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
           StelloVault
