@@ -132,10 +132,9 @@ export function useLiquidity(publicKey: string | null) {
       });
 
       try {
-        // Fetch account for sequence number
+        // Fetch account for sequence number (validates account exists)
         const accountRes = await fetch(`${HORIZON_URL}/accounts/${publicKey}`);
         if (!accountRes.ok) throw new Error('Failed to fetch account');
-        const accountData = await accountRes.json();
 
         const server = new SorobanRpc.Server(SOROBAN_RPC);
         const sourceAccount = await server.getAccount(publicKey);

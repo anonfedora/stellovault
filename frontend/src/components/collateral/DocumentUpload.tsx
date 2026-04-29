@@ -8,7 +8,7 @@ const ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/web
 const MAX_SIZE_MB = 10;
 
 function fileIcon(mimeType?: string) {
-  if (mimeType?.startsWith("image/")) return <Image className="h-4 w-4 text-blue-600" />;
+  if (mimeType?.startsWith("image/")) return <Image className="h-4 w-4 text-blue-600" alt="" />;
   return <FileText className="h-4 w-4 text-gray-600" />;
 }
 

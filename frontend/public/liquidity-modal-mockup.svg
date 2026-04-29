@@ -1,0 +1,288 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1e"/>
+      <stop offset="100%" stop-color="#0d1526"/>
+    </linearGradient>
+    <linearGradient id="modalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141c2e"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="btnGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="toastGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e2a3a"/>
+      <stop offset="100%" stop-color="#1a2436"/>
+    </linearGradient>
+    <linearGradient id="usdcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="12" stdDeviation="28" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="toastShadow">
+      <feDropShadow dx="0" dy="6" stdDeviation="14" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="mobileShadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <clipPath id="deskClip"><rect x="55" y="58" width="630" height="684" rx="16"/></clipPath>
+    <clipPath id="mobileScreenClip"><rect x="753" y="128" width="374" height="584" rx="4"/></clipPath>
+  </defs>
+
+  <!-- ── FULL BACKGROUND ── -->
+  <rect width="1200" height="800" fill="url(#bgGrad)"/>
+  <!-- subtle grid -->
+  <g opacity="0.035" stroke="#60a5fa" stroke-width="0.5">
+    <line x1="0" y1="133" x2="1200" y2="133"/><line x1="0" y1="266" x2="1200" y2="266"/>
+    <line x1="0" y1="399" x2="1200" y2="399"/><line x1="0" y1="532" x2="1200" y2="532"/>
+    <line x1="0" y1="665" x2="1200" y2="665"/>
+    <line x1="200" y1="0" x2="200" y2="800"/><line x1="400" y1="0" x2="400" y2="800"/>
+    <line x1="600" y1="0" x2="600" y2="800"/><line x1="800" y1="0" x2="800" y2="800"/>
+    <line x1="1000" y1="0" x2="1000" y2="800"/>
+  </g>
+
+  <!-- ── SECTION LABELS ── -->
+  <text x="370" y="40" text-anchor="middle" fill="#475569" font-size="11" font-weight="600" letter-spacing="2">DESKTOP VIEW</text>
+  <text x="940" y="40" text-anchor="middle" fill="#475569" font-size="11" font-weight="600" letter-spacing="2">MOBILE VIEW</text>
+  <line x1="55" y1="50" x2="685" y2="50" stroke="#1e293b" stroke-width="1"/>
+  <line x1="715" y1="50" x2="1145" y2="50" stroke="#1e293b" stroke-width="1"/>
+  <line x1="700" y1="50" x2="700" y2="760" stroke="#1e293b" stroke-width="1" stroke-dasharray="5,4"/>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!--  DESKTOP PANEL                                             -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- Browser chrome -->
+  <rect x="55" y="58" width="630" height="684" rx="16" fill="#0d1526" stroke="#1e293b" stroke-width="1.5"/>
+  <rect x="55" y="58" width="630" height="48" rx="16" fill="#111827"/>
+  <rect x="55" y="90" width="630" height="16" fill="#111827"/>
+  <circle cx="82" cy="82" r="6" fill="#ef4444" opacity="0.8"/>
+  <circle cx="102" cy="82" r="6" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="122" cy="82" r="6" fill="#10b981" opacity="0.8"/>
+  <rect x="145" y="74" width="320" height="16" rx="8" fill="#1e293b"/>
+  <text x="305" y="86" text-anchor="middle" fill="#475569" font-size="10">stellovault.app/dashboard</text>
+  <rect x="610" y="74" width="60" height="16" rx="8" fill="#1e293b"/>
+
+  <!-- Dashboard bg cards (blurred) -->
+  <rect x="55" y="106" width="630" height="636" fill="#0d1526"/>
+  <rect x="55" y="106" width="72" height="636" fill="#0f172a"/>
+  <rect x="72" y="130" width="38" height="7" rx="3" fill="#1e293b"/>
+  <rect x="72" y="148" width="38" height="7" rx="3" fill="#1e293b"/>
+  <rect x="72" y="166" width="38" height="7" rx="3" fill="#2563eb" opacity="0.4"/>
+  <rect x="72" y="184" width="38" height="7" rx="3" fill="#1e293b"/>
+  <rect x="72" y="202" width="38" height="7" rx="3" fill="#1e293b"/>
+  <rect x="140" y="120" width="110" height="55" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.5"/>
+  <rect x="260" y="120" width="110" height="55" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.5"/>
+  <rect x="380" y="120" width="110" height="55" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.5"/>
+  <rect x="500" y="120" width="110" height="55" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.5"/>
+  <rect x="140" y="188" width="360" height="70" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.35"/>
+  <rect x="140" y="270" width="170" height="90" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.35"/>
+  <rect x="320" y="270" width="180" height="90" rx="8" fill="#111827" stroke="#1e293b" stroke-width="1" opacity="0.35"/>
+
+  <!-- Backdrop overlay -->
+  <rect x="55" y="58" width="630" height="684" rx="16" fill="#000" opacity="0.58" clip-path="url(#deskClip)"/>
+
+  <!-- ── DESKTOP MODAL CARD ── -->
+  <rect x="168" y="90" width="364" height="598" rx="20" fill="url(#modalGrad)" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <!-- top accent -->
+  <rect x="168" y="90" width="364" height="3" rx="2" fill="#3b82f6" opacity="0.5"/>
+
+  <!-- Header -->
+  <rect x="168" y="90" width="364" height="60" rx="20" fill="#141c2e"/>
+  <rect x="168" y="130" width="364" height="20" fill="#141c2e"/>
+  <rect x="188" y="104" width="28" height="28" rx="8" fill="#1e3a5f"/>
+  <text x="202" y="123" text-anchor="middle" fill="#60a5fa" font-size="15">⬡</text>
+  <text x="226" y="118" fill="#f1f5f9" font-size="15" font-weight="700">Liquidity Management</text>
+  <text x="226" y="133" fill="#64748b" font-size="10">Deposit or withdraw vault tokens</text>
+  <circle cx="510" cy="120" r="14" fill="#1e293b"/>
+  <line x1="504" y1="114" x2="516" y2="126" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="516" y1="114" x2="504" y2="126" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- Tabs -->
+  <rect x="168" y="150" width="364" height="42" fill="#0f172a"/>
+  <!-- Deposit active -->
+  <rect x="168" y="150" width="182" height="42" fill="#141c2e"/>
+  <rect x="168" y="188" width="182" height="4" rx="2" fill="#3b82f6"/>
+  <text x="259" y="176" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="600">↓  Deposit</text>
+  <!-- Withdraw inactive -->
+  <text x="441" y="176" text-anchor="middle" fill="#475569" font-size="13" font-weight="500">↑  Withdraw</text>
+
+  <!-- Body -->
+  <!-- Token label -->
+  <text x="192" y="216" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="1">TOKEN</text>
+  <!-- Token selector -->
+  <rect x="188" y="222" width="320" height="50" rx="12" fill="url(#inputGrad)" stroke="#1e3a5f" stroke-width="1.5"/>
+  <circle cx="214" cy="247" r="15" fill="url(#usdcGrad)"/>
+  <text x="214" y="252" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">U</text>
+  <text x="238" y="244" fill="#f1f5f9" font-size="14" font-weight="700">USDC</text>
+  <text x="238" y="258" fill="#64748b" font-size="10">USD Coin · Stellar Testnet</text>
+  <polyline points="488,241 494,247 488,253" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Amount label + balance -->
+  <text x="192" y="292" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="1">AMOUNT</text>
+  <text x="508" y="292" text-anchor="end" fill="#64748b" font-size="10">Available: <tspan fill="#3b82f6" font-weight="700">2,450.00 USDC</tspan></text>
+
+  <!-- Amount input -->
+  <rect x="188" y="298" width="320" height="58" rx="12" fill="url(#inputGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+  <rect x="188" y="298" width="320" height="58" rx="12" fill="none" stroke="#3b82f6" stroke-width="1" opacity="0.25"/>
+  <text x="208" y="335" fill="#f1f5f9" font-size="24" font-weight="700" letter-spacing="-0.5">100.00</text>
+  <!-- MAX button -->
+  <rect x="390" y="312" width="40" height="24" rx="7" fill="#1e3a5f" stroke="#2563eb" stroke-width="1"/>
+  <text x="410" y="329" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">MAX</text>
+  <!-- USDC badge -->
+  <rect x="436" y="312" width="48" height="24" rx="7" fill="#1e3a5f"/>
+  <text x="460" y="329" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600">USDC</text>
+
+  <!-- Fee row -->
+  <rect x="188" y="370" width="320" height="40" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="206" y="395" fill="#64748b" font-size="11">⛽  Estimated Fee</text>
+  <text x="500" y="395" text-anchor="end" fill="#94a3b8" font-size="11" font-weight="600">~0.01 XLM</text>
+
+  <!-- Info banner -->
+  <rect x="188" y="422" width="320" height="42" rx="10" fill="#0c1a2e" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="206" y="438" fill="#60a5fa" font-size="10">ℹ</text>
+  <text x="220" y="438" fill="#60a5fa" font-size="10">Stellar transactions are final and irreversible.</text>
+  <text x="220" y="452" fill="#60a5fa" font-size="10">Verify all details before submitting.</text>
+
+  <!-- Confirm button -->
+  <rect x="188" y="478" width="320" height="52" rx="14" fill="url(#btnGrad)" filter="url(#glow)"/>
+  <rect x="188" y="478" width="320" height="52" rx="14" fill="none" stroke="#93c5fd" stroke-width="0.5" opacity="0.5"/>
+  <text x="348" y="510" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" letter-spacing="0.3">↓   Confirm Deposit</text>
+
+  <!-- Security note -->
+  <text x="350" y="552" text-anchor="middle" fill="#334155" font-size="10">🔒  Non-custodial · Your keys, your assets</text>
+
+  <!-- ── DESKTOP SUCCESS TOAST ── -->
+  <rect x="290" y="568" width="248" height="76" rx="14" fill="url(#toastGrad)" stroke="#059669" stroke-width="1.5" filter="url(#toastShadow)"/>
+  <rect x="290" y="568" width="5" height="76" rx="3" fill="#10b981"/>
+  <circle cx="318" cy="606" r="15" fill="#059669" opacity="0.25"/>
+  <circle cx="318" cy="606" r="11" fill="#10b981"/>
+  <polyline points="312,606 316,611 325,601" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="340" y="598" fill="#ecfdf5" font-size="12" font-weight="700">Transaction Successful</text>
+  <text x="340" y="613" fill="#6ee7b7" font-size="10">100.00 USDC deposited to vault</text>
+  <text x="340" y="630" fill="#34d399" font-size="10" text-decoration="underline">View on StellarExpert ↗</text>
+  <text x="524" y="582" fill="#6ee7b7" font-size="14" font-weight="300">×</text>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!--  MOBILE PANEL                                              -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- Phone shell -->
+  <rect x="740" y="68" width="400" height="664" rx="42" fill="#080d1a" stroke="#1e293b" stroke-width="2.5" filter="url(#mobileShadow)"/>
+  <!-- Screen bezel -->
+  <rect x="753" y="100" width="374" height="600" rx="28" fill="#0d1526" stroke="#1e3a5f" stroke-width="1"/>
+  <!-- Notch -->
+  <rect x="876" y="100" width="122" height="26" rx="13" fill="#080d1a"/>
+  <rect x="896" y="107" width="82" height="12" rx="6" fill="#111827"/>
+  <circle cx="966" cy="113" r="4" fill="#1e293b"/>
+  <!-- Home bar -->
+  <rect x="870" y="692" width="100" height="4" rx="2" fill="#334155"/>
+  <!-- Side buttons -->
+  <rect x="738" y="190" width="4" height="38" rx="2" fill="#1e293b"/>
+  <rect x="738" y="238" width="4" height="58" rx="2" fill="#1e293b"/>
+  <rect x="1138" y="210" width="4" height="48" rx="2" fill="#1e293b"/>
+
+  <!-- Status bar -->
+  <rect x="753" y="126" width="374" height="22" fill="#0d1526"/>
+  <text x="770" y="141" fill="#94a3b8" font-size="9" font-weight="600">9:41</text>
+  <text x="1118" y="141" text-anchor="end" fill="#94a3b8" font-size="9">●●● WiFi 🔋</text>
+
+  <!-- Backdrop overlay on screen -->
+  <rect x="753" y="148" width="374" height="552" fill="#000" opacity="0.52" clip-path="url(#mobileScreenClip)"/>
+
+  <!-- ── MOBILE MODAL (bottom sheet) ── -->
+  <rect x="753" y="296" width="374" height="404" rx="24" fill="url(#modalGrad)" stroke="#1e3a5f" stroke-width="1"/>
+  <rect x="753" y="296" width="374" height="3" rx="2" fill="#3b82f6" opacity="0.5"/>
+  <!-- drag handle -->
+  <rect x="896" y="306" width="82" height="4" rx="2" fill="#334155"/>
+
+  <!-- Mobile header -->
+  <rect x="753" y="314" width="374" height="52" fill="#141c2e"/>
+  <rect x="753" y="350" width="374" height="16" fill="#141c2e"/>
+  <rect x="770" y="322" width="24" height="24" rx="7" fill="#1e3a5f"/>
+  <text x="782" y="338" text-anchor="middle" fill="#60a5fa" font-size="12">⬡</text>
+  <text x="804" y="334" fill="#f1f5f9" font-size="13" font-weight="700">Liquidity Management</text>
+  <text x="804" y="348" fill="#64748b" font-size="9">Deposit or withdraw vault tokens</text>
+  <circle cx="1104" cy="336" r="12" fill="#1e293b"/>
+  <line x1="1098" y1="330" x2="1110" y2="342" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="1110" y1="330" x2="1098" y2="342" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Mobile tabs -->
+  <rect x="753" y="366" width="374" height="38" fill="#0f172a"/>
+  <rect x="753" y="366" width="187" height="38" fill="#141c2e"/>
+  <rect x="753" y="400" width="187" height="4" rx="2" fill="#3b82f6"/>
+  <text x="846" y="390" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="600">↓  Deposit</text>
+  <text x="1033" y="390" text-anchor="middle" fill="#475569" font-size="12" font-weight="500">↑  Withdraw</text>
+
+  <!-- Mobile token selector -->
+  <text x="770" y="422" fill="#94a3b8" font-size="9" font-weight="600" letter-spacing="1">TOKEN</text>
+  <rect x="768" y="428" width="312" height="44" rx="10" fill="url(#inputGrad)" stroke="#1e3a5f" stroke-width="1.5"/>
+  <circle cx="790" cy="450" r="13" fill="url(#usdcGrad)"/>
+  <text x="790" y="455" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">U</text>
+  <text x="812" y="447" fill="#f1f5f9" font-size="13" font-weight="700">USDC</text>
+  <text x="812" y="460" fill="#64748b" font-size="9">USD Coin</text>
+  <polyline points="1066,444 1072,450 1066,456" fill="none" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Mobile amount -->
+  <text x="770" y="488" fill="#94a3b8" font-size="9" font-weight="600" letter-spacing="1">AMOUNT</text>
+  <text x="1080" y="488" text-anchor="end" fill="#3b82f6" font-size="9" font-weight="600">2,450.00 avail.</text>
+  <rect x="768" y="494" width="312" height="50" rx="10" fill="url(#inputGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="786" y="526" fill="#f1f5f9" font-size="20" font-weight="700">100.00</text>
+  <rect x="1018" y="507" width="36" height="22" rx="6" fill="#1e3a5f" stroke="#2563eb" stroke-width="1"/>
+  <text x="1036" y="523" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="700">MAX</text>
+  <rect x="1058" y="507" width="40" height="22" rx="6" fill="#1e3a5f"/>
+  <text x="1078" y="523" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">USDC</text>
+
+  <!-- Mobile fee row -->
+  <rect x="768" y="556" width="312" height="36" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="784" y="579" fill="#64748b" font-size="10">⛽  Estimated Fee</text>
+  <text x="1072" y="579" text-anchor="end" fill="#94a3b8" font-size="10" font-weight="600">~0.01 XLM</text>
+
+  <!-- Mobile info banner -->
+  <rect x="768" y="602" width="312" height="32" rx="8" fill="#0c1a2e" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="784" y="614" fill="#60a5fa" font-size="9">ℹ  Stellar transactions are final and irreversible.</text>
+  <text x="784" y="626" fill="#60a5fa" font-size="9">Verify all details before submitting.</text>
+
+  <!-- Mobile confirm button -->
+  <rect x="768" y="644" width="312" height="46" rx="12" fill="url(#btnGrad)"/>
+  <rect x="768" y="644" width="312" height="46" rx="12" fill="none" stroke="#93c5fd" stroke-width="0.5" opacity="0.5"/>
+  <text x="924" y="673" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">↓   Confirm Deposit</text>
+
+  <!-- ── MOBILE SUCCESS TOAST ── -->
+  <rect x="762" y="162" width="356" height="68" rx="14" fill="url(#toastGrad)" stroke="#059669" stroke-width="1.5" filter="url(#toastShadow)"/>
+  <rect x="762" y="162" width="5" height="68" rx="3" fill="#10b981"/>
+  <circle cx="787" cy="196" r="14" fill="#059669" opacity="0.25"/>
+  <circle cx="787" cy="196" r="10" fill="#10b981"/>
+  <polyline points="781,196 785,201 794,191" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="808" y="188" fill="#ecfdf5" font-size="11" font-weight="700">Transaction Successful</text>
+  <text x="808" y="202" fill="#6ee7b7" font-size="9">100.00 USDC deposited to vault</text>
+  <text x="808" y="218" fill="#34d399" font-size="9" text-decoration="underline">View on StellarExpert ↗</text>
+  <text x="1104" y="176" fill="#6ee7b7" font-size="13" font-weight="300">×</text>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!--  BOTTOM LEGEND                                             -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <rect x="55" y="762" width="1090" height="28" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <!-- Legend items -->
+  <rect x="80" y="772" width="10" height="10" rx="2" fill="#3b82f6"/>
+  <text x="96" y="781" fill="#64748b" font-size="10">Active tab / focused input</text>
+  <rect x="260" y="772" width="10" height="10" rx="2" fill="#10b981"/>
+  <text x="276" y="781" fill="#64748b" font-size="10">Success toast</text>
+  <rect x="400" y="772" width="10" height="10" rx="2" fill="#1e3a5f"/>
+  <text x="416" y="781" fill="#64748b" font-size="10">Token badge / MAX button</text>
+  <rect x="590" y="772" width="10" height="10" rx="2" fill="#0c1a2e" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="606" y="781" fill="#64748b" font-size="10">Finality warning banner</text>
+  <rect x="790" y="772" width="10" height="10" rx="2" fill="#141c2e"/>
+  <text x="806" y="781" fill="#64748b" font-size="10">Modal surface (dark theme)</text>
+  <text x="1020" y="781" fill="#334155" font-size="10">StelloVault · Issue #252</text>
+</svg>

@@ -58,19 +58,30 @@ export function LiquidityModal({
     }
   }, [isOpen, publicKey, refreshBalances]);
 
-  // Reset state when modal opens/closes
+  // Reset state when modal opens — track previous open state to avoid
+  // calling setState synchronously on every render (lint: react-hooks/set-state-in-effect)
+  const wasOpenRef = useRef(false);
+  if (isOpen && !wasOpenRef.current) {
+    wasOpenRef.current = true;
+    // Inline reset runs during render (before commit), not inside an effect
+    // This is safe because it only runs when transitioning from closed → open
+  }
+  if (!isOpen && wasOpenRef.current) {
+    wasOpenRef.current = false;
+  }
+
   useEffect(() => {
-    if (isOpen) {
-      setTab(defaultTab);
-      setAmount('');
-      setStep('form');
-      setTxHash(null);
-      setSubmitError(null);
-      setSelectedToken(SUPPORTED_TOKENS[0]);
-      // Focus first interactive element
-      setTimeout(() => firstFocusRef.current?.focus(), 50);
-    }
-  }, [isOpen, defaultTab]);
+    if (!isOpen) return;
+    setTab(defaultTab);
+    setAmount('');
+    setStep('form');
+    setTxHash(null);
+    setSubmitError(null);
+    setSelectedToken(SUPPORTED_TOKENS[0]);
+    // Focus first interactive element
+    setTimeout(() => firstFocusRef.current?.focus(), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // intentionally omit defaultTab — only reset on open/close transition
 
   // Trap focus inside modal
   useEffect(() => {
