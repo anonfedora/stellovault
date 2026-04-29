@@ -13,6 +13,7 @@ import {
   type WidgetDefinition,
 } from "@/components/dashboard/WidgetCustomizer";
 import { LiquidityModal } from "@/components/dashboard/LiquidityModal";
+import { CollateralPortfolio } from "@/components/dashboard/CollateralPortfolio";
 import { QuickStartCard } from "@/components/onboarding/QuickStartCard";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -26,6 +27,11 @@ const WIDGETS: WidgetDefinition[] = [
     id: "portfolio",
     label: "Portfolio overview",
     description: "Headline assets, liabilities and ratios.",
+  },
+  {
+    id: "collateral",
+    label: "Collateral portfolio",
+    description: "Tokenized assets with status badges.",
   },
   {
     id: "metrics",
@@ -236,6 +242,7 @@ export default function DashboardPage() {
             key={metric.title}
             title={metric.title}
             value={metric.value}
+            loading={loading}
           />
         ))}
       </div>
@@ -252,6 +259,10 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {isVisible("collateral") && (
+        <CollateralPortfolio loans={loans} loading={loading} />
+      )}
 
       {isVisible("metrics") && (
         <MetricsChart data={metrics} loading={loading} />
