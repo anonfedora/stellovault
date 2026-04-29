@@ -8,6 +8,7 @@ export { QuickActions } from './dashboard/QuickActions';
 export { MetricsChart } from './dashboard/MetricsChart';
 export { NotificationCenter } from './dashboard/NotificationCenter';
 export { WidgetCustomizer } from './dashboard/WidgetCustomizer';
+export { LiquidityModal } from './dashboard/LiquidityModal';
 export { LoanCard } from './loans/LoanCard';
 export { RepaymentSchedule } from './loans/RepaymentSchedule';
 export { LoanForm } from './loans/LoanForm';

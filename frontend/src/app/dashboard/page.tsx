@@ -12,8 +12,10 @@ import {
   WidgetCustomizer,
   type WidgetDefinition,
 } from "@/components/dashboard/WidgetCustomizer";
+import { LiquidityModal } from "@/components/dashboard/LiquidityModal";
 import { QuickStartCard } from "@/components/onboarding/QuickStartCard";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import {
   exportDashboardReport,
   type ExportFormat,
@@ -68,6 +70,7 @@ const formatTime = (date: Date | null) =>
 
 export default function DashboardPage() {
   const dashboard = useDashboard();
+  const { publicKey } = useWalletAuth();
   const {
     portfolio,
     activity,
@@ -97,6 +100,7 @@ export default function DashboardPage() {
     },
   );
   const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
+  const [liquidityOpen, setLiquidityOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -244,7 +248,7 @@ export default function DashboardPage() {
         )}
         {isVisible("actions") && (
           <div>
-            <QuickActions onExport={handleExport} />
+            <QuickActions onExport={handleExport} onLiquidity={() => setLiquidityOpen(true)} />
           </div>
         )}
       </div>
@@ -265,6 +269,12 @@ export default function DashboardPage() {
           />
         )}
       </div>
+
+      <LiquidityModal
+        isOpen={liquidityOpen}
+        onClose={() => setLiquidityOpen(false)}
+        publicKey={publicKey}
+      />
     </div>
   );
 }

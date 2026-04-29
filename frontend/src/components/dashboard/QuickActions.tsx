@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   FileDown,
   Activity,
+  Droplets,
 } from "lucide-react";
 
 export interface QuickAction {
@@ -21,6 +22,7 @@ export interface QuickAction {
 interface QuickActionsProps {
   actions?: QuickAction[];
   onExport?: () => void;
+  onLiquidity?: () => void;
 }
 
 const DEFAULT_ACTIONS: QuickAction[] = [
@@ -53,6 +55,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
 export const QuickActions = ({
   actions = DEFAULT_ACTIONS,
   onExport,
+  onLiquidity,
 }: QuickActionsProps) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -65,16 +68,29 @@ export const QuickActions = ({
             Shortcuts to the operations you use most.
           </p>
         </div>
-        {onExport && (
-          <button
-            type="button"
-            onClick={onExport}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            Export
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onLiquidity && (
+            <button
+              type="button"
+              onClick={onLiquidity}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              aria-label="Open liquidity management"
+            >
+              <Droplets className="h-3.5 w-3.5" />
+              Liquidity
+            </button>
+          )}
+          {onExport && (
+            <button
+              type="button"
+              onClick={onExport}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              Export
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
