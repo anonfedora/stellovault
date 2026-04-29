@@ -17,4 +17,5 @@ pub fn wallet_routes() -> Router<AppState> {
         .route("/wallets/:id", delete(wallet::unlink_wallet))
         .route("/wallets/:id", patch(wallet::update_wallet))
         .route("/wallets/:id/primary", put(wallet::set_primary_wallet))
+        .route("/wallets/:id/balance", get(wallet::get_wallet_balance))
 }
