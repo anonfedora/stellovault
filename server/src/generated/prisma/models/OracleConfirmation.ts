@@ -31,6 +31,8 @@ export type OracleConfirmationMinAggregateOutputType = {
   eventType: string | null
   signature: string | null
   createdAt: Date | null
+  status: $Enums.ConfirmationStatus | null
+  validated: boolean | null
 }
 
 export type OracleConfirmationMaxAggregateOutputType = {
@@ -40,6 +42,8 @@ export type OracleConfirmationMaxAggregateOutputType = {
   eventType: string | null
   signature: string | null
   createdAt: Date | null
+  status: $Enums.ConfirmationStatus | null
+  validated: boolean | null
 }
 
 export type OracleConfirmationCountAggregateOutputType = {
@@ -50,6 +54,8 @@ export type OracleConfirmationCountAggregateOutputType = {
   signature: number
   payload: number
   createdAt: number
+  status: number
+  validated: number
   _all: number
 }
 
@@ -61,6 +67,8 @@ export type OracleConfirmationMinAggregateInputType = {
   eventType?: true
   signature?: true
   createdAt?: true
+  status?: true
+  validated?: true
 }
 
 export type OracleConfirmationMaxAggregateInputType = {
@@ -70,6 +78,8 @@ export type OracleConfirmationMaxAggregateInputType = {
   eventType?: true
   signature?: true
   createdAt?: true
+  status?: true
+  validated?: true
 }
 
 export type OracleConfirmationCountAggregateInputType = {
@@ -80,6 +90,8 @@ export type OracleConfirmationCountAggregateInputType = {
   signature?: true
   payload?: true
   createdAt?: true
+  status?: true
+  validated?: true
   _all?: true
 }
 
@@ -163,6 +175,8 @@ export type OracleConfirmationGroupByOutputType = {
   signature: string
   payload: runtime.JsonValue
   createdAt: Date
+  status: $Enums.ConfirmationStatus
+  validated: boolean
   _count: OracleConfirmationCountAggregateOutputType | null
   _min: OracleConfirmationMinAggregateOutputType | null
   _max: OracleConfirmationMaxAggregateOutputType | null
@@ -194,6 +208,8 @@ export type OracleConfirmationWhereInput = {
   signature?: Prisma.StringFilter<"OracleConfirmation"> | string
   payload?: Prisma.JsonFilter<"OracleConfirmation">
   createdAt?: Prisma.DateTimeFilter<"OracleConfirmation"> | Date | string
+  status?: Prisma.EnumConfirmationStatusFilter<"OracleConfirmation"> | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFilter<"OracleConfirmation"> | boolean
   oracle?: Prisma.XOR<Prisma.OracleScalarRelationFilter, Prisma.OracleWhereInput>
   escrow?: Prisma.XOR<Prisma.EscrowScalarRelationFilter, Prisma.EscrowWhereInput>
 }
@@ -206,6 +222,8 @@ export type OracleConfirmationOrderByWithRelationInput = {
   signature?: Prisma.SortOrder
   payload?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  validated?: Prisma.SortOrder
   oracle?: Prisma.OracleOrderByWithRelationInput
   escrow?: Prisma.EscrowOrderByWithRelationInput
 }
@@ -222,6 +240,8 @@ export type OracleConfirmationWhereUniqueInput = Prisma.AtLeast<{
   signature?: Prisma.StringFilter<"OracleConfirmation"> | string
   payload?: Prisma.JsonFilter<"OracleConfirmation">
   createdAt?: Prisma.DateTimeFilter<"OracleConfirmation"> | Date | string
+  status?: Prisma.EnumConfirmationStatusFilter<"OracleConfirmation"> | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFilter<"OracleConfirmation"> | boolean
   oracle?: Prisma.XOR<Prisma.OracleScalarRelationFilter, Prisma.OracleWhereInput>
   escrow?: Prisma.XOR<Prisma.EscrowScalarRelationFilter, Prisma.EscrowWhereInput>
 }, "id" | "oracleId_escrowId_eventType">
@@ -234,6 +254,8 @@ export type OracleConfirmationOrderByWithAggregationInput = {
   signature?: Prisma.SortOrder
   payload?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  validated?: Prisma.SortOrder
   _count?: Prisma.OracleConfirmationCountOrderByAggregateInput
   _max?: Prisma.OracleConfirmationMaxOrderByAggregateInput
   _min?: Prisma.OracleConfirmationMinOrderByAggregateInput
@@ -250,6 +272,8 @@ export type OracleConfirmationScalarWhereWithAggregatesInput = {
   signature?: Prisma.StringWithAggregatesFilter<"OracleConfirmation"> | string
   payload?: Prisma.JsonWithAggregatesFilter<"OracleConfirmation">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"OracleConfirmation"> | Date | string
+  status?: Prisma.EnumConfirmationStatusWithAggregatesFilter<"OracleConfirmation"> | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolWithAggregatesFilter<"OracleConfirmation"> | boolean
 }
 
 export type OracleConfirmationCreateInput = {
@@ -258,6 +282,8 @@ export type OracleConfirmationCreateInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
   oracle: Prisma.OracleCreateNestedOneWithoutConfirmationsInput
   escrow: Prisma.EscrowCreateNestedOneWithoutConfirmationsInput
 }
@@ -270,6 +296,8 @@ export type OracleConfirmationUncheckedCreateInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationUpdateInput = {
@@ -278,6 +306,8 @@ export type OracleConfirmationUpdateInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
   oracle?: Prisma.OracleUpdateOneRequiredWithoutConfirmationsNestedInput
   escrow?: Prisma.EscrowUpdateOneRequiredWithoutConfirmationsNestedInput
 }
@@ -290,6 +320,8 @@ export type OracleConfirmationUncheckedUpdateInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationCreateManyInput = {
@@ -300,6 +332,8 @@ export type OracleConfirmationCreateManyInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationUpdateManyMutationInput = {
@@ -308,6 +342,8 @@ export type OracleConfirmationUpdateManyMutationInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationUncheckedUpdateManyInput = {
@@ -318,6 +354,8 @@ export type OracleConfirmationUncheckedUpdateManyInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationListRelationFilter = {
@@ -344,6 +382,8 @@ export type OracleConfirmationCountOrderByAggregateInput = {
   signature?: Prisma.SortOrder
   payload?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  validated?: Prisma.SortOrder
 }
 
 export type OracleConfirmationMaxOrderByAggregateInput = {
@@ -353,6 +393,8 @@ export type OracleConfirmationMaxOrderByAggregateInput = {
   eventType?: Prisma.SortOrder
   signature?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  validated?: Prisma.SortOrder
 }
 
 export type OracleConfirmationMinOrderByAggregateInput = {
@@ -362,6 +404,8 @@ export type OracleConfirmationMinOrderByAggregateInput = {
   eventType?: Prisma.SortOrder
   signature?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  validated?: Prisma.SortOrder
 }
 
 export type OracleConfirmationCreateNestedManyWithoutEscrowInput = {
@@ -448,12 +492,18 @@ export type OracleConfirmationUncheckedUpdateManyWithoutOracleNestedInput = {
   deleteMany?: Prisma.OracleConfirmationScalarWhereInput | Prisma.OracleConfirmationScalarWhereInput[]
 }
 
+export type EnumConfirmationStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ConfirmationStatus
+}
+
 export type OracleConfirmationCreateWithoutEscrowInput = {
   id?: string
   eventType: string
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
   oracle: Prisma.OracleCreateNestedOneWithoutConfirmationsInput
 }
 
@@ -464,6 +514,8 @@ export type OracleConfirmationUncheckedCreateWithoutEscrowInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationCreateOrConnectWithoutEscrowInput = {
@@ -503,6 +555,8 @@ export type OracleConfirmationScalarWhereInput = {
   signature?: Prisma.StringFilter<"OracleConfirmation"> | string
   payload?: Prisma.JsonFilter<"OracleConfirmation">
   createdAt?: Prisma.DateTimeFilter<"OracleConfirmation"> | Date | string
+  status?: Prisma.EnumConfirmationStatusFilter<"OracleConfirmation"> | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFilter<"OracleConfirmation"> | boolean
 }
 
 export type OracleConfirmationCreateWithoutOracleInput = {
@@ -511,6 +565,8 @@ export type OracleConfirmationCreateWithoutOracleInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
   escrow: Prisma.EscrowCreateNestedOneWithoutConfirmationsInput
 }
 
@@ -521,6 +577,8 @@ export type OracleConfirmationUncheckedCreateWithoutOracleInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationCreateOrConnectWithoutOracleInput = {
@@ -556,6 +614,8 @@ export type OracleConfirmationCreateManyEscrowInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationUpdateWithoutEscrowInput = {
@@ -564,6 +624,8 @@ export type OracleConfirmationUpdateWithoutEscrowInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
   oracle?: Prisma.OracleUpdateOneRequiredWithoutConfirmationsNestedInput
 }
 
@@ -574,6 +636,8 @@ export type OracleConfirmationUncheckedUpdateWithoutEscrowInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationUncheckedUpdateManyWithoutEscrowInput = {
@@ -583,6 +647,8 @@ export type OracleConfirmationUncheckedUpdateManyWithoutEscrowInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationCreateManyOracleInput = {
@@ -592,6 +658,8 @@ export type OracleConfirmationCreateManyOracleInput = {
   signature: string
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  status?: $Enums.ConfirmationStatus
+  validated?: boolean
 }
 
 export type OracleConfirmationUpdateWithoutOracleInput = {
@@ -600,6 +668,8 @@ export type OracleConfirmationUpdateWithoutOracleInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
   escrow?: Prisma.EscrowUpdateOneRequiredWithoutConfirmationsNestedInput
 }
 
@@ -610,6 +680,8 @@ export type OracleConfirmationUncheckedUpdateWithoutOracleInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type OracleConfirmationUncheckedUpdateManyWithoutOracleInput = {
@@ -619,6 +691,8 @@ export type OracleConfirmationUncheckedUpdateManyWithoutOracleInput = {
   signature?: Prisma.StringFieldUpdateOperationsInput | string
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  status?: Prisma.EnumConfirmationStatusFieldUpdateOperationsInput | $Enums.ConfirmationStatus
+  validated?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 
@@ -631,6 +705,8 @@ export type OracleConfirmationSelect<ExtArgs extends runtime.Types.Extensions.In
   signature?: boolean
   payload?: boolean
   createdAt?: boolean
+  status?: boolean
+  validated?: boolean
   oracle?: boolean | Prisma.OracleDefaultArgs<ExtArgs>
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["oracleConfirmation"]>
@@ -643,6 +719,8 @@ export type OracleConfirmationSelectCreateManyAndReturn<ExtArgs extends runtime.
   signature?: boolean
   payload?: boolean
   createdAt?: boolean
+  status?: boolean
+  validated?: boolean
   oracle?: boolean | Prisma.OracleDefaultArgs<ExtArgs>
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["oracleConfirmation"]>
@@ -655,6 +733,8 @@ export type OracleConfirmationSelectUpdateManyAndReturn<ExtArgs extends runtime.
   signature?: boolean
   payload?: boolean
   createdAt?: boolean
+  status?: boolean
+  validated?: boolean
   oracle?: boolean | Prisma.OracleDefaultArgs<ExtArgs>
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["oracleConfirmation"]>
@@ -667,9 +747,11 @@ export type OracleConfirmationSelectScalar = {
   signature?: boolean
   payload?: boolean
   createdAt?: boolean
+  status?: boolean
+  validated?: boolean
 }
 
-export type OracleConfirmationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "oracleId" | "escrowId" | "eventType" | "signature" | "payload" | "createdAt", ExtArgs["result"]["oracleConfirmation"]>
+export type OracleConfirmationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "oracleId" | "escrowId" | "eventType" | "signature" | "payload" | "createdAt" | "status" | "validated", ExtArgs["result"]["oracleConfirmation"]>
 export type OracleConfirmationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   oracle?: boolean | Prisma.OracleDefaultArgs<ExtArgs>
   escrow?: boolean | Prisma.EscrowDefaultArgs<ExtArgs>
@@ -697,6 +779,8 @@ export type $OracleConfirmationPayload<ExtArgs extends runtime.Types.Extensions.
     signature: string
     payload: runtime.JsonValue
     createdAt: Date
+    status: $Enums.ConfirmationStatus
+    validated: boolean
   }, ExtArgs["result"]["oracleConfirmation"]>
   composites: {}
 }
@@ -1129,6 +1213,8 @@ export interface OracleConfirmationFieldRefs {
   readonly signature: Prisma.FieldRef<"OracleConfirmation", 'String'>
   readonly payload: Prisma.FieldRef<"OracleConfirmation", 'Json'>
   readonly createdAt: Prisma.FieldRef<"OracleConfirmation", 'DateTime'>
+  readonly status: Prisma.FieldRef<"OracleConfirmation", 'ConfirmationStatus'>
+  readonly validated: Prisma.FieldRef<"OracleConfirmation", 'Boolean'>
 }
     
 

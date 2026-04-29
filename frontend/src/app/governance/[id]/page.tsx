@@ -5,7 +5,7 @@ import { useGovernance } from "@/hooks/useGovernance";
 import { VoteTallyBar } from "@/components/governance/VoteTallyBar";
 import { VoteButton } from "@/components/governance/VoteButton";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
@@ -42,6 +42,15 @@ export default function ProposalDetailPage() {
     [proposals, id],
   );
 
+  // Live wall-clock so the "X remaining" display ticks down. Captured once
+  // via the lazy initializer and refreshed every minute.
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   if (!proposal) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
@@ -71,7 +80,7 @@ export default function ProposalDetailPage() {
 
   const expiresDate = new Date(proposal.expiresAt);
   const timeLeft = (() => {
-    const diff = proposal.expiresAt - Date.now();
+    const diff = proposal.expiresAt - now;
     if (diff <= 0) return "Expired";
     const days = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);

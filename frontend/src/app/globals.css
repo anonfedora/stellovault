@@ -3,6 +3,40 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --chart-grid: #e5e7eb;
+  --chart-axis: #6b7280;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #e5e7eb;
+}
+
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl\:mr-auto {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+[dir="rtl"] .rtl\:ml-0 {
+  margin-left: 0;
+}
+
+[dir="rtl"] .rtl\:pl-0 {
+  padding-left: 0;
+}
+
+[dir="rtl"] .rtl\:text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:text-right {
+  text-align: left;
 }
 
 @theme inline {
@@ -16,6 +50,10 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --chart-grid: #374151;
+    --chart-axis: #9ca3af;
+    --chart-tooltip-bg: #1f2937;
+    --chart-tooltip-border: #374151;
   }
 }
 

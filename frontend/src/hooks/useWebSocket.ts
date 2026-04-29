@@ -51,7 +51,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
 
     let ws: WebSocket | null = null;
-    let attempt = 0;
     let consecutiveFailures = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
@@ -66,7 +65,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     function connect() {
       if (stopped) return;
 
-      attempt += 1;
       ws = new WebSocket("/ws");
 
       ws.onopen = () => {

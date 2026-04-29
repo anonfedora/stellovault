@@ -14,8 +14,7 @@ use crate::escrow::{
     UpdateEscrowStatusRequest, WebhookPayload,
 };
 use crate::websocket::WsEvent;
-use crate::loan::{CreateLoanRequest, ListLoansQuery, Loan, Repayment, RepaymentRequest};
-use crate::websocket::{WsEvent, EscrowEvent as WsEscrowEvent};
+use crate::websocket::EscrowEvent as WsEscrowEvent;
 use crate::models::{ApiResponse, User};
 use crate::state::AppState;
 
@@ -409,89 +408,8 @@ pub async fn get_escrow_history(
 // ===== Collateral Handlers =====
 // Moved to src/handlers/collateral.rs
 
+
 // ===== Loan Handlers =====
-
-/// Get list of loans
-pub async fn list_loans(
-    State(app_state): State<AppState>,
-    Query(query): Query<ListLoansQuery>,
-) -> Json<ApiResponse<Vec<Loan>>> {
-    match app_state
-        .loan_service
-        .list_loans(query.borrower_id, query.lender_id, query.status)
-        .await
-    {
-        Ok(loans) => Json(ApiResponse {
-            success: true,
-            data: Some(loans),
-            error: None,
-        }),
-        Err(e) => Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to list loans: {}", e)),
-        }),
-    }
-}
-
-/// Get a single loan by ID
-pub async fn get_loan(
-    State(app_state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> Json<ApiResponse<Loan>> {
-    match app_state.loan_service.get_loan(&id).await {
-        Ok(Some(loan)) => Json(ApiResponse {
-            success: true,
-            data: Some(loan),
-            error: None,
-        }),
-        Ok(None) => Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some("Loan not found".to_string()),
-        }),
-        Err(e) => Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Database error: {}", e)),
-        }),
-    }
-}
-
-/// Issue a new loan
-pub async fn create_loan(
-    State(app_state): State<AppState>,
-    Json(req): Json<CreateLoanRequest>,
-) -> Json<ApiResponse<Loan>> {
-    match app_state.loan_service.issue_loan(req).await {
-        Ok(loan) => Json(ApiResponse {
-            success: true,
-            data: Some(loan),
-            error: None,
-        }),
-        Err(e) => Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to issue loan: {}", e)),
-        }),
-    }
-}
-
-/// Record a repayment
-pub async fn record_repayment(
-    State(app_state): State<AppState>,
-    Json(req): Json<RepaymentRequest>,
-) -> Json<ApiResponse<Repayment>> {
-    match app_state.loan_service.record_repayment(req).await {
-        Ok(repayment) => Json(ApiResponse {
-            success: true,
-            data: Some(repayment),
-            error: None,
-        }),
-        Err(e) => Json(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to record repayment: {}", e)),
-        }),
-    }
-}
+// NOTE: Loan handlers have been moved to src/handlers/loan.rs
+// The following functions are deprecated and should not be used.
+// Use the loan handlers module instead.

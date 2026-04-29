@@ -1,0 +1,46 @@
+{
+  "detectors": [
+    "reentrancy",
+    "timestamp",
+    "delegatecall",
+    "shadowing",
+    "suicidal",
+    "uninitialized-state",
+    "uninitialized-local",
+    "constant-function-asm",
+    "constant-function-state",
+    "predictable-variables",
+    "tx-origin",
+    "unchecked-send",
+    "unchecked-lowlevel",
+    "unchecked-transfer",
+    "arbitrary-send",
+    "locked-ether",
+    "calls-loop",
+    "events-access",
+    "events-maths",
+    "pragma",
+    "solc-version",
+    "assert-state-change",
+    "code-complexity",
+    "too-many-digits",
+    "naming-convention",
+    "external-function",
+    "low-level-calls",
+    "missing-zero-check",
+    "missing-events",
+    "reentrancy-benign",
+    "reentrancy-events",
+    "reentrancy-unlimited-gas"
+  ],
+  "exclude": [
+    "naming-convention",
+    "external-function"
+  ],
+  "filter_paths": [
+    "node_modules",
+    "tests"
+  ],
+  "json": true,
+  "markdown": true
+}

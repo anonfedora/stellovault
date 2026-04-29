@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "sonner";
+import type { Metadata, Viewport } from "next";
+import { AppProviders } from "@/components/providers/AppProviders";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider";
+import { LanguageProvider } from '@/components/i18n/LanguageProvider';
+import { Toaster } from "sonner";
 import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
 import { AppProviders } from "@/components/providers/AppProviders";
 import { PerformanceMonitor } from "@/components/PerformanceMonitor";
@@ -19,15 +19,39 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StelloVault - Decentralized Lending Protocol",
+  title: {
+    template: "%s | StelloVault",
+    default: "StelloVault - Decentralized Lending Protocol",
+  },
   description: "A decentralized lending protocol built on the Stellar network with on-chain governance and automated collateral management.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "StelloVault",
+  },
+  alternates: {
+    languages: {
+      en: "/",
+      es: "/es",
+      fr: "/fr",
+      ar: "/ar",
+      he: "/he",
+      zh: "/zh",
+      ja: "/ja",
+    },
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f3b82",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <head>
@@ -42,16 +66,7 @@ export default function RootLayout({
             <ServiceWorkerRegistration />
             {children}
           </AppProviders>
-          <Toaster 
-            position="top-right"
-            expand={false}
-            richColors
-            closeButton
-            duration={5000}
-            visibleToasts={3}
-          />
-          <TransactionHistoryDrawer />
-        </TransactionStatusProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
