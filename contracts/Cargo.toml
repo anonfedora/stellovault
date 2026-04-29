@@ -2,6 +2,7 @@
 members = [
     "collateral-registry",
     "escrow-manager",
+    "bridge",
     "example",
     "governance",
     "invoice-contract",
