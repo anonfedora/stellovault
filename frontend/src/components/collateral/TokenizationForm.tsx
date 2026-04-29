@@ -31,6 +31,12 @@ export function TokenizationForm({ escrowId, onSubmit, loading = false }: Tokeni
 
   async function handleSubmit() {
     setError(null);
+    if (documents.length === 0) {
+      setError("Upload at least one supporting document before tokenizing.");
+      setStep(1);
+      return;
+    }
+
     try {
       await onSubmit({
         escrowId,
@@ -75,6 +81,9 @@ export function TokenizationForm({ escrowId, onSubmit, loading = false }: Tokeni
       {/* Step 0 — Asset Details */}
       {step === 0 && (
         <div className="space-y-4">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+            Supported collateral: invoices, commodities, receivables, inventory, and real estate.
+          </div>
           <label className="block space-y-1 text-sm font-medium text-gray-700">
             Asset Type
             <select
@@ -119,7 +128,15 @@ export function TokenizationForm({ escrowId, onSubmit, loading = false }: Tokeni
           <button
             type="button"
             disabled={!amount || Number(amount) <= 0}
-            onClick={() => setStep(1)}
+            onClick={() => {
+              if (!amount || Number(amount) <= 0) {
+                setError('Enter a valid USD value to continue.');
+                return;
+              }
+
+              setError(null);
+              setStep(1);
+            }}
             className="w-full rounded-lg bg-blue-900 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             Next: Upload Documents
@@ -130,7 +147,13 @@ export function TokenizationForm({ escrowId, onSubmit, loading = false }: Tokeni
       {/* Step 1 — Documents */}
       {step === 1 && (
         <div className="space-y-4">
-          <DocumentUpload documents={documents} onChange={setDocuments} />
+          <p className="text-sm text-gray-500">
+            Upload proof documents such as invoices, certificates, and receipts. Accepted formats: PDF, JPEG, PNG, WEBP.
+          </p>
+          <DocumentUpload documents={documents} onChange={(docs) => { setDocuments(docs); if (docs.length) setError(null); }} />
+          {documents.length === 0 && (
+            <p className="text-xs text-red-600">Please upload at least one supporting document to continue.</p>
+          )}
           <div className="flex gap-3">
             <button
               type="button"
@@ -141,7 +164,14 @@ export function TokenizationForm({ escrowId, onSubmit, loading = false }: Tokeni
             </button>
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                if (documents.length === 0) {
+                  setError('Upload at least one supporting document before reviewing.');
+                  return;
+                }
+                setError(null);
+                setStep(2);
+              }}
               className="flex-1 rounded-lg bg-blue-900 py-2.5 text-sm font-semibold text-white"
             >
               Next: Review
