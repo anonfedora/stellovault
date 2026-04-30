@@ -7,7 +7,6 @@ members = [
     "invoice-contract",
     "loan-management",
     "oracle-adapter",
-    "protocol-treasury",
     "reputation-registry",
     "risk-assessment",
     "upgrade-system",

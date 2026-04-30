@@ -9,6 +9,36 @@
   --chart-tooltip-border: #e5e7eb;
 }
 
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl\:mr-auto {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+[dir="rtl"] .rtl\:ml-0 {
+  margin-left: 0;
+}
+
+[dir="rtl"] .rtl\:pl-0 {
+  padding-left: 0;
+}
+
+[dir="rtl"] .rtl\:text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:text-right {
+  text-align: left;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

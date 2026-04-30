@@ -12,23 +12,22 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol,
-    Vec, Map,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
 };
 
-mod collateral;
-mod valuation;
-mod ownership;
-mod locking;
-mod verification;
 mod classification;
+mod collateral;
+mod locking;
+mod ownership;
+mod valuation;
+mod verification;
 
-pub use collateral::*;
-pub use valuation::*;
-pub use ownership::*;
-pub use locking::*;
-pub use verification::*;
-pub use classification::*;
+use classification::*;
+use collateral::*;
+use locking::*;
+use ownership::*;
+use valuation::*;
+use verification::*;
 
 /// Contract errors
 #[contracttype]
@@ -103,10 +102,8 @@ impl CollateralRegistry {
             .instance()
             .set(&symbol_short!("next_id"), &1u64);
 
-        env.events().publish(
-            (symbol_short!("registry_init"),),
-            (admin.clone(), oracle),
-        );
+        env.events()
+            .publish((symbol_short!("reg_init"),), (admin.clone(), oracle));
 
         Ok(())
     }
@@ -166,7 +163,7 @@ impl CollateralRegistry {
             status: CollateralStatus::Active,
             locked: false,
             locked_by_escrow: 0,
-            verification_status: VerificationStatus::Pending,
+            verification_status: collateral::VerificationStatus::Pending,
             verified_by: None,
             verified_at: 0,
             created_at: env.ledger().timestamp(),
@@ -181,9 +178,7 @@ impl CollateralRegistry {
         env.storage().persistent().set(&storage_key, &collateral);
 
         // Store asset hash mapping
-        env.storage()
-            .persistent()
-            .set(&hash_key, &collateral_id);
+        env.storage().persistent().set(&hash_key, &collateral_id);
 
         // Store owner mapping
         let owner_key = format_owner_collateral_key(&owner, collateral_id);
@@ -196,7 +191,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_registered"),),
+            (symbol_short!("col_regd"),),
             (collateral_id, owner, initial_valuation),
         );
 
@@ -216,7 +211,7 @@ impl CollateralRegistry {
         env: Env,
         collateral_id: u64,
         new_valuation: i128,
-        oracle_signature: BytesN<64>,
+        _oracle_signature: BytesN<64>,
     ) -> Result<(), ContractError> {
         // Get oracle address
         let oracle: Address = env
@@ -271,10 +266,8 @@ impl CollateralRegistry {
             .set(&valuation_key, &valuation_record);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("valuation_updated"),),
-            (collateral_id, new_valuation),
-        );
+        env.events()
+            .publish((symbol_short!("val_updt"),), (collateral_id, new_valuation));
 
         Ok(())
     }
@@ -326,7 +319,9 @@ impl CollateralRegistry {
         env.storage().persistent().remove(&old_owner_key);
 
         let new_owner_key = format_owner_collateral_key(&new_owner, collateral_id);
-        env.storage().persistent().set(&new_owner_key, &collateral_id);
+        env.storage()
+            .persistent()
+            .set(&new_owner_key, &collateral_id);
 
         // Record transfer
         let transfer_record = OwnershipTransfer {
@@ -343,7 +338,7 @@ impl CollateralRegistry {
 
         // Emit event
         env.events().publish(
-            (symbol_short!("collateral_transferred"),),
+            (symbol_short!("col_xfer"),),
             (collateral_id, previous_owner, new_owner),
         );
 
@@ -399,10 +394,8 @@ impl CollateralRegistry {
         env.storage().persistent().set(&lock_key, &lock_record);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("collateral_locked"),),
-            (collateral_id, escrow_id),
-        );
+        env.events()
+            .publish((symbol_short!("col_lock"),), (collateral_id, escrow_id));
 
         Ok(())
     }
@@ -441,10 +434,8 @@ impl CollateralRegistry {
         env.storage().persistent().set(&storage_key, &collateral);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("collateral_unlocked"),),
-            (collateral_id, escrow_id),
-        );
+        env.events()
+            .publish((symbol_short!("col_unlk"),), (collateral_id, escrow_id));
 
         Ok(())
     }
@@ -484,7 +475,7 @@ impl CollateralRegistry {
         }
 
         // Update verification status
-        collateral.verification_status = VerificationStatus::Verified;
+        collateral.verification_status = collateral::VerificationStatus::Verified;
         collateral.verified_by = Some(admin.clone());
         collateral.verified_at = env.ledger().timestamp();
         collateral.updated_at = env.ledger().timestamp();
@@ -506,10 +497,8 @@ impl CollateralRegistry {
             .set(&verification_key, &verification_record);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("collateral_verified"),),
-            (collateral_id, admin),
-        );
+        env.events()
+            .publish((symbol_short!("col_verf"),), (collateral_id, admin));
 
         Ok(())
     }
@@ -536,10 +525,7 @@ impl CollateralRegistry {
     ///
     /// # Returns
     /// Collateral ID if found
-    pub fn get_collateral_by_hash(
-        env: Env,
-        asset_hash: BytesN<32>,
-    ) -> Result<u64, ContractError> {
+    pub fn get_collateral_by_hash(env: Env, asset_hash: BytesN<32>) -> Result<u64, ContractError> {
         let hash_key = format_asset_hash_key(&asset_hash);
         env.storage()
             .persistent()
@@ -556,7 +542,7 @@ impl CollateralRegistry {
     /// Vector of valuation records
     pub fn get_valuation_history(
         env: Env,
-        collateral_id: u64,
+        _collateral_id: u64,
     ) -> Result<Vec<ValuationRecord>, ContractError> {
         // Note: In production, would iterate through valuation records
         Ok(Vec::new(&env))
@@ -571,7 +557,7 @@ impl CollateralRegistry {
     /// Vector of transfer records
     pub fn get_transfer_history(
         env: Env,
-        collateral_id: u64,
+        _collateral_id: u64,
     ) -> Result<Vec<OwnershipTransfer>, ContractError> {
         // Note: In production, would iterate through transfer records
         Ok(Vec::new(&env))
@@ -597,7 +583,7 @@ impl CollateralRegistry {
 
         // Get collateral
         let storage_key = format_collateral_storage_key(collateral_id);
-        let collateral: Collateral = env
+        let _collateral: Collateral = env
             .storage()
             .persistent()
             .get(&storage_key)
@@ -610,10 +596,8 @@ impl CollateralRegistry {
             .set(&classification_key, &classification);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("collateral_classified"),),
-            (collateral_id, admin),
-        );
+        env.events()
+            .publish((symbol_short!("col_class"),), (collateral_id, admin));
 
         Ok(())
     }
@@ -639,46 +623,43 @@ impl CollateralRegistry {
 
 // Helper functions
 
-fn format_collateral_storage_key(collateral_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("collateral_{}", collateral_id))
+fn format_collateral_storage_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("collat"), collateral_id)
 }
 
-fn format_asset_hash_key(asset_hash: &BytesN<32>) -> String {
-    String::from_slice(&Env::default(), &format!("hash_{:?}", asset_hash))
+fn format_asset_hash_key(asset_hash: &BytesN<32>) -> (soroban_sdk::Symbol, BytesN<32>) {
+    (symbol_short!("hash"), asset_hash.clone())
 }
 
-fn format_owner_collateral_key(owner: &Address, collateral_id: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("owner_{}_{}", owner, collateral_id),
-    )
+fn format_owner_collateral_key(
+    owner: &Address,
+    collateral_id: u64,
+) -> (soroban_sdk::Symbol, Address, u64) {
+    (symbol_short!("owner"), owner.clone(), collateral_id)
 }
 
-fn format_valuation_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("valuation_{}_{}", collateral_id, timestamp),
-    )
+fn format_valuation_history_key(
+    collateral_id: u64,
+    timestamp: u64,
+) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("val"), collateral_id, timestamp)
 }
 
-fn format_transfer_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("transfer_{}_{}", collateral_id, timestamp),
-    )
+fn format_transfer_history_key(
+    collateral_id: u64,
+    timestamp: u64,
+) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("trans"), collateral_id, timestamp)
 }
 
-fn format_lock_history_key(collateral_id: u64, timestamp: u64) -> String {
-    String::from_slice(
-        &Env::default(),
-        &format!("lock_{}_{}", collateral_id, timestamp),
-    )
+fn format_lock_history_key(collateral_id: u64, timestamp: u64) -> (soroban_sdk::Symbol, u64, u64) {
+    (symbol_short!("lock"), collateral_id, timestamp)
 }
 
-fn format_verification_history_key(collateral_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("verification_{}", collateral_id))
+fn format_verification_history_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("verif"), collateral_id)
 }
 
-fn format_classification_key(collateral_id: u64) -> String {
-    String::from_slice(&Env::default(), &format!("classification_{}", collateral_id))
+fn format_classification_key(collateral_id: u64) -> (soroban_sdk::Symbol, u64) {
+    (symbol_short!("class"), collateral_id)
 }

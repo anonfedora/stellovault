@@ -6,10 +6,10 @@ use soroban_sdk::{contracttype, Address, String};
 #[contracttype]
 #[derive(Clone)]
 pub struct PaymentTerms {
-    pub discount_rate: u32,           // basis points
-    pub early_payment_discount: u32,  // basis points
-    pub late_payment_fee: u32,        // basis points
-    pub payment_deadline: u64,        // timestamp
+    pub discount_rate: u32,          // basis points
+    pub early_payment_discount: u32, // basis points
+    pub late_payment_fee: u32,       // basis points
+    pub payment_deadline: u64,       // timestamp
 }
 
 /// Payment record

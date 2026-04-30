@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: StelloVault API
+  version: 1.0.0
+  description: |
+    REST API for the StelloVault decentralised lending protocol built on the
+    Stellar network. All endpoints are prefixed `/api/v1` unless noted.
+
+    ## Authentication
+    Protected endpoints require a JWT bearer token obtained via
+    `POST /api/v1/auth/challenge` → `POST /api/v1/auth/verify`.
+
+    ## Rate limiting
+    All endpoints are rate-limited to **60 requests / minute** per IP.
+    Exceed the limit and you receive `429 Too Many Requests`.
+  contact:
+    name: StelloVault Team
+    url: https://stellovault.io/contact
+  license:
+    name: MIT
+
+servers:
+  - url: /api
+    description: Current deployment
+  - url: https://stellovault.io/api
+    description: Production
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Wallet-based authentication (Stellar Freighter)
+  - name: Collateral
+    description: Tokenise and manage collateral assets
+  - name: Loans
+    description: Borrow against collateral
+  - name: Escrows
+    description: Escrow contract management
+  - name: Governance
+    description: On-chain governance proposals and voting
+  - name: Analytics
+    description: Protocol and user analytics
+  - name: Contact
+    description: Contact form endpoint
+
+paths:
+  /v1/auth/challenge:
+    post:
+      tags: [Auth]
+      summary: Request a sign-in challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [walletAddress]
+              properties:
+                walletAddress:
+                  type: string
+                  example: GABC123…
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/auth/verify:
+    post:
+      tags: [Auth]
+      summary: Verify wallet signature and issue JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [walletAddress, signature, challenge]
+              properties:
+                walletAddress:
+                  type: string
+                signature:
+                  type: string
+                challenge:
+                  type: string
+      responses:
+        '200':
+          description: JWT issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh an expiring JWT
+      responses:
+        '200':
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the current session
+      responses:
+        '204':
+          description: Logged out
+
+  /v1/analytics/mobile:
+    post:
+      tags: [Analytics]
+      summary: Report mobile runtime signal
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Signal received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /contact:
+    post:
+      tags: [Contact]
+      summary: Submit a contact form message
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, subject, message]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  example: Alice Chen
+                email:
+                  type: string
+                  format: email
+                  example: alice@company.com
+                subject:
+                  type: string
+                  enum: [General, Partnership, Bug Report, Oracle Registration]
+                message:
+                  type: string
+                  minLength: 10
+                  example: I'd like to learn more about oracle registration.
+      responses:
+        '200':
+          description: Message received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Validation failed

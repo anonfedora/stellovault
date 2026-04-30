@@ -1,6 +1,6 @@
 //! Repayment processing module
 
-use soroban_sdk::{contracttype, Address, String};
+use soroban_sdk::{contracttype, Address};
 
 /// Repayment record
 #[contracttype]

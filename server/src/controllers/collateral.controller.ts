@@ -34,3 +34,46 @@ export async function getCollateralByMetadata(req: Request, res: Response, next:
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 }
+
+export async function tokenizeAsset(req: Request, res: Response, next: NextFunction) {
+    try {
+        const result = await collateralService.tokenizeAsset(req.body);
+        res.status(201).json({ success: true, data: result });
+    } catch (err) { next(err); }
+}
+
+export async function updateValuation(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { newUSDValue } = req.body;
+        const result = await collateralService.updateValuation(req.params.id, Number(newUSDValue));
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+}
+
+export async function verifyCollateral(req: Request, res: Response, next: NextFunction) {
+    try {
+        const result = await collateralService.verifyCollateral(req.params.id, req.body);
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+}
+
+export async function getCollateralMetadata(req: Request, res: Response, next: NextFunction) {
+    try {
+        const result = await collateralService.getCollateralMetadata(req.params.id);
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+}
+
+export async function calculateLTV(req: Request, res: Response, next: NextFunction) {
+    try {
+        const result = await collateralService.calculateLTV(req.params.id);
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+}
+
+export async function getCollateralTypes(_req: Request, res: Response, next: NextFunction) {
+    try {
+        const result = collateralService.getCollateralTypes();
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+}

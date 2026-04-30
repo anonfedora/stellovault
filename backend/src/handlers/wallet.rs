@@ -148,3 +148,50 @@ pub async fn update_wallet(
         verified_at: wallet.verified_at,
     }))
 }
+
+
+/// GET /wallets/:id/balance - Get wallet balance and transaction history
+pub async fn get_wallet_balance(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(wallet_id): Path<Uuid>,
+) -> Result<Json<WalletBalanceResponse>, ApiError> {
+    // Get the wallet first to verify ownership
+    let wallets = state
+        .auth_service
+        .get_user_wallets(user.user_id)
+        .await
+        .map_err(|e| ApiError::InternalError(e.to_string()))?;
+
+    let wallet = wallets
+        .into_iter()
+        .find(|w| w.id == wallet_id)
+        .ok_or_else(|| ApiError::NotFound("Wallet not found".to_string()))?;
+
+    // Query Stellar Horizon for balance (simplified - would use actual Horizon API)
+    // For now, return a placeholder response
+    Ok(Json(WalletBalanceResponse {
+        wallet_address: wallet.wallet_address,
+        balance: 0, // Would be fetched from Stellar Horizon
+        last_updated: chrono::Utc::now(),
+        transactions: Vec::new(),
+    }))
+}
+
+/// Wallet balance response
+#[derive(Debug, serde::Serialize)]
+pub struct WalletBalanceResponse {
+    pub wallet_address: String,
+    pub balance: i64,
+    pub last_updated: chrono::DateTime<chrono::Utc>,
+    pub transactions: Vec<WalletTransaction>,
+}
+
+/// Wallet transaction
+#[derive(Debug, serde::Serialize)]
+pub struct WalletTransaction {
+    pub tx_hash: String,
+    pub amount: i64,
+    pub direction: String, // "in" or "out"
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}

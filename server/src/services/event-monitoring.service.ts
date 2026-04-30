@@ -614,6 +614,18 @@ export class EventMonitoringService {
         cancelUrl: event.cancelUrl ?? null,
       },
     });
+
+    await webhookService.triggerEvent("payment.received", {
+      loanId: event.loanId,
+      repaymentId: event.repaymentId,
+      paymentSessionId: event.paymentSessionId ?? null,
+      checkoutUrl: event.checkoutUrl ?? null,
+      amount: event.amount,
+      outstandingAfter: event.outstandingAfter,
+      paidAt: event.paidAt,
+      successUrl: event.successUrl ?? null,
+      cancelUrl: event.cancelUrl ?? null,
+    });
   }
 
   private async handleContractEvent(event: ContractEvent) {

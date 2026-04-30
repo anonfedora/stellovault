@@ -17,6 +17,7 @@ import confirmationRoutes from "./routes/confirmation.routes";
 import governanceRoutes from "./routes/governance.routes";
 import riskRoutes from "./routes/risk.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import webhookRoutes from "./routes/webhook.routes";
 import paymentRoutes from "./routes/payment.routes";
 import monitoringRoutes from "./routes/monitoring.routes";
 
@@ -95,6 +96,7 @@ app.use(`${api}/risk`, riskRoutes);
 app.use(`${api}/analytics`, analyticsRoutes);
 app.use(`${api}/v1/analytics`, analyticsRoutes);
 app.use(`${api}/monitoring`, monitoringRoutes);
+app.use(`${api}/v1/webhooks`, webhookRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
