@@ -30,7 +30,6 @@ export const env = {
     horizonUrl:
       process.env.HORIZON_URL || "https://horizon-testnet.stellar.org",
     rpcUrl: process.env.RPC_URL || "https://soroban-testnet.stellar.org",
-    sorobanRpcUrl: process.env.SOROBAN_RPC_URL || process.env.RPC_URL || "https://soroban-testnet.stellar.org",
     networkPassphrase:
       process.env.NETWORK_PASSPHRASE || "Test SDF Network ; September 2015",
   },
@@ -52,14 +51,4 @@ export const env = {
   webhookSignatureSecret:
     process.env.WEBHOOK_SIGNATURE_SECRET || process.env.WEBHOOK_SECRET || "",
   corsAllowedOrigins: process.env.CORS_ALLOWED_ORIGINS?.split(",") || ["*"],
-
-  slack: {
-    webhookUrl: process.env.SLACK_WEBHOOK_URL || "",
-  },
-
-  monitoring: {
-    enabled: process.env.MONITORING_ENABLED === "true",
-    pollInterval: parseInt(process.env.MONITORING_POLL_INTERVAL || "5000", 10),
-    healthCheckInterval: parseInt(process.env.MONITORING_HEALTH_CHECK_INTERVAL || "30000", 10),
-  },
 };
