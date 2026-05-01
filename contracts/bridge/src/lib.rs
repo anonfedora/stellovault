@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Bytes, Env, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, Env, Symbol, Vec};
 
 // Public error type for the bridge contract. Minimal for skeleton purposes.
 #[contracttype]
@@ -159,14 +157,14 @@ impl BridgeContract {
 
     // Validate a bridge transaction hash coming from source chain (skeleton)
     /// Validate a bridge transaction hash from the source chain (skeleton).
-    pub fn validate_bridge_transaction(env: Env, tx_hash: Bytes, source_chain: Bytes) -> bool {
+    pub fn validate_bridge_transaction(_env: Env, tx_hash: Bytes, source_chain: Bytes) -> bool {
         // Very lightweight validation placeholder
         !tx_hash.is_empty() && !source_chain.is_empty()
     }
 
     // Calculate bridge fees based on amount and number of destination chains
     /// Calculate bridge fees based on amount and destination chains (skeleton).
-    pub fn calculate_bridge_fees(env: Env, amount: i128, chains: Vec<Bytes>) -> i128 {
+    pub fn calculate_bridge_fees(_env: Env, amount: i128, chains: Vec<Bytes>) -> i128 {
         // Simple placeholder: base fee plus a small per-chain increment
         let base_fee: i128 = 100;
         let per_chain = 50i128;
