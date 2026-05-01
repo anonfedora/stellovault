@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec, Bytes};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, Bytes, Env, Symbol, Vec,
+};
 
 // Public error type for the bridge contract. Minimal for skeleton purposes.
 #[contracttype]
@@ -72,9 +74,13 @@ impl BridgeContract {
             return Err(BridgeError::AlreadyInitialized);
         }
 
-        let config = BridgeConfig { admin: admin.clone(), initialized: true };
+        let config = BridgeConfig {
+            admin: admin.clone(),
+            initialized: true,
+        };
         env.storage().instance().set(&DataKey::Config, &config);
-        env.events().publish((Symbol::new(&env, "bridge_init"),), admin);
+        env.events()
+            .publish((Symbol::new(&env, "bridge_init"),), admin);
         Ok(())
     }
 
@@ -122,7 +128,10 @@ impl BridgeContract {
             return Err(BridgeError::InvalidParams);
         }
         config.admin.require_auth();
-        env.events().publish((Symbol::new(&env, "mint_wrapped_asset"),), (original_asset, amount, recipient));
+        env.events().publish(
+            (Symbol::new(&env, "mint_wrapped_asset"),),
+            (original_asset, amount, recipient),
+        );
         Ok(())
     }
 
@@ -141,7 +150,10 @@ impl BridgeContract {
             return Err(BridgeError::InvalidParams);
         }
         config.admin.require_auth();
-        env.events().publish((Symbol::new(&env, "burn_wrapped_asset"),), (wrapped_asset, amount));
+        env.events().publish(
+            (Symbol::new(&env, "burn_wrapped_asset"),),
+            (wrapped_asset, amount),
+        );
         Ok(())
     }
 
@@ -160,7 +172,11 @@ impl BridgeContract {
         let per_chain = 50i128;
         let chain_count = chains.len() as i128;
         let fee = base_fee + (per_chain * chain_count) + (amount / 1000);
-        if fee < 0 { 0 } else { fee }
+        if fee < 0 {
+            0
+        } else {
+            fee
+        }
     }
 
     // Monitor bridge status by id (skeleton)
