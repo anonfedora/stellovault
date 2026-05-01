@@ -1,0 +1,20 @@
+[package]
+name = "bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-chain bridge contract between Stellar/Soroban and other chains"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { version = "22.0.0" }
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]
+
+# Profile settings moved to workspace manifest for workspace builds

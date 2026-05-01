@@ -2,6 +2,7 @@
 members = [
     "collateral-registry",
     "escrow-manager",
+    "bridge",
     "example",
     "governance",
     "invoice-contract",
@@ -13,3 +14,18 @@ members = [
 ]
 resolver = "2"
 exclude = ["fuzz"]
+
+# Workspace-wide release profiles that apply to all crates
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
