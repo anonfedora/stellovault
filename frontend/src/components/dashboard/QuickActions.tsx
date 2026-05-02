@@ -21,6 +21,7 @@ export interface QuickAction {
 interface QuickActionsProps {
   actions?: QuickAction[];
   onExport?: () => void;
+  onLiquidity?: () => void;
 }
 
 const DEFAULT_ACTIONS: QuickAction[] = [
@@ -53,6 +54,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
 export const QuickActions = ({
   actions = DEFAULT_ACTIONS,
   onExport,
+  onLiquidity,
 }: QuickActionsProps) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -73,6 +75,15 @@ export const QuickActions = ({
           >
             <FileDown className="h-3.5 w-3.5" />
             Export
+          </button>
+        )}
+        {onLiquidity && (
+          <button
+            type="button"
+            onClick={onLiquidity}
+            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+          >
+            Liquidity
           </button>
         )}
       </div>
