@@ -9,7 +9,6 @@ export { MetricsChart } from './dashboard/MetricsChart';
 export { NotificationCenter } from './dashboard/NotificationCenter';
 export { WidgetCustomizer } from './dashboard/WidgetCustomizer';
 export { LiquidityModal } from './dashboard/LiquidityModal';
-export { CollateralPortfolio } from './dashboard/CollateralPortfolio';
 export { LoanCard } from './loans/LoanCard';
 export { RepaymentSchedule } from './loans/RepaymentSchedule';
 export { LoanForm } from './loans/LoanForm';
