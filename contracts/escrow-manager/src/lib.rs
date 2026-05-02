@@ -23,6 +23,7 @@ pub enum EscrowStatus {
     Released = 1,
     Refunded = 2,
     Disputed = 3,
+    Initialized = 4,
 }
 
 #[contracttype]
@@ -44,6 +45,9 @@ pub enum ContractError {
     EscrowNotDisputed = 14,
     InsufficientBalance = 15,
     NoPendingAdmin = 16,
+    InvalidStatus = 17,
+    InvalidReleaseCode = 18,
+    AlreadyFunded = 19,
 }
 
 impl From<soroban_sdk::Error> for ContractError {
@@ -74,6 +78,7 @@ pub struct EscrowConfig {
     pub min_destination_amount: i128,
     pub required_confirmations: u32,
     pub oracle_set: Vec<Address>,
+    pub release_code_hash: Option<BytesN<32>>,
 }
 
 /// Escrow data structure linking buyer, seller, lender, collateral and oracle.
@@ -100,6 +105,8 @@ pub struct Escrow {
     pub required_confirmations: u32,
     /// Set of authorized oracles for consensus (empty means any registered oracle can confirm)
     pub oracle_set: Vec<Address>,
+    pub funded_amount: i128,
+    pub release_code_hash: Option<BytesN<32>>,
     pub disputed_at: Option<u64>,
     pub disputed_by: Option<Address>,
     pub dispute_reason: Option<Bytes>,
@@ -294,23 +301,8 @@ impl EscrowManager {
             }
         }
 
-        // Lock collateral via CollateralRegistry
-        let coll_reg: Address = env
-            .storage()
-            .instance()
-            .get(&symbol_short!("coll_reg"))
-            .ok_or(ContractError::Unauthorized)?;
-
         let lock_args: Vec<Val> = Vec::from_array(&env, [config.collateral_id.into_val(&env)]);
         env.invoke_contract::<Val>(&coll_reg, &Symbol::new(&env, "lock_collateral"), lock_args);
-
-        // Transfer funds from lender to this contract
-        let token_client = token::Client::new(&env, &config.asset);
-        token_client.transfer(
-            &config.lender,
-            &env.current_contract_address(),
-            &config.amount,
-        );
 
         let escrow_id: u64 = env
             .storage()
@@ -327,13 +319,15 @@ impl EscrowManager {
             amount: config.amount,
             asset: config.asset,
             required_confirmation: config.required_confirmation,
-            status: EscrowStatus::Active,
+            status: EscrowStatus::Initialized,
             expiry_ts: config.expiry_ts,
             created_at: env.ledger().timestamp(),
             destination_asset: config.destination_asset,
             min_destination_amount: config.min_destination_amount,
             required_confirmations: config.required_confirmations,
             oracle_set: config.oracle_set,
+            funded_amount: 0,
+            release_code_hash: config.release_code_hash,
             disputed_at: None,
             disputed_by: None,
             dispute_reason: None,
@@ -366,6 +360,192 @@ impl EscrowManager {
         );
 
         Ok(escrow_id)
+    }
+
+    /// Fund an initialized escrow.
+    pub fn fund_escrow(env: Env, escrow_id: u64, amount: i128) -> Result<(), ContractError> {
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        if escrow.status != EscrowStatus::Initialized {
+            return Err(ContractError::AlreadyFunded);
+        }
+
+        if amount < escrow.amount {
+            return Err(ContractError::InvalidAmount);
+        }
+
+        escrow.lender.require_auth();
+
+        // Transfer funds from lender to this contract
+        let token_client = token::Client::new(&env, &escrow.asset);
+        token_client.transfer(
+            &escrow.lender,
+            &env.current_contract_address(),
+            &amount,
+        );
+
+        escrow.funded_amount = amount;
+        escrow.status = EscrowStatus::Active;
+
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        env.events().publish(
+            (symbol_short!("esc_fndd"),),
+            (escrow_id, amount),
+        );
+
+        Ok(())
+    }
+
+    /// Release escrow funds with a release code (if configured).
+    pub fn release_escrow(
+        env: Env,
+        escrow_id: u64,
+        release_code: Option<Bytes>,
+    ) -> Result<(), ContractError> {
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        if escrow.status != EscrowStatus::Active {
+            return Err(ContractError::EscrowNotActive);
+        }
+
+        // Validate release code if configured
+        if let Some(hash) = &escrow.release_code_hash {
+            if let Some(code) = release_code {
+                if env.crypto().keccak256(&code) != *hash {
+                    return Err(ContractError::InvalidReleaseCode);
+                }
+            } else {
+                return Err(ContractError::InvalidReleaseCode);
+            }
+        } else {
+            // If no release code is configured, only the buyer or an oracle can release
+            // In this specific function, we assume it's a manual release by buyer
+            escrow.buyer.require_auth();
+        }
+
+        Self::execute_release_payout(&env, escrow_id, &escrow)?;
+        Self::collect_protocol_fee(&env, escrow_id, &escrow);
+        Self::unlock_collateral(&env, escrow.collateral_id)?;
+
+        escrow.status = EscrowStatus::Released;
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        env.events()
+            .publish((symbol_short!("esc_rel"),), (escrow_id,));
+
+        Ok(())
+    }
+
+    /// Add an authorized oracle to an escrow.
+    pub fn add_oracle(env: Env, escrow_id: u64, oracle_address: Address) -> Result<(), ContractError> {
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        // Only buyer or admin can add oracles
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("admin"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        if env.has_auth() {
+            admin.require_auth();
+        } else {
+            escrow.buyer.require_auth();
+        }
+
+        // Check if oracle already exists
+        for existing in escrow.oracle_set.iter() {
+            if existing == oracle_address {
+                return Ok(()); // Already added
+            }
+        }
+
+        escrow.oracle_set.push_back(oracle_address);
+        env.storage().persistent().set(&escrow_id, &escrow);
+
+        env.events().publish(
+            (symbol_short!("orc_add"),),
+            (escrow_id, oracle_address),
+        );
+
+        Ok(())
+    }
+
+    /// Oracle confirmation of a condition.
+    ///
+    /// This function is called by authorized oracles to submit confirmation data
+    /// and a signature. It forwards the verification to the OracleAdapter and
+    /// triggers an auto-release check.
+    pub fn confirm_condition(
+        env: Env,
+        escrow_id: u64,
+        oracle_id: Address,
+        confirmation_data: Bytes,
+        signature: Bytes,
+    ) -> Result<(), ContractError> {
+        oracle_id.require_auth();
+
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&escrow_id)
+            .ok_or(ContractError::EscrowNotFound)?;
+
+        // Verify oracle is in the authorized set
+        let mut authorized = false;
+        for oracle in escrow.oracle_set.iter() {
+            if oracle == oracle_id {
+                authorized = true;
+                break;
+            }
+        }
+
+        if !authorized && !escrow.oracle_set.is_empty() {
+            return Err(ContractError::Unauthorized);
+        }
+
+        // Record confirmation in OracleAdapter (via cross-contract call)
+        let oracle_adapter: Address = env
+            .storage()
+            .instance()
+            .get(&symbol_short!("oracle"))
+            .ok_or(ContractError::Unauthorized)?;
+
+        let escrow_id_bytes = Bytes::from_slice(&env, &escrow_id.to_be_bytes());
+        let confirm_args: Vec<Val> = Vec::from_array(
+            &env,
+            [
+                oracle_id.into_val(&env),
+                escrow_id_bytes.into_val(&env),
+                escrow.required_confirmation.into_val(&env),
+                confirmation_data.into_val(&env),
+                signature.into_val(&env),
+            ],
+        );
+
+        env.invoke_contract::<Val>(
+            &oracle_adapter,
+            &Symbol::new(&env, "confirm_event"),
+            confirm_args,
+        );
+
+        // Check if consensus is met and auto-release if so
+        let _ = Self::release_funds_on_confirmation(env, escrow_id);
+
+        Ok(())
     }
 
     pub fn raise_dispute(
@@ -1025,7 +1205,7 @@ mod test {
 
     fn create_test_escrow(t: &TestEnv) -> u64 {
         let expiry = t.env.ledger().timestamp() + 3600;
-        t.escrow_client.create_escrow(&EscrowConfig {
+        let id = t.escrow_client.create_escrow(&EscrowConfig {
             buyer: t.buyer.clone(),
             seller: t.seller.clone(),
             lender: t.lender.clone(),
@@ -1038,7 +1218,10 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
-        })
+            release_code_hash: None,
+        });
+        t.escrow_client.fund_escrow(&id, &5000i128);
+        id
     }
 
     fn set_oracle_confirmation(t: &TestEnv, escrow_id: u64, event_type: u32, verified: bool) {
@@ -1159,6 +1342,7 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
+            release_code_hash: None,
         });
     }
 
@@ -1470,7 +1654,9 @@ mod test {
             min_destination_amount: 4500i128,
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
+            release_code_hash: None,
         });
+        t.escrow_client.fund_escrow(&escrow_id, &5000i128);
 
         // Set exchange rate: 0.95
         t.escrow_client.set_test_exchange_rate(&950_000i128);
@@ -1505,6 +1691,52 @@ mod test {
     fn test_get_escrow_not_found() {
         let t = setup();
         assert!(t.escrow_client.get_escrow(&999u64).is_none());
+    }
+
+    #[test]
+    fn test_get_merchant_escrows() {
+        let t = setup();
+
+        // Create multiple escrows with the same seller
+        let escrow_id1 = create_test_escrow(&t);
+        let escrow_id2 = create_test_escrow(&t);
+
+        // Create an escrow with a different seller
+        let different_seller = Address::generate(&t.env);
+        let expiry = t.env.ledger().timestamp() + 3600;
+        let escrow_id3 = t.escrow_client.create_escrow(&EscrowConfig {
+            buyer: t.buyer.clone(),
+            seller: different_seller.clone(),
+            lender: t.lender.clone(),
+            collateral_id: 1u64,
+            amount: 5000i128,
+            asset: t.token_addr.clone(),
+            required_confirmation: 2u32,
+            expiry_ts: expiry,
+            destination_asset: t.token_addr.clone(),
+            min_destination_amount: 5000i128,
+            required_confirmations: 0u32,
+            oracle_set: Vec::new(&t.env),
+            release_code_hash: None,
+        });
+        t.escrow_client.fund_escrow(&escrow_id3, &5000i128);
+
+        // Query escrows for the original seller
+        let seller_escrows = t.escrow_client.get_merchant_escrows(&t.seller);
+        assert_eq!(seller_escrows.len(), 2);
+        assert!(seller_escrows.iter().any(|id| id == escrow_id1));
+        assert!(seller_escrows.iter().any(|id| id == escrow_id2));
+        assert!(!seller_escrows.iter().any(|id| id == escrow_id3));
+
+        // Query escrows for the different seller
+        let different_seller_escrows = t.escrow_client.get_merchant_escrows(&different_seller);
+        assert_eq!(different_seller_escrows.len(), 1);
+        assert_eq!(different_seller_escrows.get(0).unwrap(), escrow_id3);
+
+        // Query escrows for an address with no escrows
+        let no_escrows_address = Address::generate(&t.env);
+        let no_escrows = t.escrow_client.get_merchant_escrows(&no_escrows_address);
+        assert_eq!(no_escrows.len(), 0);
     }
 
     #[test]
@@ -1556,7 +1788,9 @@ mod test {
             min_destination_amount: 4500i128,
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
+            release_code_hash: None,
         });
+        t.escrow_client.fund_escrow(&escrow_id, &5000i128);
 
         // Set exchange rate: 0.95 (5% slippage) → dest_amount = 4750 ≥ min 4500
         t.escrow_client.set_test_exchange_rate(&950_000i128);
@@ -1640,7 +1874,9 @@ mod test {
             min_destination_amount: 4500i128,
             required_confirmations: 0u32,
             oracle_set: Vec::new(&t.env),
+            release_code_hash: None,
         });
+        t.escrow_client.fund_escrow(&escrow_id, &5000i128);
 
         let escrow = t.escrow_client.get_escrow(&escrow_id).unwrap();
         assert_eq!(escrow.destination_asset, dest_token_addr);
@@ -1657,8 +1893,7 @@ mod test {
     }
 
     fn create_multi_oracle_escrow(t: &TestEnv, threshold: u32, oracle_set: Vec<Address>) -> u64 {
-        let expiry = t.env.ledger().timestamp() + 3600;
-        t.escrow_client.create_escrow(&EscrowConfig {
+        let id = t.escrow_client.create_escrow(&EscrowConfig {
             buyer: t.buyer.clone(),
             seller: t.seller.clone(),
             lender: t.lender.clone(),
@@ -1671,7 +1906,10 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: threshold,
             oracle_set,
-        })
+            release_code_hash: None,
+        });
+        t.escrow_client.fund_escrow(&id, &5000i128);
+        id
     }
 
     fn set_multi_oracle_confirmations(
@@ -1783,6 +2021,7 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 2u32, // > 0 requires oracle_set
             oracle_set: Vec::new(&t.env), // Empty - should fail
+            release_code_hash: None,
         });
     }
 
@@ -1809,6 +2048,7 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 3u32, // > oracle_set.len()
             oracle_set,
+            release_code_hash: None,
         });
     }
 
@@ -1834,6 +2074,7 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 2u32,
             oracle_set, // Contains duplicate
+            release_code_hash: None,
         });
     }
 
@@ -1898,7 +2139,9 @@ mod test {
             min_destination_amount: 5000i128,
             required_confirmations: 0u32, // Single oracle mode
             oracle_set: Vec::new(&t.env), // Ignored in single oracle mode
+            release_code_hash: None,
         });
+        t.escrow_client.fund_escrow(&escrow_id, &5000i128);
 
         // Set single oracle confirmation using the old method
         set_oracle_confirmation(&t, escrow_id, 2, true);
