@@ -4,9 +4,19 @@ import { TransactionStatusProvider } from "@/contexts/TransactionStatusProvider"
 import { LanguageProvider } from '@/components/i18n/LanguageProvider';
 import { Toaster } from "sonner";
 import { TransactionHistoryDrawer } from "@/components/transactions/TransactionHistoryDrawer";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { MobileRuntimeSignals } from "@/components/layout/MobileRuntimeSignals";
-import "./globals.css";
+import { AppProviders } from "@/components/providers/AppProviders";
+import { PerformanceMonitor } from "@/components/PerformanceMonitor";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: {
@@ -44,23 +54,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <LanguageProvider initialLocale="en">
+      <head>
+        <link rel="preload" href="/favicon.ico" as="image" />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <TransactionStatusProvider>
           <AppProviders>
-            <TransactionStatusProvider>
-              {children}
-              <Toaster 
-                position="top-right"
-                expand={false}
-                richColors
-                closeButton
-                duration={5000}
-                visibleToasts={3}
-              />
-              <TransactionHistoryDrawer />
-              <MobileBottomNav />
-              <MobileRuntimeSignals />
-            </TransactionStatusProvider>
+            <PerformanceMonitor />
+            <ServiceWorkerRegistration />
+            {children}
           </AppProviders>
         </LanguageProvider>
       </body>

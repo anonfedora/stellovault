@@ -65,7 +65,13 @@ function shortenHash(hash: string): string {
 // Transaction item component
 function TransactionItem({ transaction }: { transaction: Transaction }) {
   return (
-    <div className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+    <div 
+      className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+      style={{ 
+        contentVisibility: 'auto', 
+        containIntrinsicSize: '0 80px' // Estimate height of one item
+      } as React.CSSProperties}
+    >
       <div className="flex items-start gap-3">
         <StatusIcon status={transaction.status} />
         
